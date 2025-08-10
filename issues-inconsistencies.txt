@@ -1,0 +1,300 @@
+Betanet Linter: Errors, Inconsistencies & Improvement Backlog
+============================================================
+Format: [ ] ISSUE-ID | Category | Title  (mark fixed with [x] or [✓])
+Description
+Impact
+Proposed Fix / Action
+
+Legend Categories: ARCH (Architecture), PERF (Performance), HEUR (Heuristics), API, SBOM, TEST, CODE, PLATFORM, ERROR, SEC, UX, EDGE, DOC
+
+ARCHITECTURE / DESIGN
+---------------------
+[X] ISSUE-001 | ARCH | Duplicate compliance engines
+Two separate implementations: BetanetComplianceChecker (src/index.ts) and ComplianceChecker (src/compliance.ts) with diverging logic, severities, wording.
+Impact: Confusion, inconsistent results, maintenance burden.
+Action: Choose one canonical implementation; remove or deprecate the other. Prefer a single analyzer pass model.
+
+[X] ISSUE-002 | ARCH | Duplicate SBOM logic
+SBOM generation exists in both BetanetComplianceChecker (index.ts) and SBOMGenerator (sbom.ts) with differing formats and field richness.
+Impact: Divergent output, duplicated maintenance.
+Action: Centralize SBOM logic into one module (e.g., src/sbom/) and expose consistent API.
+
+[X] ISSUE-003 | ARCH | Analyzer encapsulation leak
+Code accesses private/internal state via checker.analyzer['binaryPath'] and similar patterns.
+Impact: Breaks encapsulation; refactors risky.
+Action: Add public getter(s); remove bracket access.
+
+PERFORMANCE
+-----------
+[X] ISSUE-004 | PERF | Repeated full analysis
+Each capability helper calls analyze(), re-running expensive external commands for every compliance check.
+Impact: O(N_checks * extraction cost) slowdown.
+Action: Memoize analyze() result inside BinaryAnalyzer; reuse.
+
+[X] ISSUE-005 | PERF | Sequential capability checks
+Checks run serially though many depend only on static analysis.
+Impact: Increased runtime latency.
+Action: After memoization, compute capability helpers in parallel (Promise.all) or derive from cached analysis.
+
+HEURISTICS / ACCURACY
+---------------------
+[X] ISSUE-006 | HEUR | Kyber detection too broad
+hasKyber768 triggers on substring '768' alone.
+Impact: High false positives.
+Action: Require 'kyber' AND maybe '768' or stricter regex /\bkyber(768)?\b/.
+
+[X] ISSUE-007 | HEUR | Port 443 detection naive
+Searches any '443' substring (could be version numbers, etc.).
+Impact: False positives.
+Action: Use regex for network patterns (":443", "443/tcp") or context tokens.
+
+[X] ISSUE-008 | HEUR | QUIC / TLS / ECH detection simplistic
+Simple substring presence; may misclassify libraries vs actual protocol support.
+Impact: False positives.
+Action: Combine multiple indicators (symbols + ALPN strings + version markers) with scoring threshold.
+
+[X] ISSUE-009 | HEUR | SCION path management inference weak
+Looks for generic 'path' + 'maintenance' or 'disjoint'.
+Impact: False positives.
+Action: Define more specific token set; require at least one SCION-specific indicator.
+
+[X] ISSUE-010 | HEUR | DHT deterministic bootstrap detection
+Just 'deterministic' + 'bootstrap'; may match comments or unrelated text.
+Impact: Low signal quality.
+Action: Expand to pattern list ("seed", "hash", configuration markers) or allow user-supplied hints.
+
+[X] ISSUE-011 | HEUR | Build provenance detection
+'SLSA' OR 'provenance' triggers; 'reproducible' OR 'deterministic'.
+Impact: Overstates compliance.
+Action: Require combination and maybe structured metadata file detection.
+
+[X] ISSUE-012 | HEUR | Payment support inference broad
+'ln' substring may match unrelated tokens.
+Impact: False positives.
+Action: Prefer 'lnpay', 'lightning', 'lnnode', 'lnurl', 'bolt' patterns.
+
+API / LOGIC INCONSISTENCIES
+---------------------------
+[X] ISSUE-013 | API | Severity differences between implementations
+Same checks have different severities across index.ts vs compliance.ts.
+Impact: Inconsistent pass/fail weighting.
+Action: Normalize severity map centrally.
+
+[X] ISSUE-014 | API | Check naming differences
+"DHT Seed Bootstrap" vs "DHT Bootstrap"; etc.
+Impact: User confusion.
+Action: Standardize names list constant.
+
+[X] ISSUE-015 | API | Potential division by zero
+If include filter selects zero checks, overallScore = (0/0) => NaN.
+Impact: Output invalid / crash risk downstream.
+Action: Guard: if total == 0 set score=0 and passed=false with message.
+
+[X] ISSUE-016 | API | Post-quantum date logic timezone ambiguity
+Using Date('2027-01-01') without timezone normalization.
+Impact: Boundary off-by-one in some locales.
+Action: Compare in UTC; use Date.UTC.
+
+SBOM ISSUES
+-----------
+[X] ISSUE-017 | SBOM | SPDX output simplistic / non-compliant
+index.ts uses ad-hoc tag-value; relationships assume at least one component; duplicates possible.
+Impact: Tooling ingestion problems.
+Action: Use SPDX tools or produce valid 2.3 JSON/YAML with required fields; validate.
+
+[X] ISSUE-018 | SBOM | Missing component hashes
+No SHA-256 or other integrity data.
+Impact: Limited supply chain value.
+Action: Compute hashes of binary and dependencies.
+
+[X] ISSUE-019 | SBOM | License detection naive
+Hardcoded crypto component licenses, others 'unknown'.
+Impact: Incomplete compliance data.
+Action: Attempt simple license string scanning; allow override.
+
+[X] ISSUE-020 | SBOM | Duplicate component extraction patterns
+Two paths produce diverging component sets.
+Impact: Inconsistent outputs.
+Action: Consolidate extraction logic.
+
+[X] ISSUE-021 | SBOM | Version inference weak
+Regex may capture false positives; unbounded scanning duplicates.
+Impact: Noise in SBOM.
+Action: Debounce matches; require plausible semantic version context.
+
+TESTING
+-------
+[X] ISSUE-022 | TEST | Analyzer mocking via property getter misuse
+jest.spyOn(checker as any, 'analyzer', 'get') on a plain field (no getter) may not function as intended.
+Impact: Tests might not actually stub analyzer.
+Action: Refactor BetanetComplianceChecker to accept analyzer dependency injection.
+
+[X] ISSUE-023 | TEST | Missing coverage for compliance.ts & sbom.ts
+Alternate implementations untested.
+Impact: Dead or diverging code unnoticed.
+Action: Add targeted tests or remove unused code.
+
+[X] ISSUE-024 | TEST | No negative / false-positive tests
+All tests check presence counts only.
+Impact: Heuristic regressions undetected.
+Action: Add fixtures with misleading strings to ensure not matched.
+
+[X] ISSUE-025 | TEST | Lacks performance regression tests
+No measurement of extraction count.
+Impact: Silent slowdown risk.
+Action: Add test counting analyze() invocations after memoization.
+
+CODE QUALITY / CLEANUP
+----------------------
+[X] ISSUE-026 | CODE | Unused imports in analyzer.ts
+Imports of types not referenced.
+Impact: Minor clutter.
+Action: Remove unused imports; enable lint rule.
+
+[X] ISSUE-027 | CODE | Repeated 'Missing:' message assembly
+Pattern duplicated across checks.
+Impact: Boilerplate, harder to adjust formatting.
+Action: Utility helper for assembling missing features list.
+
+[X] ISSUE-028 | CODE | Magic numbers / strings
+Minimum string length 4; severity tokens; date string.
+Impact: Reduced clarity.
+Action: Extract constants.
+
+[X] ISSUE-029 | CODE | Post-quantum mandatory date hardcoded
+No configuration layer.
+Impact: Hard to test or update.
+Action: Expose via env var / CLI flag.
+
+[X] ISSUE-030 | CODE | Long method length (index.ts checkCompliance)
+Could separate filtering logic & aggregation.
+Impact: Readability.
+Action: Extract smaller functions.
+
+PLATFORM / PORTABILITY
+----------------------
+[X] ISSUE-031 | PLATFORM | Reliance on Unix toolchain
+strings,file,nm,objdump,ldd,uname may not exist on native Windows.
+Impact: Limited portability; degraded analysis.
+Action: Detect OS, use alternative (e.g., dumpbin on Windows) or require WSL; aggregate warnings.
+
+[X] ISSUE-032 | PLATFORM | No graceful partial capability reporting
+Failures silently return empty arrays.
+Impact: User unaware of reduced analysis fidelity.
+Action: Collect diagnostics and show in report footer.
+
+ERROR HANDLING / ROBUSTNESS
+---------------------------
+[X] ISSUE-033 | ERROR | No binary existence pre-check
+Errors arise deep in extraction.
+Impact: Less friendly error messaging.
+Action: fs.pathExists check upfront with clear message.
+
+[X] ISSUE-034 | ERROR | No timeout on external commands
+Execa calls may hang.
+Impact: CLI stalls.
+Action: Add timeout & fallback path.
+
+[X] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
+Critical missing tool warnings suppressed by default.
+Impact: Users misinterpret results.
+Action: Always warn once (concise); verbose yields detail.
+
+[X] ISSUE-036 | ERROR | Missing try/catch around entire check loop
+Individual check exceptions would abort entire run.
+Impact: Partial results lost.
+Action: Wrap per-check with error capture; mark check failed with diagnostic.
+
+SECURITY / TRUST
+----------------
+[X] ISSUE-037 | SEC | Unvalidated dependency path strings in SBOM
+Names derived via path.basename without sanitization.
+Impact: Potential formatting injection in reports.
+Action: Sanitize component names (allow alphanum + -._ ).
+
+[X] ISSUE-038 | SEC | Large binary full read for fallback strings
+Reads entire file into memory; potential memory exhaustion.
+Impact: DoS risk on huge binaries.
+Action: Stream parse in chunks with size limit guard.
+
+[X] ISSUE-039 | SEC | No hash computation for integrity
+SBOM lacks integrity proofs.
+Impact: Cannot verify tampering.
+Action: Compute SHA-256 of binary + dependencies.
+
+UX / CLI
+--------
+[X] ISSUE-040 | UX | Filters only on 'validate' command
+'check' lacks --checks / --exclude parity.
+Impact: Inconsistent UX.
+Action: Add same options to 'check'.
+
+[X] ISSUE-041 | UX | Severity threshold not configurable
+All failures equal except severity icon; cannot ignore minor.
+Impact: Limited customization.
+Action: Add --fail-on <critical|major|minor>.
+
+[X] ISSUE-042 | UX | SBOM generation flag naming
+--sbom + --sbom-format vs separate 'sbom' command; redundancy.
+Impact: User confusion.
+Action: Keep both but unify naming (--sbom-format -> --format for check).
+
+[X] ISSUE-043 | UX | Report lacks tool versions & analysis diagnostics
+No section showing which external tools succeeded / failed.
+Impact: Hard to trust results.
+Action: Add diagnostics summary table.
+
+EDGE CASES
+----------
+[X] ISSUE-044 | EDGE | Zero components SBOM relationships
+Relationship lines assume at least one component.
+Impact: Invalid SPDX output when none.
+Action: Conditionally emit relationships.
+
+[X] ISSUE-045 | EDGE | Duplicate components not deduped in index.ts SBOM
+No duplicate filtering there (only in sbom.ts).
+Impact: Bloated SBOM.
+Action: Add dedupe pass.
+
+[X] ISSUE-046 | EDGE | Large number of components performance
+Mapping and building XML without streaming.
+Impact: Memory spike.
+Action: Stream or chunk if components > threshold.
+
+[X] ISSUE-047 | EDGE | Unicode strings handling
+Fallback extraction only treats bytes 32-126 ASCII.
+Impact: Misses UTF-8 indicators.
+Action: Improve parsing to decode UTF-8 sequences.
+
+DOCUMENTATION
+-------------
+[X] ISSUE-048 | DOC | README omits alternate ComplianceChecker
+User unaware of second implementation.
+Impact: Confusion for contributors.
+Action: Remove or document status of file.
+
+[X] ISSUE-049 | DOC | Missing explanation of heuristic nature
+Spec suggests "validates" but actually heuristics.
+Impact: Overstated confidence.
+Action: Add disclaimer & guidance.
+
+[X] ISSUE-050 | DOC | No contribution guidelines for adding new checks
+Process unclear.
+Impact: Inconsistent future additions.
+Action: Add CONTRIBUTING section: pattern, naming, severity criteria.
+
+PRIORITIZATION SUGGESTION (High → Low)
+--------------------------------------
+High: ISSUE-001, 004, 006, 013, 015, 017, 031, 033, 034
+Medium: 002, 007, 018, 022, 036, 037, 038, 040, 041
+Low: Remaining items.
+
+NEXT ACTION STARTER SET
+-----------------------
+1) Implement analyze() memoization (ISSUE-004) + add unit test (ISSUE-025).
+2) Introduce Diagnostics object capturing tool availability (ISSUE-031, 032) and display in report (ISSUE-043).
+3) Harden heuristics for Kyber/port (ISSUE-006, 007, 008) with regex.
+4) Guard division by zero (ISSUE-015).
+5) Select & deprecate duplicate compliance engine (ISSUE-001, 013, 014).
+
+End of backlog.
