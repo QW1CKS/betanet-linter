@@ -1,0 +1,48 @@
+# Example workflow using the reusable Betanet compliance check
+name: Example Betanet Compliance Check
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Build your binary first
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up build environment
+      run: |
+        # Add your build commands here
+        echo "Building application..."
+        
+    - name: Build binary
+      run: |
+        # Example: build your Go application
+        # go build -o betanet-app ./cmd/main.go
+        
+        # For demonstration, create a dummy binary
+        echo '#!/bin/bash' > betanet-app
+        echo 'echo "Betanet application"' >> betanet-app
+        chmod +x betanet-app
+        
+    - name: Upload binary
+      uses: actions/upload-artifact@v3
+      with:
+        name: betanet-binary
+        path: betanet-app
+        retention-days: 1
+
+  # Run compliance check
+  compliance:
+    needs: build
+    uses: ./.github/workflows/reusable-compliance.yml
+    with:
+      binary-path: 'betanet-app'
+      generate-sbom: true
+      output-format: 'json'
+      fail-on-error: true
+    secrets: inherit

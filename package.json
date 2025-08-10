@@ -1,0 +1,54 @@
+{
+  "name": "betanet-compliance-linter",
+  "version": "1.0.0",
+  "description": "CLI tool for checking Betanet specification compliance",
+  "main": "dist/index.js",
+  "bin": {
+    "betanet-lint": "bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "betanet",
+    "compliance",
+    "linter",
+    "cli",
+    "specification"
+  ],
+  "author": "QW1CKS",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^11.0.0",
+    "chalk": "^4.1.2",
+    "table": "^6.8.1",
+    "xml2js": "^0.6.2",
+    "js-yaml": "^4.1.0",
+    "fs-extra": "^11.1.1",
+    "temp-write": "^4.0.0",
+    "execa": "^5.1.1",
+    "which": "^3.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.0",
+    "@types/js-yaml": "^4.0.5",
+    "@types/xml2js": "^0.4.11",
+    "@types/fs-extra": "^11.0.1",
+    "@types/which": "^3.0.0",
+    "typescript": "^5.1.6",
+    "ts-node": "^10.9.1",
+    "@typescript-eslint/eslint-plugin": "^6.4.0",
+    "@typescript-eslint/parser": "^6.4.0",
+    "eslint": "^8.47.0",
+    "jest": "^29.6.2",
+    "@types/jest": "^29.5.4"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

@@ -1,0 +1,170 @@
+name: Betanet Compliance Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run compliance checks daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  betanet-compliance:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install Betanet Compliance Linter
+      run: |
+        npm install -g betanet-compliance-linter
+        
+    - name: Find binary files
+      id: find-binaries
+      run: |
+        # Find executable binaries in the repository
+        binaries=$(find . -type f -executable -not -path "./node_modules/*" -not -path "./.git/*" | head -10)
+        echo "binaries<<EOF" >> $GITHUB_OUTPUT
+        echo "$binaries" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+        
+    - name: Run Compliance Checks
+      id: compliance
+      run: |
+        # Create results directory
+        mkdir -p compliance-results
+        
+        # Run compliance check on each binary
+        binaries="${{ steps.find-binaries.outputs.binaries }}"
+        overall_passed=true
+        
+        while IFS= read -r binary; do
+          if [ -n "$binary" ] && [ -f "$binary" ]; then
+            echo "Checking compliance for: $binary"
+            
+            # Run compliance check
+            if betanet-lint check "$binary" --output json --sbom > "compliance-results/$(basename "$binary").json" 2>&1; then
+              echo "✅ $binary: PASSED"
+            else
+              echo "❌ $binary: FAILED"
+              overall_passed=false
+            fi
+            
+            # Generate SBOM
+            betanet-lint sbom "$binary" --format cyclonedx --output "compliance-results/$(basename "$binary")-sbom.xml"
+          fi
+        done <<< "$binaries"
+        
+        # Set overall status
+        if [ "$overall_passed" = true ]; then
+          echo "status=passed" >> $GITHUB_OUTPUT
+        else
+          echo "status=failed" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload Compliance Results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: compliance-results-${{ github.run_number }}
+        path: compliance-results/
+        retention-days: 30
+        
+    - name: Generate Compliance Report
+      run: |
+        # Create summary report
+        echo "# Betanet Compliance Report" > compliance-summary.md
+        echo "Generated on: $(date -u)" >> compliance-summary.md
+        echo "" >> compliance-summary.md
+        
+        echo "## Overall Status: ${{ steps.compliance.outputs.status }}" >> compliance-summary.md
+        echo "" >> compliance-summary.md
+        
+        echo "## Binary Files Checked" >> compliance-summary.md
+        binaries="${{ steps.find-binaries.outputs.binaries }}"
+        while IFS= read -r binary; do
+          if [ -n "$binary" ] && [ -f "$binary" ]; then
+            basename_binary=$(basename "$binary")
+            if [ -f "compliance-results/$basename_binary.json" ]; then
+              # Extract score from JSON
+              score=$(jq '.overallScore' "compliance-results/$basename_binary.json")
+              passed=$(jq '.passed' "compliance-results/$basename_binary.json")
+              status_icon=$([ "$passed" = "true" ] && echo "✅" || echo "❌")
+              echo "- $status_icon \`$basename_binary\` (Score: $score%)" >> compliance-summary.md
+            fi
+          fi
+        done <<< "$binaries"
+        
+        echo "" >> compliance-summary.md
+        echo "## Detailed Results" >> compliance-summary.md
+        echo "Detailed compliance results and SBOMs are available in the uploaded artifacts." >> compliance-summary.md
+        
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // Read compliance summary
+          const summaryPath = path.join(process.cwd(), 'compliance-summary.md');
+          let comment = '';
+          
+          if (fs.existsSync(summaryPath)) {
+            comment = fs.readFileSync(summaryPath, 'utf8');
+          } else {
+            comment = '## Betanet Compliance Check\n\nUnable to generate compliance report.';
+          }
+          
+          // Add artifact link
+          comment += '\n\n---\n📋 [View Detailed Results](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})';
+          
+          // Find existing comment
+          const { data: comments } = await github.rest.issues.listComments({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo
+          });
+          
+          const botComment = comments.find(c => 
+            c.user.login === 'github-actions[bot]' && 
+            c.body.includes('Betanet Compliance Check')
+          );
+          
+          if (botComment) {
+            // Update existing comment
+            await github.rest.issues.updateComment({
+              comment_id: botComment.id,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          } else {
+            // Create new comment
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+          
+    - name: Set Compliance Status
+      if: steps.compliance.outputs.status == 'failed'
+      run: |
+        echo "::warning::Betanet compliance check failed. Please review the compliance results."
+        exit 1
+        
+    - name: Success Notification
+      if: steps.compliance.outputs.status == 'passed'
+      run: |
+        echo "::notice::All Betanet compliance checks passed! 🎉"

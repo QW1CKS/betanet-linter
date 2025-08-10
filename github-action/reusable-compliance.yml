@@ -1,0 +1,177 @@
+name: Betanet Compliance Check (Reusable)
+
+on:
+  workflow_call:
+    inputs:
+      binary-path:
+        description: 'Path to the binary to check'
+        required: true
+        type: string
+      generate-sbom:
+        description: 'Generate SBOM files'
+        required: false
+        type: boolean
+        default: true
+      output-format:
+        description: 'Output format for results'
+        required: false
+        type: string
+        default: 'json'
+        options: ['json', 'table', 'console']
+      fail-on-error:
+        description: 'Fail the workflow if compliance check fails'
+        required: false
+        type: boolean
+        default: true
+  workflow_dispatch:
+    inputs:
+      binary-path:
+        description: 'Path to the binary to check'
+        required: true
+        type: string
+      generate-sbom:
+        description: 'Generate SBOM files'
+        required: false
+        type: boolean
+        default: true
+      output-format:
+        description: 'Output format for results'
+        required: false
+        type: string
+        default: 'json'
+        options: ['json', 'table', 'console']
+      fail-on-error:
+        description: 'Fail the workflow if compliance check fails'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  betanet-compliance:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install Betanet Compliance Linter
+      run: |
+        npm install -g betanet-compliance-linter
+        
+    - name: Verify binary exists
+      id: verify-binary
+      run: |
+        BINARY_PATH="${{ inputs.binary-path || github.event.inputs.binary-path }}"
+        if [ -f "$BINARY_PATH" ]; then
+          echo "Binary found: $BINARY_PATH"
+          echo "binary_exists=true" >> $GITHUB_OUTPUT
+          echo "binary_path=$BINARY_PATH" >> $GITHUB_OUTPUT
+        else
+          echo "Error: Binary not found at $BINARY_PATH"
+          echo "binary_exists=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+        
+    - name: Run compliance check
+      id: compliance
+      if: steps.verify-binary.outputs.binary_exists == 'true'
+      run: |
+        BINARY_PATH="${{ steps.verify-binary.outputs.binary_path }}"
+        OUTPUT_FORMAT="${{ inputs.output-format || github.event.inputs.output-format }}"
+        GENERATE_SBOM="${{ inputs.generate-sbom || github.event.inputs.generate-sbom }}"
+        
+        echo "🔍 Running Betanet compliance check for: $BINARY_PATH"
+        echo "Output format: $OUTPUT_FORMAT"
+        echo "Generate SBOM: $GENERATE_SBOM"
+        
+        # Create results directory
+        mkdir -p compliance-results
+        
+        # Run compliance check
+        if betanet-lint check "$BINARY_PATH" --output "$OUTPUT_FORMAT" --github-action > "compliance-results/result.json"; then
+          echo "✅ Compliance check passed"
+          echo "compliance_passed=true" >> $GITHUB_OUTPUT
+        else
+          echo "❌ Compliance check failed"
+          echo "compliance_passed=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Generate SBOM if requested
+        if [ "$GENERATE_SBOM" = "true" ]; then
+          echo "📦 Generating SBOM files..."
+          betanet-lint sbom "$BINARY_PATH" --format cyclonedx > "compliance-results/sbom.cyclonedx.json"
+          betanet-lint sbom "$BINARY_PATH" --format spdx > "compliance-results/sbom.spdx"
+          echo "sbom_generated=true" >> $GITHUB_OUTPUT
+        else
+          echo "sbom_generated=false" >> $GITHUB_OUTPUT
+        fi
+        
+        # Extract summary information
+        if [ -f "compliance-results/result.json" ]; then
+          TOTAL_CHECKS=$(jq '.summary.total' compliance-results/result.json)
+          PASSED_CHECKS=$(jq '.summary.passed' compliance-results/result.json)
+          FAILED_CHECKS=$(jq '.summary.failed' compliance-results/result.json)
+          CRITICAL_FAILURES=$(jq '.summary.critical' compliance-results/result.json)
+          
+          echo "total_checks=$TOTAL_CHECKS" >> $GITHUB_OUTPUT
+          echo "passed_checks=$PASSED_CHECKS" >> $GITHUB_OUTPUT
+          echo "failed_checks=$FAILED_CHECKS" >> $GITHUB_OUTPUT
+          echo "critical_failures=$CRITICAL_FAILURES" >> $GITHUB_OUTPUT
+        fi
+        
+    - name: Upload compliance results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: betanet-compliance-${{ github.run_number }}
+        path: compliance-results/
+        retention-days: 30
+        
+    - name: Generate summary
+      if: always()
+      run: |
+        echo "## 📋 Betanet Compliance Summary" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Binary | \`${{ steps.verify-binary.outputs.binary_path }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Overall Status | ${{ steps.compliance.outputs.compliance_passed == 'true' && '✅ PASSED' || '❌ FAILED' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Total Checks | ${{ steps.compliance.outputs.total_checks || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Passed | ${{ steps.compliance.outputs.passed_checks || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Failed | ${{ steps.compliance.outputs.failed_checks || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Critical Failures | ${{ steps.compliance.outputs.critical_failures || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| SBOM Generated | ${{ steps.compliance.outputs.sbom_generated == 'true' && '✅ Yes' || '❌ No' }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ steps.compliance.outputs.compliance_passed }}" != "true" ]; then
+          echo "### ⚠️ Failed Checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ -f "compliance-results/result.json" ]; then
+            echo "| Check | Section | Severity | Details |" >> $GITHUB_STEP_SUMMARY
+            echo "|-------|---------|----------|---------|" >> $GITHUB_STEP_SUMMARY
+            
+            jq -r '.checks[] | select(.passed == false) | "| \(.name) | \(.section) | \(.severity) | \(.details) |"' compliance-results/result.json >> $GITHUB_STEP_SUMMARY
+          fi
+        fi
+        
+    - name: Set workflow status
+      if: always()
+      run: |
+        FAIL_ON_ERROR="${{ inputs.fail-on-error || github.event.inputs.fail-on-error }}"
+        COMPLIANCE_PASSED="${{ steps.compliance.outputs.compliance_passed }}"
+        
+        if [ "$FAIL_ON_ERROR" = "true" ] && [ "$COMPLIANCE_PASSED" != "true" ]; then
+          echo "❌ Compliance check failed and fail-on-error is enabled"
+          exit 1
+        elif [ "$COMPLIANCE_PASSED" = "true" ]; then
+          echo "✅ Compliance check passed"
+        else
+          echo "⚠️ Compliance check failed but fail-on-error is disabled"
+        fi

@@ -1,0 +1,143 @@
+# Betanet Compliance Linter Configuration Example
+# This file shows various configuration options for the linter
+
+# Global configuration for the linter
+[general]
+# Output verbosity level (error, warn, info, debug)
+verbosity = "info"
+# Default output format (console, table, json)
+default_format = "console"
+# Whether to generate SBOM by default
+generate_sbom = false
+# Default SBOM format (cyclonedx, spdx)
+default_sbom_format = "cyclonedx"
+
+# Compliance check configuration
+[compliance]
+# Severity levels that cause failure
+fail_on_severity = ["critical", "major"]
+# Whether to fail the overall check if any individual check fails
+fail_on_any_failure = true
+# Post-quantum compliance date (YYYY-MM-DD)
+post_quantum_mandatory_date = "2027-01-01"
+
+# SBOM generation configuration
+[sbom]
+# Include system libraries in SBOM
+include_system_libs = true
+# Include detected components
+include_detected_components = true
+# SBOM output directory
+output_directory = "./sbom"
+
+# Network analysis configuration
+[network]
+# Ports to check for Betanet protocols
+betanet_ports = [443, 8443, 8080]
+# Protocols to detect
+protocols = ["HTX", "QUIC", "TLS", "HTTP"]
+# Endpoints to check for
+required_endpoints = [
+    "/betanet/htx/1.0.0",
+    "/betanet/htxquic/1.0.0"
+]
+
+# Cryptographic analysis configuration
+[crypto]
+# Required cryptographic algorithms
+required_algorithms = [
+    "SHA-256",
+    "ChaCha20-Poly1305",
+    "Ed25519",
+    "X25519"
+]
+# Post-quantum algorithms
+post_quantum_algorithms = [
+    "X25519-Kyber768",
+    "Kyber768"
+]
+# Minimum key sizes (in bits)
+min_key_sizes = {
+    "RSA" = 2048,
+    "ECC" = 256,
+    "AES" = 128
+}
+
+# Binary analysis configuration
+[binary]
+# Minimum string length to consider
+min_string_length = 4
+# Maximum number of strings to extract
+max_strings = 10000
+# File extensions to analyze
+extensions = [".exe", ".bin", ".out", ".app", "", ".so", ".dylib"]
+# Directories to exclude from analysis
+exclude_dirs = [
+    "node_modules",
+    ".git",
+    "vendor",
+    "target/debug",
+    "target/release"
+]
+
+# Reporting configuration
+[reporting]
+# Include detailed information in reports
+include_details = true
+# Include recommendations for failed checks
+include_recommendations = true
+# Report output directory
+output_directory = "./reports"
+# Report file prefix
+file_prefix = "betanet-compliance"
+
+# GitHub Action configuration
+[github]
+# Create GitHub annotations for failures
+create_annotations = true
+# Set commit status checks
+set_status_checks = true
+# Comment on pull requests
+comment_on_pr = true
+# Upload reports as artifacts
+upload_artifacts = true
+# Artifact retention days (0 = forever)
+artifact_retention_days = 30
+
+# Example custom compliance rules
+[[custom_rules]]
+name = "Custom Security Check"
+description = "Additional security validation"
+severity = "major"
+check_type = "string_pattern"
+pattern = "security_check_passed"
+required = true
+
+[[custom_rules]]
+name = "Performance Check"
+description = "Performance requirements validation"
+severity = "minor"
+check_type = "file_size"
+max_size_mb = 100
+required = true
+
+# Environment-specific configuration
+[development]
+# Development-specific settings
+fail_on_severity = ["critical"]
+generate_sbom = false
+verbosity = "debug"
+
+[production]
+# Production-specific settings
+fail_on_severity = ["critical", "major", "minor"]
+generate_sbom = true
+verbosity = "error"
+set_status_checks = true
+
+[ci]
+# CI/CD specific settings
+output_format = "json"
+generate_sbom = true
+upload_artifacts = true
+fail_on_any_failure = true
