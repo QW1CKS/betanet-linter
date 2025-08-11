@@ -124,6 +124,23 @@ describe('BetanetComplianceChecker', () => {
       expect(result.checks).toHaveLength(9);
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
+
+    it('should handle zero selected checks gracefully (overallScore 0, passed false)', async () => {
+      (checker as any)._analyzer = {
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkNetworkCapabilities: async () => ({}),
+        checkCryptographicCapabilities: async () => ({}),
+        checkSCIONSupport: async () => ({}),
+        checkDHTSupport: async () => ({}),
+        checkLedgerSupport: async () => ({}),
+        checkPaymentSupport: async () => ({}),
+        checkBuildProvenance: async () => ({})
+      };
+      const result = await checker.checkCompliance(mockBinaryPath, { checkFilters: { include: [] } });
+      expect(result.checks).toHaveLength(0);
+      expect(result.overallScore).toBe(0);
+      expect(result.passed).toBe(false);
+    });
   });
 
   describe('generateSBOM', () => {

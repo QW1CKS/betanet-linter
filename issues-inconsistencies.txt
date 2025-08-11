@@ -112,10 +112,10 @@ Hardcoded crypto component licenses, others 'unknown'.
 Impact: Incomplete compliance data.
 Action: Attempt simple license string scanning; allow override.
 
-[X] ISSUE-020 | SBOM | Duplicate component extraction patterns
-Two paths produce diverging component sets.
-Impact: Inconsistent outputs.
-Action: Consolidate extraction logic.
+[✓] ISSUE-020 | SBOM | Duplicate component extraction patterns
+RESOLVED: Legacy sbom.ts removed; single extraction path in index.ts.
+Impact: Inconsistent outputs eliminated.
+Action: (Done) Further enhancements tracked by 017-019,021.
 
 [X] ISSUE-021 | SBOM | Version inference weak
 Regex may capture false positives; unbounded scanning duplicates.
@@ -129,10 +129,10 @@ jest.spyOn(checker as any, 'analyzer', 'get') on a plain field (no getter) may n
 Impact: Tests might not actually stub analyzer.
 Action: Refactor BetanetComplianceChecker to accept analyzer dependency injection.
 
-[X] ISSUE-023 | TEST | Missing coverage for compliance.ts & sbom.ts
-Alternate implementations untested.
-Impact: Dead or diverging code unnoticed.
-Action: Add targeted tests or remove unused code.
+[✓] ISSUE-023 | TEST | Missing coverage for compliance.ts & sbom.ts
+RESOLVED: Duplicate implementations removed (compliance.ts, sbom.ts). No longer applicable.
+Impact: Reduced maintenance & confusion.
+Action: (Done) Focus remains on canonical BetanetComplianceChecker.
 
 [✓] ISSUE-024 | TEST | No negative / false-positive tests
 All tests check presence counts only.
@@ -268,10 +268,10 @@ Action: Improve parsing to decode UTF-8 sequences.
 
 DOCUMENTATION
 -------------
-[X] ISSUE-048 | DOC | README omits alternate ComplianceChecker
-User unaware of second implementation.
-Impact: Confusion for contributors.
-Action: Remove or document status of file.
+[✓] ISSUE-048 | DOC | README omits alternate ComplianceChecker
+RESOLVED: Alternate ComplianceChecker removed; README already reflects single implementation.
+Impact: Confusion eliminated.
+Action: (Done) Consider adding ARCHITECTURE.md note of consolidation.
 
 [X] ISSUE-049 | DOC | Missing explanation of heuristic nature
 Spec suggests "validates" but actually heuristics.
