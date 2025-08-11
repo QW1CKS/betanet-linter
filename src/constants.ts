@@ -6,7 +6,25 @@ export const OPTIONAL_TRANSPORTS = [
   { path: "/betanet/webrtc/1.0.0", kind: "webrtc", mandatory: false }
 ];
 
-export const POST_QUANTUM_MANDATORY_DATE = "2027-01-01"; // ISO date string
+// Post-quantum enforcement date expressed as an ISO (UTC) day boundary.
+// ISSUE-016 fix: avoid local timezone interpretation by using UTC epoch milliseconds.
+export const POST_QUANTUM_MANDATORY_DATE = "2027-01-01"; // canonical ISO date string (UTC midnight)
+export const POST_QUANTUM_MANDATORY_EPOCH_MS = Date.UTC(2027, 0, 1, 0, 0, 0, 0);
+
+export function parseOverridePQDate(override?: string): number | undefined {
+  if (!override) return undefined;
+  // Accept YYYY-MM-DD or full ISO. Always interpret as UTC midnight if only date provided.
+  const dateOnlyMatch = override.match(/^\d{4}-\d{2}-\d{2}$/);
+  if (dateOnlyMatch) {
+    const [y, m, d] = override.split('-').map(n => parseInt(n, 10));
+    if (y && m && d) return Date.UTC(y, m - 1, d, 0, 0, 0, 0);
+  }
+  const parsed = Date.parse(override); // Date.parse treats unspecified TZ as local or UTC depending on format
+  if (!isNaN(parsed)) {
+    return parsed; // retain given explicit timezone / timestamp
+  }
+  return undefined; // invalid override ignored by caller
+}
 
 export const SPEC_VERSION_SUPPORTED_BASE = "1.0"; // baseline fully targeted
 export const SPEC_VERSION_PARTIAL = "1.1"; // partially covered heuristically

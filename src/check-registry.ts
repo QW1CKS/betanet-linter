@@ -3,7 +3,7 @@
 // This replaces ad-hoc per-check methods and normalizes naming & severities.
 
 import { BinaryAnalyzer } from './analyzer';
-import { TRANSPORT_ENDPOINT_VERSIONS, OPTIONAL_TRANSPORTS, POST_QUANTUM_MANDATORY_DATE } from './constants';
+import { TRANSPORT_ENDPOINT_VERSIONS, OPTIONAL_TRANSPORTS, POST_QUANTUM_MANDATORY_DATE, POST_QUANTUM_MANDATORY_EPOCH_MS, parseOverridePQDate } from './constants';
 import { evaluatePrivacyTokens } from './heuristics';
 import { ComplianceCheck } from './types';
 
@@ -273,12 +273,14 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   mandatoryIn: POST_QUANTUM_MANDATORY_DATE,
     evaluate: async (analyzer, now) => {
       const cryptoCaps = await analyzer.checkCryptographicCapabilities();
-      // Allow override via env var for testing future enforcement earlier
+      // ISSUE-016: UTC-safe mandatory date evaluation
       const override = process.env.BETANET_PQ_DATE_OVERRIDE;
-      const mandatoryDate = new Date(override || POST_QUANTUM_MANDATORY_DATE);
-      const isPastMandatoryDate = now >= mandatoryDate;
+      const overrideEpoch = parseOverridePQDate(override);
+      const mandatoryEpoch = overrideEpoch !== undefined ? overrideEpoch : POST_QUANTUM_MANDATORY_EPOCH_MS;
+      const isPastMandatoryDate = now.getTime() >= mandatoryEpoch;
+      const mandatoryISO = new Date(mandatoryEpoch).toISOString().slice(0,10);
       let passed = true;
-      let details = `✅ Post-quantum requirements not yet mandatory (enforce after ${mandatoryDate.toISOString().slice(0,10)})`;
+      let details = `✅ Post-quantum requirements not yet mandatory (enforce after ${mandatoryISO})`;
       let severity: 'minor' | 'critical' = 'minor';
       if (isPastMandatoryDate) {
         severity = 'critical';
@@ -286,7 +288,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         details = passed ? '✅ Found X25519-Kyber768 hybrid cipher suite' : `❌ Missing: ${missingList([
           !cryptoCaps.hasX25519 && 'X25519',
           !cryptoCaps.hasKyber768 && 'Kyber768'
-        ])} (mandatory after ${mandatoryDate.toISOString().slice(0,10)})`;
+        ])} (mandatory after ${mandatoryISO})`;
       }
       return {
         id: 10,

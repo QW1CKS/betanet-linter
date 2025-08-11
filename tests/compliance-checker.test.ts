@@ -716,6 +716,88 @@ describe('BetanetComplianceChecker', () => {
       const dht = result.checks.find(c => c.id === 6);
       expect(dht?.passed).toBe(false);
     });
+
+    describe('post-quantum UTC boundary (ISSUE-016)', () => {
+      const originalNow = Date;
+      function mockNow(epochMs: number) {
+        // Monkey patch Date constructor & now
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (global as any).Date = class extends Date {
+          constructor(arg?: any) { super(arg ?? epochMs); }
+          static now() { return epochMs; }
+        } as unknown as DateConstructor;
+      }
+      afterEach(() => {
+        (global as any).Date = originalNow;
+        delete process.env.BETANET_PQ_DATE_OVERRIDE;
+      });
+
+      it('treats moment just before UTC midnight as pre-mandatory', async () => {
+        // 2026-12-31T23:59:59.500Z
+        mockNow(Date.UTC(2026, 11, 31, 23, 59, 59, 500));
+        const checker = new BetanetComplianceChecker();
+        (checker as any)._analyzer = {
+          checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
+          analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+          checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+          checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
+          checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
+          checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+          checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+          checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+        };
+        const tmp = path.join(__dirname, 'temp-pq-pre');
+        await fs.writeFile(tmp, Buffer.from('dummy'));
+        const result = await checker.checkCompliance(tmp);
+        const pq = result.checks.find(c => c.id === 10);
+        expect(pq?.severity).toBe('minor');
+        expect(pq?.details).toMatch(/not yet mandatory/);
+      });
+
+      it('treats UTC midnight or later as mandatory boundary', async () => {
+        // 2027-01-01T00:00:00.000Z
+        mockNow(Date.UTC(2027, 0, 1, 0, 0, 0, 0));
+        const checker = new BetanetComplianceChecker();
+        (checker as any)._analyzer = {
+          checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
+          analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+            checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+          checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
+          checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
+          checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+          checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+          checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+        };
+        const tmp = path.join(__dirname, 'temp-pq-post');
+        await fs.writeFile(tmp, Buffer.from('dummy'));
+        const result = await checker.checkCompliance(tmp);
+        const pq = result.checks.find(c => c.id === 10);
+        expect(pq?.severity).toBe('critical');
+        expect(pq?.details).toMatch(/mandatory after 2027-01-01/);
+      });
+
+      it('applies override with timezone aware full ISO string', async () => {
+        process.env.BETANET_PQ_DATE_OVERRIDE = '2025-12-31T00:00:00Z';
+        mockNow(Date.UTC(2025, 11, 31, 0, 0, 0, 0));
+        const checker = new BetanetComplianceChecker();
+        (checker as any)._analyzer = {
+          checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
+          analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+          checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+          checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
+          checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
+          checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+          checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+          checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+        };
+        const tmp = path.join(__dirname, 'temp-pq-override-boundary');
+        await fs.writeFile(tmp, Buffer.from('dummy'));
+        const result = await checker.checkCompliance(tmp);
+        const pq = result.checks.find(c => c.id === 10);
+        expect(pq?.severity).toBe('critical');
+        delete process.env.BETANET_PQ_DATE_OVERRIDE;
+      });
+    });
   });
 
   describe('performance memoization', () => {
