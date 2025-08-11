@@ -2,6 +2,7 @@
 
 const { program } = require('commander');
 const path = require('path');
+const fs = require('fs');
 // Support running from source in development while using dist in packaged form
 let BetanetComplianceChecker;
 try {
@@ -10,10 +11,24 @@ try {
   ({ BetanetComplianceChecker } = require('../src/index'));
 }
 
+let pkgVersion = '0.0.0';
+try {
+  const pkgPath = path.join(__dirname, '..', 'package.json');
+  const raw = fs.readFileSync(pkgPath, 'utf8');
+  pkgVersion = JSON.parse(raw).version || pkgVersion;
+} catch { /* ignore */ }
+
 program
   .name('betanet-lint')
   .description('CLI tool for checking Betanet specification compliance')
-  .version('1.0.0');
+  .version(pkgVersion);
+
+program
+  .command('version')
+  .description('Print version and exit')
+  .action(() => {
+    console.log(pkgVersion);
+  });
 
 program
   .command('check')

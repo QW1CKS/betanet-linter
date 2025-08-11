@@ -376,6 +376,28 @@ describe('BetanetComplianceChecker', () => {
       await fs.remove(out);
       await fs.remove(tempBin);
     });
+
+    it('Zero-component SBOM should omit relationships arrays (ISSUE-044)', async () => {
+      const tempBin = path.join(__dirname, 'zerocomp-bin');
+      await fs.writeFile(tempBin, Buffer.from('minimal')); // unlikely to produce versions or deps
+      const checkerLocal = new BetanetComplianceChecker();
+      (checkerLocal as any)._analyzer = {
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [] }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false })
+      };
+      const spdxJsonPath = path.join(__dirname, 'zerocomp.spdx.json');
+      await checkerLocal.generateSBOM(tempBin, 'spdx-json', spdxJsonPath);
+      const json = JSON.parse(await fs.readFile(spdxJsonPath, 'utf8'));
+      expect(Array.isArray(json.relationships)).toBe(true); // array present
+      expect(json.relationships.length).toBe(0); // but empty
+      await fs.remove(spdxJsonPath);
+      const cdxJsonPath = path.join(__dirname, 'zerocomp.cdx.json');
+      await checkerLocal.generateSBOM(tempBin, 'cyclonedx-json', cdxJsonPath);
+      const cdx = JSON.parse(await fs.readFile(cdxJsonPath, 'utf8'));
+      expect(cdx.dependencies === undefined || cdx.dependencies.length === 0).toBe(true);
+      await fs.remove(cdxJsonPath);
+      await fs.remove(tempBin);
+    });
   });
 
   describe('displayResults', () => {

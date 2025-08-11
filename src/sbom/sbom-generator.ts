@@ -437,6 +437,16 @@ export class SBOMGenerator {
   }
 
   private generateCycloneDX(binaryInfo: any, components: any[], dependencies: any[]): any {
+    const depsSection = dependencies.length ? [
+        {
+          ref: binaryInfo.name,
+          dependsOn: dependencies.map(dep => dep.ref)
+        },
+        ...dependencies.map(dep => ({
+          ref: dep.ref,
+          dependsOn: []
+        }))
+      ] : undefined;
     return {
       bomFormat: 'CycloneDX',
       specVersion: '1.4',
@@ -475,16 +485,7 @@ export class SBOMGenerator {
           value: 'true'
         }] : []
       })),
-      dependencies: [
-        {
-          ref: binaryInfo.name,
-          dependsOn: dependencies.map(dep => dep.ref)
-        },
-        ...dependencies.map(dep => ({
-          ref: dep.ref,
-          dependsOn: []
-        }))
-      ]
+  dependencies: depsSection
     };
   }
 
@@ -533,6 +534,11 @@ export class SBOMGenerator {
     const docId = `SPDXRef-DOCUMENT`;
     const safeBin = sanitizeName(binaryInfo.name);
     const packageId = `SPDXRef-PACKAGE-${safeBin}`;
+    const relationships = dependencies.length ? dependencies.map(dep => ({
+        spdxElementId: packageId,
+        relationshipType: 'DEPENDS_ON',
+        relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
+      })) : [];
     return {
       SPDXID: docId,
       spdxVersion: 'SPDX-2.3',
@@ -567,11 +573,7 @@ export class SBOMGenerator {
           copyrightText: 'NOASSERTION'
         }))
       ],
-      relationships: dependencies.map(dep => ({
-        spdxElementId: packageId,
-        relationshipType: 'DEPENDS_ON',
-        relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
-      }))
+  relationships
     };
   }
 
