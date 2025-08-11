@@ -325,6 +325,8 @@ Compliance results include a `diagnostics` object with tooling and performance m
 
 Degraded mode lowers confidence and normally does not trigger failure; set `BETANET_FAIL_ON_DEGRADED=1` (or `--fail-on-degraded`) to enforce failure.
 
+All external tool invocations (strings, nm, objdump, ldd, file, sha256sum) pass through a unified `safeExec` wrapper with a configurable timeout to prevent hangs (ISSUE-034). Missing or timed-out tools contribute to degradation reasons.
+
 ## Development
 
 ### Building from Source

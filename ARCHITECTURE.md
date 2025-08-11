@@ -49,6 +49,8 @@ betanet-linter/
 - Force refresh option (`--force-refresh`) to invalidate cache
 - Environment gates: `BETANET_FAIL_ON_DEGRADED`, `BETANET_PQ_DATE_OVERRIDE` (UTC-safe), tool skip list
 - Concise degraded summary printed when degraded=true
+ - Unified external command timeout via `safeExec` (file, strings, ldd, nm, objdump, sha256sum) configurable with `BETANET_TOOL_TIMEOUT_MS` (ISSUE-034)
+ - Planned: per-check inline degraded hints (ISSUE-035 partial)
    - Each entry exposes `evaluate(analyzer, now)` returning a `ComplianceCheck`
    - Handles dynamic severity escalation (post-quantum critical date) & version acceptances (transport 1.0 / 1.1)
 

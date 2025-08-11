@@ -197,10 +197,11 @@ Errors arise deep in extraction.
 Impact: Less friendly error messaging.
 Action: fs.pathExists check upfront with clear message.
 
-[X] ISSUE-034 | ERROR | No timeout on external commands
+[✓] ISSUE-034 | ERROR | No timeout on external commands
 Execa calls may hang.
 Impact: CLI stalls.
 Action: Add timeout & fallback path.
+Resolution: Centralized safeExec wrapper (configurable via BETANET_TOOL_TIMEOUT_MS) now used for analyzer + SBOM (strings, ldd, file, sha256sum) with per-call timeouts (2025-08-11).
 
 [ ] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
 Partial: Now prints one-line degraded summary with reasons & missing core tools. Remaining: per-check inline hints could be added later.

@@ -1,8 +1,9 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import execa from 'execa';
+import execa from 'execa'; // retained for hash fallback; phased out for core probes
 import { SBOM } from '../types';
 import { BinaryAnalyzer } from '../analyzer';
+import { safeExec } from '../safe-exec';
 import { evaluatePrivacyTokens } from '../heuristics';
 
 export class SBOMGenerator {
@@ -100,17 +101,18 @@ export class SBOMGenerator {
 
   private async getBinaryInfo(binaryPath: string): Promise<any> {
     try {
-      const [fileInfo, stat] = await Promise.all([
-        execa('file', [binaryPath]),
+      const [fileInfoRes, stat] = await Promise.all([
+        safeExec('file', [binaryPath], 3000),
         fs.stat(binaryPath)
       ]);
+      const fileType = fileInfoRes.failed ? 'Unknown' : fileInfoRes.stdout;
 
       return {
         name: path.basename(binaryPath),
         path: binaryPath,
         size: stat.size,
         modified: stat.mtime.toISOString(),
-        type: fileInfo.stdout,
+  type: fileType,
         hash: await this.calculateHash(binaryPath)
       };
   } catch (error: unknown) {
@@ -128,8 +130,10 @@ export class SBOMGenerator {
 
   private async calculateHash(binaryPath: string): Promise<string> {
     try {
-      const { stdout } = await execa('sha256sum', [binaryPath]);
-      return stdout.split(' ')[0];
+      const hashRes = await safeExec('sha256sum', [binaryPath], 4000);
+      if (!hashRes.failed && hashRes.stdout) {
+        return hashRes.stdout.split(' ')[0];
+      }
     } catch (error) {
       try {
         // Fallback to Node.js crypto
@@ -142,6 +146,7 @@ export class SBOMGenerator {
         return '';
       }
     }
+  return '';
   }
 
   private async extractComponents(binaryPath: string): Promise<any[]> {
@@ -200,8 +205,12 @@ export class SBOMGenerator {
 
     // Non-Windows: attempt `strings`
     try {
-      const { stdout } = await execa('strings', [binaryPath]);
-      addVersions(stdout);
+      const res = await safeExec('strings', [binaryPath], 5000);
+      if (!res.failed) {
+        addVersions(res.stdout);
+      } else {
+        throw new Error(res.errorMessage || 'strings-failed');
+      }
     } catch (e: any) {
       const msg = (e as any)?.message || '';
       if (debug) console.warn('SBOM strings exec skipped:', msg);
@@ -209,8 +218,9 @@ export class SBOMGenerator {
 
     // Attempt ldd for component library names (best-effort)
     try {
-      const { stdout: lddOutput } = await execa('ldd', [binaryPath]);
-      const lddLines = lddOutput.split('\n');
+      const lddRes = await safeExec('ldd', [binaryPath], 5000);
+      if (lddRes.failed) throw new Error(lddRes.errorMessage || 'ldd-failed');
+      const lddLines = lddRes.stdout.split('\n');
       for (const line of lddLines) {
         const libMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
         if (libMatch) {
@@ -240,8 +250,9 @@ export class SBOMGenerator {
 
     if (process.platform !== 'win32') {
       try {
-        const { stdout: lddOutput } = await execa('ldd', [binaryPath]);
-        const lddLines = lddOutput.split('\n');
+    const lddRes = await safeExec('ldd', [binaryPath], 5000);
+    if (lddRes.failed) throw new Error(lddRes.errorMessage || 'ldd-failed');
+    const lddLines = lddRes.stdout.split('\n');
         for (const line of lddLines) {
           const depMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
           if (depMatch) {

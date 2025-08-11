@@ -10,9 +10,9 @@ Implemented:
 - Safe access for diagnostics preventing test breakage
 
 Deferred (optional micro-enhancements):
-- Per-check timing capture
-- Per-command timeout on each capability helper (ISSUE-034 partially; only tool detection has timeout)
-- forceRefresh flag to re-run analysis ignoring cache
+- Per-check timing capture (data collected but not exported in structured JSON)
+- (DONE) Per-command timeout on each capability helper (ISSUE-034 now fully implemented across analyzer + SBOM)
+- forceRefresh flag to re-run analysis ignoring cache (implemented via `--force-refresh`)
 
 Rationale for deferral: Each adds marginal value now; can batch into a later "Observability Hardening" step if needed.
 
@@ -99,7 +99,7 @@ Goals:
 
 ## Plan 9 (Optional): Observability & Performance Deep Dive
 (Optional revisit of deferred items)
-- Per-check and per-command timing + histogram
+- Per-check and per-command timing + histogram (export JSON timings artifact)
 - forceRefresh / invalidate cache API (DONE in Plan 10)
 - Performance regression test (ISSUE-025) if not added earlier
 - Structured JSON log output option

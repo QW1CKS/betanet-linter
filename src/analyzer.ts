@@ -1,10 +1,9 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import execa from 'execa';
 import { AnalyzerDiagnostics } from './types';
 import { safeExec, isToolSkipped } from './safe-exec';
 import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
-// Removed unused imports (which, types)
+// Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 
 export class BinaryAnalyzer {
   private binaryPath: string;
