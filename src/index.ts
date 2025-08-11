@@ -169,7 +169,7 @@ export class BetanetComplianceChecker {
     }
 
     const generator = new SBOMGenerator();
-    const sbom = await generator.generate(binaryPath, format);
+  const sbom = await generator.generate(binaryPath, format, this.analyzer as any);
 
     const defaultOutputPath = (() => {
       if (format === 'cyclonedx') return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.xml`);

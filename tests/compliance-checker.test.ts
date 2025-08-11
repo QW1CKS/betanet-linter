@@ -318,6 +318,40 @@ describe('BetanetComplianceChecker', () => {
       expect(json.spdxVersion).toBe('SPDX-2.3');
       await fs.remove(outputPath);
     });
+
+    it('should tag betanet features in SBOM (CycloneDX JSON + SPDX)', async () => {
+      // Provide analyzer with strings that trigger multiple features
+      const featureStrings = [
+        '/betanet/htx/1.1.0', '/betanet/htxquic/1.1.0', '/betanet/webrtc/1.1.0', 'encrypted_client_hello',
+        'chacha20', 'poly1305', 'kyber768', 'x25519', 'scion path maintenance as123 pathid:abc', 'rendezvous rotation beaconset(epoch)',
+        'cashu', 'lightning', 'federation-mode', 'keysetid32 secret32 aggregatedsig64', 'frost-ed25519', 'pow=22',
+        'mix hop beaconset diversity vrf'
+      ];
+      const mockAnalyzer = {
+        analyze: () => Promise.resolve({ strings: featureStrings, symbols: [], dependencies: [] }),
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: true }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, rendezvousRotation: true, beaconSetIndicator: true, seedManagement: true, rotationHits: 3 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true, hasVoucherFormat: true, hasFROST: true, hasPoW22: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      (checker as any)._analyzer = mockAnalyzer;
+      const cdxJsonPath = path.join(__dirname, 'features-sbom.cdx.json');
+      await checker.generateSBOM('/tmp/fakebin2', 'cyclonedx-json', cdxJsonPath);
+      const cdxJson = JSON.parse(await fs.readFile(cdxJsonPath, 'utf8'));
+      const props = cdxJson.metadata.component.properties || [];
+      const featureProps = props.filter((p: any) => p.name === 'betanet.feature').map((p: any) => p.value);
+      expect(featureProps).toEqual(expect.arrayContaining(['transport-htx','transport-quic','transport-webrtc','crypto-chacha20poly1305','crypto-pq-hybrid','payment-cashu','payment-lightning','privacy-hop']));
+      await fs.remove(cdxJsonPath);
+      const spdxPath = path.join(__dirname, 'features-sbom.spdx');
+      await checker.generateSBOM('/tmp/fakebin2', 'spdx', spdxPath);
+      const spdxText = await fs.readFile(spdxPath, 'utf8');
+      expect(spdxText).toMatch(/PackageComment: betanet.feature=transport-htx/);
+      expect(spdxText).toMatch(/PackageComment: betanet.feature=crypto-chacha20poly1305/);
+      await fs.remove(spdxPath);
+    });
   });
 
   describe('displayResults', () => {

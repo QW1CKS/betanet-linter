@@ -349,10 +349,10 @@ RESOLVED: Parallel aggregation implemented (see ISSUE-005). Wall time test added
 Impact: Scaling latency controlled.
 Action: (Done) Add runtime timing histogram later.
 
-[ ] ISSUE-058 | SBOM | Versioned component mapping for new transports / payment modules (Deferred)
-SBOM does not classify 1.1-specific modules (e.g., WebRTC transport, payment adapter) distinctly.
-Impact: Limited traceability of which spec-era features binary includes.
-Action: Extend component classifier to tag modules by spec feature set.
+[✓] ISSUE-058 | SBOM | Versioned component mapping for new transports / payment modules
+Implemented: SBOM feature tagging adds betanet.feature properties (transport-htx, transport-quic, transport-webrtc, crypto-pq-hybrid, payment-* etc.) to CycloneDX metadata and PackageComment lines in SPDX outputs.
+Impact: Traceability of spec-era capabilities now visible in SBOM.
+Action: Future: optionally tag individual dependency components when feature-specific libraries detected.
 
 [ ] ISSUE-059 | EDGE | Static-only approach misses dynamic 1.1 behaviors (Deferred)
 Rotation scheduling, path diversity, and real PoW verification are runtime phenomena.

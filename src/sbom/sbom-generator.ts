@@ -2,12 +2,21 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import execa from 'execa';
 import { SBOM } from '../types';
+import { BinaryAnalyzer } from '../analyzer';
+import { evaluatePrivacyTokens } from '../heuristics';
 
 export class SBOMGenerator {
-  async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json' = 'cyclonedx'): Promise<SBOM> {
+  async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json' = 'cyclonedx', analyzer?: BinaryAnalyzer): Promise<SBOM> {
     const binaryInfo = await this.getBinaryInfo(binaryPath);
     const components = await this.extractComponents(binaryPath);
     const dependencies = await this.extractDependencies(binaryPath);
+    // Derive feature tags (Betanet spec-era capabilities) if we can analyze the binary
+    try {
+      const features = await this.deriveFeatures(binaryPath, analyzer);
+      if (features.length) {
+        (binaryInfo as any).betanetFeatures = features.sort();
+      }
+    } catch {/* non-fatal */}
 
     // Attempt per-component hashing when a concrete path exists
     await this.addComponentHashes(components);
@@ -41,6 +50,52 @@ export class SBOMGenerator {
         generated: new Date().toISOString()
       };
     }
+  }
+
+  private async deriveFeatures(binaryPath: string, analyzer?: BinaryAnalyzer): Promise<string[]> {
+    const features: string[] = [];
+    let a = analyzer;
+    if (!a) {
+      try { a = new BinaryAnalyzer(binaryPath); } catch { /* ignore */ }
+    }
+    if (!a) return features;
+    try {
+      // Run minimal capability detections leveraging existing analyzer helpers
+      const [network, crypto, scion, dht, ledger, payment, build] = await Promise.all([
+        a.checkNetworkCapabilities().catch(() => ({} as any)),
+        a.checkCryptographicCapabilities().catch(() => ({} as any)),
+        a.checkSCIONSupport().catch(() => ({} as any)),
+        a.checkDHTSupport().catch(() => ({} as any)),
+        a.checkLedgerSupport().catch(() => ({} as any)),
+        a.checkPaymentSupport().catch(() => ({} as any)),
+        a.checkBuildProvenance().catch(() => ({} as any))
+      ]);
+      // Analyze strings once for privacy evaluation (avoid double analyze())
+      const analysis = await a.analyze();
+      const privacy = evaluatePrivacyTokens(analysis.strings);
+      // Mapping rules
+      if (network.hasHTX) features.push('transport-htx');
+      if (network.hasQUIC) features.push('transport-quic');
+      if (network.port443) features.push('transport-443');
+      if (network.hasWebRTC) features.push('transport-webrtc');
+      if (network.hasECH) features.push('security-ech');
+      if (crypto.hasChaCha20 && crypto.hasPoly1305) features.push('crypto-chacha20poly1305');
+      if (crypto.hasKyber768 && crypto.hasX25519) features.push('crypto-pq-hybrid');
+      if (scion.hasSCION) features.push('scion');
+      if (scion.pathDiversityCount >= 2) features.push('scion-path-diversity');
+      if (dht.rendezvousRotation) features.push('dht-rotation');
+      if (dht.deterministicBootstrap) features.push('dht-deterministic');
+      if (dht.beaconSetIndicator) features.push('dht-beaconset');
+      if (ledger.hasAliasLedger && ledger.hasConsensus) features.push('alias-ledger');
+      if (payment.hasCashu) features.push('payment-cashu');
+      if (payment.hasLightning) features.push('payment-lightning');
+      if (payment.hasVoucherFormat) features.push('payment-voucher-format');
+      if (payment.hasFROST) features.push('payment-frost');
+      if (payment.hasPoW22) features.push('payment-pow22');
+      if (build.hasSLSA && build.reproducible && build.provenance) features.push('build-provenance');
+      if (privacy.passed) features.push('privacy-hop');
+    } catch {/* ignore feature derivation errors */}
+    return Array.from(new Set(features));
   }
 
   private async getBinaryInfo(binaryPath: string): Promise<any> {
@@ -386,14 +441,9 @@ export class SBOMGenerator {
           ],
           licenses: binaryInfo.licenses ? binaryInfo.licenses.map((l: string) => ({ license: { id: l } })) : (binaryInfo.license ? [{ license: { id: binaryInfo.license } }] : undefined),
           properties: [
-            {
-              name: 'binary:size',
-              value: binaryInfo.size.toString()
-            },
-            {
-              name: 'binary:type',
-              value: binaryInfo.type
-            }
+            { name: 'binary:size', value: binaryInfo.size.toString() },
+            { name: 'binary:type', value: binaryInfo.type },
+            ...(binaryInfo.betanetFeatures ? (binaryInfo.betanetFeatures as string[]).map(f => ({ name: 'betanet.feature', value: f })) : [])
           ]
         }
       },
@@ -423,36 +473,6 @@ export class SBOMGenerator {
   }
 
   private generateSPDXTagValue(binaryInfo: any, components: any[], dependencies: any[]): string {
-    const spdxContent = {
-      SPDXID: 'SPDXRef-DOCUMENT',
-      spdxVersion: 'SPDX-2.3',
-      creationInfo: {
-        created: new Date().toISOString(),
-        creators: ['Tool: betanet-compliance-linter']
-      },
-      name: binaryInfo.name,
-      documentNamespace: `https://spdx.org/spdxdocs/${binaryInfo.name}-${this.generateUUID()}`,
-      packages: [{
-        name: binaryInfo.name,
-        SPDXID: 'SPDXRef-PACKAGE',
-        versionInfo: '1.0.0',
-        downloadLocation: 'NOASSERTION',
-        filesAnalyzed: false,
-        checksums: [{
-          algorithm: 'SHA256',
-          checksumValue: binaryInfo.hash
-        }],
-        licenseConcluded: 'NOASSERTION',
-        licenseDeclared: 'NOASSERTION',
-        copyrightText: 'NOASSERTION'
-      }],
-      relationships: dependencies.map(dep => ({
-        spdxElementId: 'SPDXRef-PACKAGE',
-        relationshipType: 'DEPENDS_ON',
-        relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
-      }))
-    };
-
     // Convert to SPDX format
     let spdxText = `SPDXVersion: SPDX-2.3\n`;
     spdxText += `DataLicense: CC0-1.0\n`;
@@ -473,6 +493,11 @@ export class SBOMGenerator {
     spdxText += `PackageCopyrightText: NOASSERTION\n`;
     if (binaryInfo.hash) {
       spdxText += `PackageChecksum: SHA256: ${binaryInfo.hash}\n`;
+    }
+    if (binaryInfo.betanetFeatures && binaryInfo.betanetFeatures.length) {
+      (binaryInfo.betanetFeatures as string[]).forEach((f: string) => {
+        spdxText += `PackageComment: betanet.feature=${f}\n`;
+      });
     }
 
     // Append detected component licenses if any
@@ -510,7 +535,8 @@ export class SBOMGenerator {
           checksums: binaryInfo.hash ? [{ algorithm: 'SHA256', checksumValue: binaryInfo.hash }] : [],
           licenseDeclared: binaryInfo.licenses && binaryInfo.licenses.length > 1 ? binaryInfo.licenses.join(' OR ') : (binaryInfo.license || 'NOASSERTION'),
           licenseConcluded: 'NOASSERTION',
-          copyrightText: 'NOASSERTION'
+          copyrightText: 'NOASSERTION',
+          betanetFeatures: binaryInfo.betanetFeatures && binaryInfo.betanetFeatures.length ? binaryInfo.betanetFeatures : undefined
         },
         ...components.map((c, idx) => ({
           name: c.name,
