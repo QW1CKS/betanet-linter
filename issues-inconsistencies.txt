@@ -254,10 +254,9 @@ Impact: Invalid SPDX output when none.
 Action: Conditionally emit relationships.
 Resolution: Added conditional emission of dependencies/relationships in CycloneDX & SPDX JSON when zero dependencies; Tag-Value unaffected (2025-08-11).
 
-[X] ISSUE-045 | EDGE | Duplicate components not deduped in index.ts SBOM
-No duplicate filtering there (only in sbom.ts).
-Impact: Bloated SBOM.
-Action: Add dedupe pass.
+[✓] ISSUE-045 | EDGE | Duplicate components not deduped in index.ts SBOM
+Resolution (2025-08-11): Added dedupe step in XML serialization (index.ts generateSBOM) collapsing duplicates by name@version and merging hashes. Combined with existing generator-level dedupe to ensure consistency across formats.
+Impact: Leaner SBOM output; avoids inflated component counts.
 
 [X] ISSUE-046 | EDGE | Large number of components performance
 Mapping and building XML without streaming.

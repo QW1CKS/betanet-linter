@@ -217,7 +217,19 @@ export class BetanetComplianceChecker {
       // Serialize a CycloneDX-style XML (backwards compatible with previous output path & extension)
       const builder = new xml2js.Builder();
       const metaComponent = (sbom as any).data?.metadata?.component || {};
-      const components = (sbom as any).data?.components || [];
+      let components = (sbom as any).data?.components || [];
+      // ISSUE-045: Ensure duplicate components (same name+version) are deduped before XML serialization
+      if (Array.isArray(components) && components.length > 1) {
+        const seen = new Map<string, any>();
+        components.forEach((c: any) => {
+          const key = `${(c.name||'').toLowerCase()}@${(c.version||'').toLowerCase()}`;
+          if (!seen.has(key)) seen.set(key, c); else {
+            const existing = seen.get(key);
+            if (!existing.hashes && c.hashes) existing.hashes = c.hashes;
+          }
+        });
+        components = Array.from(seen.values());
+      }
       const xmlObj = {
         bom: {
           $: { xmlns: 'http://cyclonedx.org/schema/bom/1.4', version: '1' },
