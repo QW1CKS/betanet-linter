@@ -19,14 +19,14 @@ SBOM generation exists in both BetanetComplianceChecker (index.ts) and SBOMGener
 Impact: Divergent output, duplicated maintenance.
 Action: Centralize SBOM logic into one module (e.g., src/sbom/) and expose consistent API.
 
-[X] ISSUE-003 | ARCH | Analyzer encapsulation leak
+[✓] ISSUE-003 | ARCH | Analyzer encapsulation leak
 Code accesses private/internal state via checker.analyzer['binaryPath'] and similar patterns.
 Impact: Breaks encapsulation; refactors risky.
 Action: Add public getter(s); remove bracket access.
 
 PERFORMANCE
 -----------
-[X] ISSUE-004 | PERF | Repeated full analysis
+[✓] ISSUE-004 | PERF | Repeated full analysis
 Each capability helper calls analyze(), re-running expensive external commands for every compliance check.
 Impact: O(N_checks * extraction cost) slowdown.
 Action: Memoize analyze() result inside BinaryAnalyzer; reuse.
@@ -38,37 +38,37 @@ Action: After memoization, compute capability helpers in parallel (Promise.all) 
 
 HEURISTICS / ACCURACY
 ---------------------
-[X] ISSUE-006 | HEUR | Kyber detection too broad
+[✓] ISSUE-006 | HEUR | Kyber detection too broad
 hasKyber768 triggers on substring '768' alone.
 Impact: High false positives.
 Action: Require 'kyber' AND maybe '768' or stricter regex /\bkyber(768)?\b/.
 
-[X] ISSUE-007 | HEUR | Port 443 detection naive
+[✓] ISSUE-007 | HEUR | Port 443 detection naive
 Searches any '443' substring (could be version numbers, etc.).
 Impact: False positives.
 Action: Use regex for network patterns (":443", "443/tcp") or context tokens.
 
-[X] ISSUE-008 | HEUR | QUIC / TLS / ECH detection simplistic
+[✓] ISSUE-008 | HEUR | QUIC / TLS / ECH detection simplistic
 Simple substring presence; may misclassify libraries vs actual protocol support.
 Impact: False positives.
 Action: Combine multiple indicators (symbols + ALPN strings + version markers) with scoring threshold.
 
-[X] ISSUE-009 | HEUR | SCION path management inference weak
+[✓] ISSUE-009 | HEUR | SCION path management inference weak
 Looks for generic 'path' + 'maintenance' or 'disjoint'.
 Impact: False positives.
 Action: Define more specific token set; require at least one SCION-specific indicator.
 
-[X] ISSUE-010 | HEUR | DHT deterministic bootstrap detection
+[✓] ISSUE-010 | HEUR | DHT deterministic bootstrap detection
 Just 'deterministic' + 'bootstrap'; may match comments or unrelated text.
 Impact: Low signal quality.
 Action: Expand to pattern list ("seed", "hash", configuration markers) or allow user-supplied hints.
 
-[X] ISSUE-011 | HEUR | Build provenance detection
+[✓] ISSUE-011 | HEUR | Build provenance detection
 'SLSA' OR 'provenance' triggers; 'reproducible' OR 'deterministic'.
 Impact: Overstates compliance.
 Action: Require combination and maybe structured metadata file detection.
 
-[X] ISSUE-012 | HEUR | Payment support inference broad
+[✓] ISSUE-012 | HEUR | Payment support inference broad
 'ln' substring may match unrelated tokens.
 Impact: False positives.
 Action: Prefer 'lnpay', 'lightning', 'lnnode', 'lnurl', 'bolt' patterns.
@@ -85,7 +85,7 @@ Action: Normalize severity map centrally.
 Impact: User confusion.
 Action: Standardize names list constant.
 
-[X] ISSUE-015 | API | Potential division by zero
+[✓] ISSUE-015 | API | Potential division by zero
 If include filter selects zero checks, overallScore = (0/0) => NaN.
 Impact: Output invalid / crash risk downstream.
 Action: Guard: if total == 0 set score=0 and passed=false with message.
@@ -124,7 +124,7 @@ Action: Debounce matches; require plausible semantic version context.
 
 TESTING
 -------
-[X] ISSUE-022 | TEST | Analyzer mocking via property getter misuse
+[✓] ISSUE-022 | TEST | Analyzer mocking via property getter misuse
 jest.spyOn(checker as any, 'analyzer', 'get') on a plain field (no getter) may not function as intended.
 Impact: Tests might not actually stub analyzer.
 Action: Refactor BetanetComplianceChecker to accept analyzer dependency injection.
@@ -134,7 +134,7 @@ Alternate implementations untested.
 Impact: Dead or diverging code unnoticed.
 Action: Add targeted tests or remove unused code.
 
-[X] ISSUE-024 | TEST | No negative / false-positive tests
+[✓] ISSUE-024 | TEST | No negative / false-positive tests
 All tests check presence counts only.
 Impact: Heuristic regressions undetected.
 Action: Add fixtures with misleading strings to ensure not matched.
@@ -146,7 +146,7 @@ Action: Add test counting analyze() invocations after memoization.
 
 CODE QUALITY / CLEANUP
 ----------------------
-[X] ISSUE-026 | CODE | Unused imports in analyzer.ts
+[✓] ISSUE-026 | CODE | Unused imports in analyzer.ts
 Imports of types not referenced.
 Impact: Minor clutter.
 Action: Remove unused imports; enable lint rule.
@@ -178,7 +178,7 @@ strings,file,nm,objdump,ldd,uname may not exist on native Windows.
 Impact: Limited portability; degraded analysis.
 Action: Detect OS, use alternative (e.g., dumpbin on Windows) or require WSL; aggregate warnings.
 
-[X] ISSUE-032 | PLATFORM | No graceful partial capability reporting
+[✓] ISSUE-032 | PLATFORM | No graceful partial capability reporting
 Failures silently return empty arrays.
 Impact: User unaware of reduced analysis fidelity.
 Action: Collect diagnostics and show in report footer.
@@ -239,7 +239,7 @@ Action: Add --fail-on <critical|major|minor>.
 Impact: User confusion.
 Action: Keep both but unify naming (--sbom-format -> --format for check).
 
-[X] ISSUE-043 | UX | Report lacks tool versions & analysis diagnostics
+[✓] ISSUE-043 | UX | Report lacks tool versions & analysis diagnostics
 No section showing which external tools succeeded / failed.
 Impact: Hard to trust results.
 Action: Add diagnostics summary table.
