@@ -929,6 +929,22 @@ describe('BetanetComplianceChecker', () => {
       expect(privacy).toBeDefined();
       delete process.env.BETANET_SKIP_TOOLS;
     });
+    it('should attach degradedHints to string-heavy checks when strings tool skipped (ISSUE-035)', async () => {
+      process.env.BETANET_SKIP_TOOLS = 'strings';
+      const checker = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-degraded-hints');
+      await fs.writeFile(tmp, Buffer.from('ticket rotation chacha20 poly1305 cashu lightning federation kyber768 x25519 mix beaconset diversity'));
+      const result = await checker.checkCompliance(tmp, { maxParallel: 4 });
+      // Expect at least one check with degraded hints
+      const withHints = result.checks.filter(c => c.degradedHints && c.degradedHints.length);
+      expect(withHints.length).toBeGreaterThan(0);
+      // Network (id 1) or payment (id 8) should likely be affected
+      const network = result.checks.find(c => c.id === 1);
+      if (network) {
+        expect(network.degradedHints).toBeDefined();
+      }
+      delete process.env.BETANET_SKIP_TOOLS;
+    });
   });
 
   describe('severity filtering', () => {

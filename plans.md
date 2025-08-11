@@ -67,6 +67,7 @@ Implemented:
 - Binary existence pre-check (ISSUE-033)
 - Analyzer fallback for strings & dependency detection; graceful degradation flags
 - Added degradation tests & diagnostics exposure
+ - Per-check degradedHints inline markers (ISSUE-035 follow-up)
 
 Deferred:
 - Per-check try/catch wrap (current evaluators stable; can harden later) (ISSUE-036)

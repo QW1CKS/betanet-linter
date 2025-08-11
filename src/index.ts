@@ -70,6 +70,40 @@ export class BetanetComplianceChecker {
         const duration = performance.now() - start;
         if (timer) clearTimeout(timer);
         result.durationMs = duration;
+        // Attach degraded hints mapping (ISSUE-035)
+        try {
+          const diag = this._analyzer.getDiagnostics();
+          if (diag?.degraded) {
+            const reasons = diag.degradationReasons || [];
+            const hints: string[] = [];
+            // Map reasons that influence string-based heuristics
+            const stringReasons = reasons.filter(r => r.startsWith('strings-'));
+            const symbolReasons = reasons.filter(r => r.startsWith('symbols-'));
+            const depReasons = reasons.filter(r => r.startsWith('ldd'));
+            const appliesStringHeuristics = [1,2,4,5,6,8,10,11].includes(def.id); // checks relying heavily on strings
+            const appliesSymbolHeuristics = [1,3,4,10].includes(def.id);
+            const appliesDeps = false; // placeholder for future dependency-specific checks
+            if (appliesStringHeuristics && stringReasons.length) {
+              if (stringReasons.includes('strings-fallback-truncated')) hints.push('string extraction truncated');
+              if (stringReasons.includes('strings-missing')) hints.push('strings tool missing');
+              if (stringReasons.includes('strings-error')) hints.push('strings invocation error');
+              if (stringReasons.includes('strings-fallback-error')) hints.push('string fallback error');
+            }
+            if (appliesSymbolHeuristics && symbolReasons.length) {
+              hints.push('symbol extraction degraded');
+            }
+            if (appliesDeps && depReasons.length) {
+              hints.push('dependency resolution degraded');
+            }
+            if (!hints.length && diag.missingCoreTools?.length) {
+              // Generic platform degradation
+              hints.push('core analysis tools missing');
+            }
+            if (hints.length) {
+              result.degradedHints = Array.from(new Set(hints));
+            }
+          }
+        } catch {/* swallow */}
         checks.push(result);
         checkTimings.push({ id: result.id, durationMs: duration });
       } catch (e: any) {
@@ -267,10 +301,14 @@ export class BetanetComplianceChecker {
       const status = check.passed ? '✅' : '❌';
       const severity = check.severity === 'critical' ? '🔴' : 
                       check.severity === 'major' ? '🟡' : '🟢';
+      const degradedMark = check.degradedHints && check.degradedHints.length ? ' (degraded)' : '';
       
-      console.log(`${status} ${severity} [${check.id}] ${check.name}`);
+      console.log(`${status} ${severity} [${check.id}] ${check.name}${degradedMark}`);
       console.log(`   ${check.description}`);
       console.log(`   ${check.details}`);
+      if (check.degradedHints && check.degradedHints.length) {
+        console.log(`   Hints: ${check.degradedHints.join('; ')}`);
+      }
       console.log();
     });
 

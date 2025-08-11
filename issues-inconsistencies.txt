@@ -203,8 +203,8 @@ Impact: CLI stalls.
 Action: Add timeout & fallback path.
 Resolution: Centralized safeExec wrapper (configurable via BETANET_TOOL_TIMEOUT_MS) now used for analyzer + SBOM (strings, ldd, file, sha256sum) with per-call timeouts (2025-08-11).
 
-[ ] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
-Partial: Now prints one-line degraded summary with reasons & missing core tools. Remaining: per-check inline hints could be added later.
+[✓] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
+Resolved: Added per-check degradedHints array with inline '(degraded)' marker & hints (strings tool missing, truncated, symbol degradation). Global degraded summary retained.
 
 [✓] ISSUE-036 | ERROR | Missing try/catch around entire check loop
 RESOLVED: Each check evaluation isolated with error & timeout handling; failures converted to failed check entry.

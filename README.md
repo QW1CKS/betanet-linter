@@ -328,6 +328,8 @@ Degraded mode lowers confidence and normally does not trigger failure; set `BETA
 
 All external tool invocations (strings, nm, objdump, ldd, file, sha256sum) pass through a unified `safeExec` wrapper with a configurable timeout to prevent hangs (ISSUE-034). Missing or timed-out tools contribute to degradation reasons. When `strings` is unavailable the linter now performs a streaming, size‑capped ASCII scan (default 32MiB) instead of reading the entire binary (ISSUE-038); truncation adds a `strings-fallback-truncated` degradation reason.
 
+Per-check transparency (ISSUE-035): Affected checks display an inline `(degraded)` marker in table output with a `Hints:` line (e.g., `strings tool missing`, `string extraction truncated`, `symbol extraction degraded`). JSON / YAML include a `degradedHints` array per check for downstream automation.
+
 ## Development
 
 ### Building from Source

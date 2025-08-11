@@ -6,6 +6,7 @@ export interface ComplianceCheck {
   details: string;
   severity: 'critical' | 'major' | 'minor';
   durationMs?: number; // execution time for the check
+  degradedHints?: string[]; // per-check degradation context (ISSUE-035)
 }
 
 export interface ComplianceResult {
