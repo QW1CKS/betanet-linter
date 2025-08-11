@@ -2,6 +2,8 @@
 
 A comprehensive CLI tool for checking Betanet specification compliance in binary implementations. It fully targets the Betanet 1.0 specification (§11) and provides enhanced heuristic coverage of emerging Betanet 1.1 changes (transport version bump, rendezvous rotation scoring, path diversity, optional WebRTC transport, privacy hop weighting). It generates detailed compliance reports.
 
+> DISCLAIMER (Heuristic Analysis – ISSUE-049): This linter performs static, best‑effort heuristic inspection of binaries. A PASS does not cryptographically prove runtime adherence; a FAIL may reflect missing static indicators rather than true absence. Dynamic phenomena (live rotation cadence, negotiated cipher activation, runtime path diversification, active voucher redemption) are not executed. Treat results as advisory signals requiring corroboration in integration / runtime QA.
+
 ## Features
 
 - ✅ **Complete Compliance Checking**: Validates all 11 Betanet specification requirements (§11)
@@ -16,6 +18,7 @@ A comprehensive CLI tool for checking Betanet specification compliance in binary
 - 🛡️ **Degraded Fail Gate**: Set `BETANET_FAIL_ON_DEGRADED=1` to force failure when tooling is degraded
 - ⚡ **Parallel Evaluation**: Runs checks concurrently; tune with `--max-parallel` and per-check `--check-timeout`
 - 🧪 **Dynamic Probe (Optional)**: `--dynamic-probe` lightly invokes the binary with `--help` to enrich heuristic surface (no network / destructive actions)
+- 🏷️ **SBOM Feature Tagging**: Adds `betanet.feature` properties (e.g. `transport-quic`, `crypto-pq-hybrid`, `payment-lightning`, `privacy-hop`) to CycloneDX / SPDX outputs for downstream audit traceability
 
 ## Installation
 
@@ -131,7 +134,22 @@ Architecture note: All checks are defined declaratively in a central registry (`
 11. **Privacy Hop Enforcement** - Weighted mixnet heuristic (mix + beacon/epoch + diversity tokens) requiring ≥2 mix, ≥1 beacon, ≥1 diversity indicator (scores now surfaced)
 
 ### Heuristic & Partial Coverage Disclaimer
-Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., live TLS fingerprint calibration, sustained path diversity rotation, runtime hop enforcement, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Rotation confidence (rotationHits) and path diversity counts are informational only.
+Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., live TLS fingerprint calibration, sustained path diversity rotation, runtime hop enforcement, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Rotation confidence (`rotationHits`), privacy weighting scores, and path diversity counts are informational only. See top-level DISCLAIMER for interpretation guidance.
+
+### Betanet 1.1 Delta Coverage Matrix (ISSUE-060)
+| 1.1 Element | Status | Evidence / Output Field |
+|-------------|--------|-------------------------|
+| Transport endpoint version bump (`/betanet/htx/1.1.0`, `htxquic/1.1.0`) | Implemented | Check 5 details (accepted list) |
+| Optional WebRTC transport | Implemented | Check 5 details (`optional: webrtc`) |
+| Rendezvous rotation / BeaconSet heuristic | Implemented | Check 6 details (`rotationHits`, beacon indicators) |
+| Path diversity threshold (≥2 markers) | Implemented | Check 4 failure details enumerate needed markers |
+| Privacy hop weighting (mix / beacon / diversity) | Implemented | Check 11 details (mix=, beacon=, diversity=, total=) |
+| Voucher structural regex detection | Implemented | Check 8 details (voucher present or missing) |
+| PoW ≥22 contextual parsing | Implemented | Check 8 details (missing list shows PoW context) |
+| PQ date override (`BETANET_PQ_DATE_OVERRIDE`) UTC-safe | Implemented | Check 10 severity escalation; override env documented |
+| SBOM feature tagging (`betanet.feature`) | Implemented | CycloneDX properties / SPDX `PackageComment` lines |
+| Windows degraded diagnostics (platform + reasons) | Implemented | Diagnostics: `platform`, `missingCoreTools`, `degradationReasons` |
+| Dynamic runtime probe / plugin mode | Deferred | Future (ISSUE-059) |
 
 ### Spec Coverage Summary
 The tool fully covers Betanet 1.0 checks and partially covers emerging 1.1 elements. Runtime output now includes a spec coverage header, e.g.:
@@ -141,7 +159,7 @@ Spec Coverage: baseline 1.0 fully covered; latest known 1.1 checks implemented 1
 Pending 1.1 refinements: (none – all heuristic refinements integrated)
 ```
 
-No pending 1.1 refinement issues remain; prior backlog items (privacy hop refinement, voucher structural voucher format, PoW context parsing) have been implemented.
+No pending 1.1 refinement issues remain; prior backlog items (privacy hop refinement, voucher structural detection, PoW context parsing) have been implemented. Dynamic execution (ISSUE-059) remains deferred.
 JSON / YAML outputs include a `specSummary` object with the same fields for programmatic consumption.
 
 ## Output Examples
@@ -254,7 +272,7 @@ jobs:
 
 ### SBOM Generation Tooling Notes
 
-The SBOM generator uses best-effort external tooling. On Windows (non-WSL) where `strings` / `ldd` are typically unavailable, the linter now silently falls back to a lightweight in-process ASCII scan and skips dynamic dependency enumeration—tests no longer emit warnings. To re-enable verbose troubleshooting messages for missing tools or parsing issues, set:
+The SBOM generator uses best-effort external tooling. On Windows (non-WSL) where `strings` / `ldd` are typically unavailable, the linter falls back to a lightweight in-process ASCII scan and skips dynamic dependency enumeration—now surfaced via a concise degraded summary (platform diagnostics). To re-enable verbose troubleshooting messages for missing tools or parsing issues, set:
 
 ```powershell
 setx BETANET_DEBUG_SBOM 1
@@ -270,6 +288,8 @@ $env:BETANET_DEBUG_SBOM = '1'
 On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhances coverage (strings, nm, objdump, ldd). The generator remains resilient if any tool is absent.
 
 Multi-license detection: Composite SPDX expressions (e.g. `Apache-2.0 OR MIT`) are split. CycloneDX lists each as a separate license entry. SPDX tag-value & JSON collapse the list with `OR` for `licenseDeclared`.
+
+Feature tagging: For every detected capability, the SBOM appends `betanet.feature` entries (CycloneDX `properties`, SPDX `PackageComment`). This enables downstream policy engines to assert presence of specific network / crypto / payment / privacy traits without re-parsing the binary.
 
 ## Exit Codes
 
@@ -287,15 +307,19 @@ Multi-license detection: Composite SPDX expressions (e.g. `Apache-2.0 OR MIT`) a
 - `BETANET_SKIP_TOOLS=strings,nm` - Comma-separated list of external tools to skip (graceful degradation)
 - `BETANET_FAIL_ON_DEGRADED=1` - Treat degraded analysis as failure (overrides otherwise passing result)
 - `BETANET_PQ_DATE_OVERRIDE=YYYY-MM-DD` - Override post-quantum mandatory enforcement date (for early testing)
+  - Accepts ISO date or full timestamp; evaluated in UTC (ISSUE-016 fix)
 
 ### Diagnostics & Degradation
 
 Compliance results include a `diagnostics` object with tooling and performance metadata:
 
-- `degraded`: true if any external tool was missing, skipped, or timed out
+-- `degraded`: true if any external tool was missing, skipped, or timed out
 - `skippedTools`: tools skipped via configuration
 - `timedOutTools`: tools that exceeded the timeout
 - `tools[]`: per-tool availability + durations
+- `platform`: execution platform (e.g., win32, linux)
+- `missingCoreTools`: list of core analysis tools unavailable
+- `degradationReasons`: high-level reason codes (e.g., `native-windows-missing-unix-tools`)
 - `parallelDurationMs`: total elapsed time for parallel evaluation phase
 - Each check includes `durationMs`
 

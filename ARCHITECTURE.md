@@ -1,5 +1,8 @@
 # Betanet Compliance Linter - Project Structure
 
+betanet-linter/
+# Betanet Compliance Linter - Project Structure
+
 ```
 betanet-linter/
 ├── src/
@@ -36,7 +39,16 @@ betanet-linter/
    - Lazy analyzer instantiation → enables dependency injection during tests
 
 - **Check Registry** (`src/check-registry.ts`)
-   - Central list of 10 compliance checks (id, key, name, description, severity, version metadata)
+   - Central list of 11 compliance checks (id, key, name, description, severity, version metadata)
+5. Feature tagging: injects `betanet.feature` properties (transport-htx, transport-quic, transport-webrtc, crypto-pq-hybrid, payment-lightning, privacy-hop, etc.) across formats
+
+## Performance & Diagnostics
+- Single-pass memoized analysis (analyze() cached)
+- Parallel evaluation of checks with per-check timeout & duration capture
+- Diagnostics object: analyze invocation count, cache hit flag, tool availability, platform, missingCoreTools, degradationReasons
+- Force refresh option (`--force-refresh`) to invalidate cache
+- Environment gates: `BETANET_FAIL_ON_DEGRADED`, `BETANET_PQ_DATE_OVERRIDE` (UTC-safe), tool skip list
+- Concise degraded summary printed when degraded=true
    - Each entry exposes `evaluate(analyzer, now)` returning a `ComplianceCheck`
    - Handles dynamic severity escalation (post-quantum critical date) & version acceptances (transport 1.0 / 1.1)
 

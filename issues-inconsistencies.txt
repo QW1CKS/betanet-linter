@@ -278,15 +278,17 @@ RESOLVED: Alternate ComplianceChecker removed; README already reflects single im
 Impact: Confusion eliminated.
 Action: (Done) Consider adding ARCHITECTURE.md note of consolidation.
 
-[X] ISSUE-049 | DOC | Missing explanation of heuristic nature
+[✓] ISSUE-049 | DOC | Missing explanation of heuristic nature
 Spec suggests "validates" but actually heuristics.
 Impact: Overstated confidence.
 Action: Add disclaimer & guidance.
+Resolution: Added explicit heuristic disclaimer, limitations, and guidance in README plus 1.1 delta matrix (2025-08-11).
 
-[X] ISSUE-050 | DOC | No contribution guidelines for adding new checks
+[✓] ISSUE-050 | DOC | No contribution guidelines for adding new checks
 Process unclear.
 Impact: Inconsistent future additions.
 Action: Add CONTRIBUTING section: pattern, naming, severity criteria.
+Resolution: CONTRIBUTING.md created with sections on architecture overview, adding a check lifecycle, severity rubric, heuristic design principles, SBOM feature tagging, performance guardrails, and test matrix requirements (2025-08-11).
 
 PRIORITIZATION SUGGESTION (High → Low)
 --------------------------------------
@@ -361,9 +363,10 @@ Rotation scheduling, path diversity, and real PoW verification are runtime pheno
 Impact: False negatives for binaries using late-bound or generated strings.
 Action: (Future) Introduce optional dynamic probe mode (exec with --dry-scan env) or plugin architecture.
 
-[ ] ISSUE-060 | DOC | README lacks 1.1 delta coverage table (Deferred)
+[✓] ISSUE-060 | DOC | README lacks 1.1 delta coverage table
 Documentation lists partial support but not a matrix of implemented vs pending 1.1 features.
 Impact: Contributors lack at-a-glance roadmap.
 Action: Add table referencing ISSUE-051..060 statuses; auto-update suggestion script.
+Resolution: README updated with 1.1 delta coverage matrix & feature tagging notes (2025-08-11).
 
 Note: Issues 051–060 focus exclusively on Betanet 1.1 evolution; they should be reassessed once Plan 3 consolidation is underway to avoid duplication with architectural refactors.
