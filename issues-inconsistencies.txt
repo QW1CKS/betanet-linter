@@ -103,30 +103,27 @@ Resolution: Replaced local Date construction with UTC epoch constant (POST_QUANT
 
 SBOM ISSUES
 -----------
-[X] ISSUE-017 | SBOM | SPDX output simplistic / non-compliant
-index.ts uses ad-hoc tag-value; relationships assume at least one component; duplicates possible.
-Impact: Tooling ingestion problems.
-Action: Use SPDX tools or produce valid 2.3 JSON/YAML with required fields; validate.
+[✓] ISSUE-017 | SBOM | SPDX output simplistic / non-compliant
+Resolution (2025-08-11): Enhanced tag-value & JSON generation: stable root SPDXID (SPDXRef-Package-Root), all components emitted with SPDXIDs, DEPENDS_ON relationships added, checksums for components & root, consistent licenseDeclared/concluded fields. Strengthens interoperability with SPDX 2.3 tooling.
+Impact: Higher ingestion reliability.
 
-[X] ISSUE-018 | SBOM | Missing component hashes
-No SHA-256 or other integrity data.
-Impact: Limited supply chain value.
-Action: Compute hashes of binary and dependencies.
+[✓] ISSUE-018 | SBOM | Missing component hashes
+Resolution: SHA-256 hashing implemented (calculateHash + addComponentHashes) earlier; reaffirmed 2025-08-11.
+Impact: Integrity data present.
 
-[X] ISSUE-019 | SBOM | License detection naive
-Hardcoded crypto component licenses, others 'unknown'.
-Impact: Incomplete compliance data.
-Action: Attempt simple license string scanning; allow override.
+[✓] ISSUE-019 | SBOM | License detection heuristic
+Resolution: Heuristic license scanning (including composite OR/AND expressions & MIT fallback) implemented; multi-license capture stored. Marking resolved 2025-08-11.
+Impact: Richer license metadata.
 
 [✓] ISSUE-020 | SBOM | Duplicate component extraction patterns
 RESOLVED: Legacy sbom.ts removed; single extraction path in index.ts.
 Impact: Inconsistent outputs eliminated.
 Action: (Done) Further enhancements tracked by 017-019,021.
 
-[X] ISSUE-021 | SBOM | Version inference weak
-Regex may capture false positives; unbounded scanning duplicates.
-Impact: Noise in SBOM.
-Action: Debounce matches; require plausible semantic version context.
+[✓] ISSUE-021 | SBOM | Version inference weak
+Original: Regex captured false positives; unbounded scanning duplicates.
+Resolution (2025-08-11): Contextual version extractor added (ISSUE-021) scoring semver/date/hash candidates, keyword proximity filtering, dedupe by normalized version, suppression metrics (versionsDetectedQuality). Reduces random numeric noise & short hex without context.
+Impact: Higher SBOM trust & downstream vulnerability mapping reliability.
 
 TESTING
 -------
@@ -192,10 +189,9 @@ Action: Collect diagnostics and show in report footer.
 
 ERROR HANDLING / ROBUSTNESS
 ---------------------------
-[X] ISSUE-033 | ERROR | No binary existence pre-check
-Errors arise deep in extraction.
-Impact: Less friendly error messaging.
-Action: fs.pathExists check upfront with clear message.
+[✓] ISSUE-033 | ERROR | Binary existence pre-check
+Resolution: Upfront path existence guard added in CLI/analyzer (Plan 5). Marking resolved 2025-08-11.
+Impact: Earlier user feedback.
 
 [✓] ISSUE-034 | ERROR | No timeout on external commands
 Execa calls may hang.
@@ -225,10 +221,9 @@ Impact: DoS risk on huge binaries.
 Action: Stream parse in chunks with size limit guard.
 Resolution: Streaming fallback with 32MiB cap (configurable via BETANET_FALLBACK_STRINGS_MAX_BYTES) added; truncation flagged via diagnostics (strings-fallback-truncated) (2025-08-11).
 
-[X] ISSUE-039 | SEC | No hash computation for integrity
-SBOM lacks integrity proofs.
-Impact: Cannot verify tampering.
-Action: Compute SHA-256 of binary + dependencies.
+[✓] ISSUE-039 | SEC | Hash computation for integrity
+Resolution (earlier Plan 4, noted 2025-08-11 review): SHA-256 hashing implemented for binary & dependencies (calculateHash + addComponentHashes). Marking resolved; previously left open inadvertently.
+Impact: Enables integrity verification & supply chain tooling alignment.
 
 UX / CLI
 --------

@@ -152,34 +152,35 @@ export class SBOMGenerator {
 
   private async extractComponents(binaryPath: string): Promise<any[]> {
     const components: any[] = [];
+  const versionCandidates: { raw: string; normalized: string; context: string; score: number }[] = [];
 
-    // Helper: add version matches to components
-    const addVersions = (text: string) => {
-      const lines = text.split('\n');
-      const versionPatterns = [
-        /(\d+\.\d+\.\d+)/,
-        /v(\d+\.\d+\.\d+)/,
-        /version\s+(\d+\.\d+\.\d+)/i,
-        /(\d+\.\d+\.\d+[-_]\w+)/,
-        /([a-zA-Z]+)\s+(\d+\.\d+\.\d+)/i
-      ];
-      const foundVersions = new Set<string>();
-      for (const line of lines) {
-        for (const pattern of versionPatterns) {
-          const match = line.match(pattern);
-            if (match && match[1]) {
-              foundVersions.add(match[1]);
-            }
+    // ISSUE-021: Improved version inference with context & scoring
+    // Scoring tiers: semver (3), semver+pre (3), date-like (2), sha/hash near keyword (1)
+    const versionRegexes: { re: RegExp; score: number; normalize: (m: RegExpMatchArray) => string }[] = [
+      { re: /\b[vV]?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z\.-]+)?)\b/g, score: 3, normalize: m => m[1] }, // semver & prerelease
+      { re: /\b(\d{4}\.\d{1,2}\.\d{1,2})\b/g, score: 2, normalize: m => m[1] }, // date style
+      { re: /\b([0-9a-f]{7,12})\b/g, score: 1, normalize: m => m[1] } // short git hash
+    ];
+    const KEYWORD_WINDOW = 24; // chars window to look back for keyword
+    const keywords = ['version', 'ver', 'v', 'release', 'rev', 'commit'];
+
+    const collectVersions = (text: string) => {
+      versionRegexes.forEach(vr => {
+        let match: RegExpExecArray | null;
+        while ((match = vr.re.exec(text)) !== null) {
+          const norm = vr.normalize(match);
+          // Skip improbable all-zero or trivial versions
+            if (/^0\.0\.0$/.test(norm)) continue;
+          // Context: ensure not part of a longer token already handled (regex boundaries should cover) but validate surrounding chars
+          const idx = match.index;
+          const contextStart = Math.max(0, idx - KEYWORD_WINDOW);
+          const context = text.slice(contextStart, idx + norm.length + KEYWORD_WINDOW);
+          const pre = text.slice(Math.max(0, idx - KEYWORD_WINDOW), idx).toLowerCase();
+          const hasKeyword = keywords.some(k => pre.includes(k));
+          // Git hash style candidates require keyword proximity else ignore (to suppress random hex)
+          if (vr.score === 1 && !hasKeyword) continue;
+          versionCandidates.push({ raw: match[0], normalized: norm, context, score: vr.score + (hasKeyword ? 1 : 0) });
         }
-      }
-      foundVersions.forEach(version => {
-        components.push({
-          type: 'library',
-          name: 'Unknown',
-          version,
-          purl: `pkg:generic/unknown@${version}`,
-          detected: true
-        });
       });
     };
 
@@ -196,7 +197,7 @@ export class SBOMGenerator {
             if (byte >= 32 && byte <= 126) { current += String.fromCharCode(byte); } else { if (current.length >= 4) ascii.push(current); current = ''; }
           }
           if (current.length >= 4) ascii.push(current);
-          addVersions(ascii.join('\n'));
+          collectVersions(ascii.join('\n'));
         }
       } catch (e) {
         if (debug) console.warn('SBOM fallback (windows strings) failed:', (e as any)?.message);
@@ -208,7 +209,7 @@ export class SBOMGenerator {
     try {
       const res = await safeExec('strings', [binaryPath], 5000);
       if (!res.failed) {
-        addVersions(res.stdout);
+        collectVersions(res.stdout);
       } else {
         throw new Error(res.errorMessage || 'strings-failed');
       }
@@ -239,6 +240,34 @@ export class SBOMGenerator {
     } catch (e) {
       // Silent unless debug
       if (debug) console.warn('SBOM ldd exec skipped:', (e as any)?.message);
+    }
+
+    // Consolidate collected version candidates into synthetic components (Unknown until better attribution)
+    if (versionCandidates.length) {
+      // Prefer highest score, then longest (for prerelease richness)
+      const byNorm = new Map<string, { normalized: string; score: number; example: string }>();
+      versionCandidates.forEach(vc => {
+        const existing = byNorm.get(vc.normalized);
+        if (!existing || vc.score > existing.score || (vc.score === existing.score && vc.normalized.length > existing.normalized.length)) {
+          byNorm.set(vc.normalized, { normalized: vc.normalized, score: vc.score, example: vc.raw });
+        }
+      });
+      Array.from(byNorm.values()).forEach(v => {
+        components.push({
+          type: 'library',
+          name: 'Unknown',
+          version: v.normalized,
+          purl: `pkg:generic/unknown@${v.normalized}`,
+          detected: true,
+          _versionScore: v.score
+        });
+      });
+      // Attach versionsDetectedQuality metric (optional quick win)
+      (components as any)._versionsDetectedQuality = {
+        candidates: versionCandidates.length,
+        accepted: byNorm.size,
+        suppressionRate: versionCandidates.length ? Number(((versionCandidates.length - byNorm.size) / versionCandidates.length).toFixed(2)) : 0
+      };
     }
 
     return components;
@@ -490,55 +519,62 @@ export class SBOMGenerator {
   }
 
   private generateSPDXTagValue(binaryInfo: any, components: any[], dependencies: any[]): string {
-    // Convert to SPDX format
-    let spdxText = `SPDXVersion: SPDX-2.3\n`;
-    spdxText += `DataLicense: CC0-1.0\n`;
-    spdxText += `SPDXID: SPDXRef-DOCUMENT\n`;
-  const safeDocName = sanitizeName(binaryInfo.name);
-  spdxText += `DocumentName: ${safeDocName}\n`;
-  spdxText += `DocumentNamespace: https://spdx.org/spdxdocs/${safeDocName}-${this.generateUUID()}\n`;
-    spdxText += `Created: ${new Date().toISOString()}\n`;
-    spdxText += `Creator: Tool: betanet-compliance-linter\n\n`;
-
-  spdxText += `Package: ${safeDocName}\n`;
-    spdxText += `SPDXID: SPDXRef-PACKAGE\n`;
-  spdxText += `PackageName: ${safeDocName}\n`;
-    spdxText += `PackageVersion: 1.0.0\n`;
-    spdxText += `PackageDownloadLocation: NOASSERTION\n`;
-    spdxText += `FilesAnalyzed: false\n`;
-    spdxText += `PackageLicenseConcluded: NOASSERTION\n`;
-  spdxText += `PackageLicenseDeclared: ${(binaryInfo.licenses && binaryInfo.licenses.length > 1) ? binaryInfo.licenses.join(' OR ') : (binaryInfo.license || 'NOASSERTION')}\n`;
-    spdxText += `PackageCopyrightText: NOASSERTION\n`;
-    if (binaryInfo.hash) {
-      spdxText += `PackageChecksum: SHA256: ${binaryInfo.hash}\n`;
-    }
+    // Enhanced SPDX Tag-Value output (ISSUE-017)
+    const safeDocName = sanitizeName(binaryInfo.name);
+    const docNs = `https://spdx.org/spdxdocs/${safeDocName}-${this.generateUUID()}`;
+    const lines: string[] = [];
+    lines.push('SPDXVersion: SPDX-2.3');
+    lines.push('DataLicense: CC0-1.0');
+    lines.push('SPDXID: SPDXRef-DOCUMENT');
+    lines.push(`DocumentName: ${safeDocName}`);
+    lines.push(`DocumentNamespace: ${docNs}`);
+    lines.push(`Created: ${new Date().toISOString()}`);
+    lines.push('Creator: Tool: betanet-compliance-linter');
+    lines.push('');
+    const rootSpdxId = 'SPDXRef-Package-Root';
+    lines.push(`PackageName: ${safeDocName}`);
+    lines.push(`SPDXID: ${rootSpdxId}`);
+    lines.push('PackageVersion: 1.0.0');
+    lines.push('PackageDownloadLocation: NOASSERTION');
+    lines.push('FilesAnalyzed: false');
+    lines.push('PackageLicenseConcluded: NOASSERTION');
+    lines.push(`PackageLicenseDeclared: ${(binaryInfo.licenses && binaryInfo.licenses.length > 1) ? binaryInfo.licenses.join(' OR ') : (binaryInfo.license || 'NOASSERTION')}`);
+    lines.push('PackageCopyrightText: NOASSERTION');
+    if (binaryInfo.hash) lines.push(`PackageChecksum: SHA256: ${binaryInfo.hash}`);
     if (binaryInfo.betanetFeatures && binaryInfo.betanetFeatures.length) {
-      (binaryInfo.betanetFeatures as string[]).forEach((f: string) => {
-        spdxText += `PackageComment: betanet.feature=${f}\n`;
+      (binaryInfo.betanetFeatures as string[]).forEach((f: string) => lines.push(`PackageComment: betanet.feature=${f}`));
+    }
+    components.forEach((c, idx) => {
+      const compId = `SPDXRef-Comp-${idx}`;
+      lines.push('');
+      lines.push(`PackageName: ${sanitizeName(c.name)}`);
+      lines.push(`SPDXID: ${compId}`);
+      lines.push(`PackageVersion: ${c.version || 'unknown'}`);
+      lines.push('PackageDownloadLocation: NOASSERTION');
+      lines.push('FilesAnalyzed: false');
+      lines.push('PackageLicenseConcluded: NOASSERTION');
+      lines.push(`PackageLicenseDeclared: ${c.license || 'NOASSERTION'}`);
+      if (c.hash) lines.push(`PackageChecksum: SHA256: ${c.hash}`);
+    });
+    if (dependencies.length) {
+      lines.push('');
+      dependencies.forEach(dep => {
+        const depRef = `SPDXRef-${dep.ref.replace(/[^A-Za-z0-9]/g, '_')}`;
+        lines.push(`Relationship: ${rootSpdxId} DEPENDS_ON ${depRef}`);
       });
     }
-
-    // Append detected component licenses if any
-    components.forEach((c, idx) => {
-      if (c.license) {
-  spdxText += `PackageName: ${sanitizeName(c.name)}\n`;
-        spdxText += `SPDXID: SPDXRef-COMP-${idx}\n`;
-        spdxText += `PackageVersion: ${c.version || 'unknown'}\n`;
-        spdxText += `PackageLicenseDeclared: ${c.license}\n`;
-      }
-    });
-    return spdxText;
+    return lines.join('\n');
   }
 
   private generateSPDXJson(binaryInfo: any, components: any[], dependencies: any[]): any {
     const docId = `SPDXRef-DOCUMENT`;
     const safeBin = sanitizeName(binaryInfo.name);
-    const packageId = `SPDXRef-PACKAGE-${safeBin}`;
+    const packageId = `SPDXRef-Package-Root`;
     const relationships = dependencies.length ? dependencies.map(dep => ({
-        spdxElementId: packageId,
-        relationshipType: 'DEPENDS_ON',
-        relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
-      })) : [];
+      spdxElementId: packageId,
+      relationshipType: 'DEPENDS_ON',
+      relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
+    })) : [];
     return {
       SPDXID: docId,
       spdxVersion: 'SPDX-2.3',
@@ -564,16 +600,17 @@ export class SBOMGenerator {
         },
         ...components.map((c, idx) => ({
           name: sanitizeName(c.name),
-          SPDXID: `SPDXRef-COMP-${idx}`,
+          SPDXID: `SPDXRef-Comp-${idx}`,
           versionInfo: c.version || 'unknown',
           filesAnalyzed: false,
           downloadLocation: 'NOASSERTION',
           licenseDeclared: c.license || 'NOASSERTION',
           licenseConcluded: 'NOASSERTION',
-          copyrightText: 'NOASSERTION'
+          copyrightText: 'NOASSERTION',
+          checksums: c.hash ? [{ algorithm: 'SHA256', checksumValue: c.hash }] : []
         }))
       ],
-  relationships
+      relationships
     };
   }
 
