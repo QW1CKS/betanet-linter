@@ -42,29 +42,67 @@ const execa_1 = __importDefault(require("execa"));
 // Removed unused imports (which, types)
 class BinaryAnalyzer {
     constructor(binaryPath, verbose = false) {
+        this.cachedAnalysis = null;
+        this.diagnostics = {
+            tools: [],
+            analyzeInvocations: 0,
+            cached: false
+        };
+        this.analysisStartHr = null;
         this.binaryPath = binaryPath;
         this.verbose = verbose;
+        void this.detectTools();
+    }
+    getDiagnostics() {
+        return this.diagnostics;
+    }
+    async detectTools() {
+        const toolCandidates = [
+            { name: 'strings', args: ['--version'] },
+            { name: 'nm', args: ['--version'] },
+            { name: 'objdump', args: ['--version'] },
+            { name: 'ldd', args: ['--version'] },
+            { name: 'file', args: ['--version'] },
+            { name: 'uname', args: ['-m'] }
+        ];
+        const checks = toolCandidates.map(async (t) => {
+            const start = Date.now();
+            try {
+                await (0, execa_1.default)(t.name, t.args, { timeout: 2000 });
+                this.diagnostics.tools.push({ name: t.name, available: true, durationMs: Date.now() - start });
+            }
+            catch (e) {
+                this.diagnostics.tools.push({ name: t.name, available: false, error: e?.shortMessage || e?.message });
+            }
+        });
+        await Promise.all(checks);
     }
     async analyze() {
+        if (this.cachedAnalysis) {
+            this.diagnostics.cached = true;
+            return this.cachedAnalysis;
+        }
         if (this.verbose) {
             console.log(`📊 Analyzing binary: ${this.binaryPath}`);
         }
-        const [strings, symbols, fileFormat, architecture, dependencies, size] = await Promise.all([
-            this.extractStrings(),
-            this.extractSymbols(),
-            this.detectFileFormat(),
-            this.detectArchitecture(),
-            this.detectDependencies(),
-            this.getFileSize()
-        ]);
-        return {
-            strings,
-            symbols,
-            fileFormat,
-            architecture,
-            dependencies,
-            size
-        };
+        this.diagnostics.analyzeInvocations += 1;
+        this.analysisStartHr = process.hrtime();
+        this.cachedAnalysis = (async () => {
+            const [strings, symbols, fileFormat, architecture, dependencies, size] = await Promise.all([
+                this.extractStrings(),
+                this.extractSymbols(),
+                this.detectFileFormat(),
+                this.detectArchitecture(),
+                this.detectDependencies(),
+                this.getFileSize()
+            ]);
+            if (this.analysisStartHr) {
+                const diff = process.hrtime(this.analysisStartHr);
+                this.diagnostics.totalAnalysisTimeMs = (diff[0] * 1e3) + (diff[1] / 1e6);
+            }
+            return { strings, symbols, fileFormat, architecture, dependencies, size };
+        })();
+        return this.cachedAnalysis;
     }
     async extractStrings() {
         try {

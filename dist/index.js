@@ -72,8 +72,9 @@ class BetanetComplianceChecker {
         // Calculate overall results
         const passedChecks = checks.filter(c => c.passed);
         const criticalChecks = checks.filter(c => c.severity === 'critical' && !c.passed);
-        const overallScore = Math.round((passedChecks.length / checks.length) * 100);
-        const passed = passedChecks.length === checks.length && criticalChecks.length === 0;
+        // Guard against zero checks (filters may exclude all)
+        const overallScore = checks.length === 0 ? 0 : Math.round((passedChecks.length / checks.length) * 100);
+        const passed = checks.length > 0 && passedChecks.length === checks.length && criticalChecks.length === 0;
         const result = {
             binaryPath,
             timestamp: new Date().toISOString(),
@@ -85,7 +86,8 @@ class BetanetComplianceChecker {
                 passed: passedChecks.length,
                 failed: checks.length - passedChecks.length,
                 critical: criticalChecks.length
-            }
+            },
+            diagnostics: this.analyzer?.getDiagnostics()
         };
         return result;
     }
@@ -445,6 +447,18 @@ ${components.slice(1).map((_, index) => `Relationship: SPDXRef-PACKAGE CONTAINS 
         console.log(`Failed: ${results.summary.failed}`);
         console.log(`Critical Failures: ${results.summary.critical}`);
         console.log('─'.repeat(80));
+        if (results.diagnostics) {
+            console.log('DIAGNOSTICS:');
+            console.log(`Analysis invocations: ${results.diagnostics.analyzeInvocations} (cached: ${results.diagnostics.cached})`);
+            if (typeof results.diagnostics.totalAnalysisTimeMs === 'number') {
+                console.log(`Initial analysis time: ${results.diagnostics.totalAnalysisTimeMs.toFixed(1)} ms`);
+            }
+            const toolLine = results.diagnostics.tools
+                .map(t => `${t.available ? '✅' : '❌'} ${t.name}`)
+                .join('  ');
+            console.log(toolLine);
+            console.log('─'.repeat(80));
+        }
     }
 }
 exports.BetanetComplianceChecker = BetanetComplianceChecker;

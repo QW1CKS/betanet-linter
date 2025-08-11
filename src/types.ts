@@ -19,6 +19,7 @@ export interface ComplianceResult {
     failed: number;
     critical: number;
   };
+  diagnostics?: AnalyzerDiagnostics;
 }
 
 export interface SBOMComponent {
@@ -35,6 +36,21 @@ export interface SBOM {
   format: 'cyclonedx' | 'spdx';
   data: any; // Underlying JSON / XML / text representation
   generated: string; // ISO timestamp
+}
+
+// Tool availability & performance diagnostics
+export interface ToolStatus {
+  name: string;
+  available: boolean;
+  durationMs?: number;
+  error?: string;
+}
+
+export interface AnalyzerDiagnostics {
+  tools: ToolStatus[];
+  analyzeInvocations: number; // how many times analyze() logic executed (should be 1 after memoization)
+  cached: boolean; // whether subsequent calls used cache
+  totalAnalysisTimeMs?: number; // elapsed time for first analysis
 }
 
 export interface CheckOptions {

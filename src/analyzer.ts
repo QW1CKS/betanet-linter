@@ -1,46 +1,85 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import execa from 'execa';
+import { AnalyzerDiagnostics, ToolStatus } from './types';
 // Removed unused imports (which, types)
 
 export class BinaryAnalyzer {
   private binaryPath: string;
   private verbose: boolean;
-
-  constructor(binaryPath: string, verbose: boolean = false) {
-    this.binaryPath = binaryPath;
-    this.verbose = verbose;
-  }
-
-  async analyze(): Promise<{
+  private cachedAnalysis: Promise<{
     strings: string[];
     symbols: string[];
     fileFormat: string;
     architecture: string;
     dependencies: string[];
     size: number;
-  }> {
+  }> | null = null;
+  private diagnostics: AnalyzerDiagnostics = {
+    tools: [],
+    analyzeInvocations: 0,
+    cached: false
+  };
+  private analysisStartHr: [number, number] | null = null;
+
+  constructor(binaryPath: string, verbose: boolean = false) {
+    this.binaryPath = binaryPath;
+    this.verbose = verbose;
+    void this.detectTools();
+  }
+
+  getDiagnostics(): AnalyzerDiagnostics {
+    return this.diagnostics;
+  }
+
+  private async detectTools(): Promise<void> {
+    const toolCandidates: { name: string; args: string[] }[] = [
+      { name: 'strings', args: ['--version'] },
+      { name: 'nm', args: ['--version'] },
+      { name: 'objdump', args: ['--version'] },
+      { name: 'ldd', args: ['--version'] },
+      { name: 'file', args: ['--version'] },
+      { name: 'uname', args: ['-m'] }
+    ];
+
+    const checks = toolCandidates.map(async t => {
+      const start = Date.now();
+      try {
+        await execa(t.name, t.args, { timeout: 2000 });
+        this.diagnostics.tools.push({ name: t.name, available: true, durationMs: Date.now() - start });
+      } catch (e: any) {
+        this.diagnostics.tools.push({ name: t.name, available: false, error: e?.shortMessage || e?.message });
+      }
+    });
+    await Promise.all(checks);
+  }
+
+  async analyze(): Promise<{ strings: string[]; symbols: string[]; fileFormat: string; architecture: string; dependencies: string[]; size: number; }> {
+    if (this.cachedAnalysis) {
+      this.diagnostics.cached = true;
+      return this.cachedAnalysis;
+    }
     if (this.verbose) {
       console.log(`📊 Analyzing binary: ${this.binaryPath}`);
     }
-
-    const [strings, symbols, fileFormat, architecture, dependencies, size] = await Promise.all([
-      this.extractStrings(),
-      this.extractSymbols(),
-      this.detectFileFormat(),
-      this.detectArchitecture(),
-      this.detectDependencies(),
-      this.getFileSize()
-    ]);
-
-    return {
-      strings,
-      symbols,
-      fileFormat,
-      architecture,
-      dependencies,
-      size
-    };
+    this.diagnostics.analyzeInvocations += 1;
+    this.analysisStartHr = process.hrtime();
+    this.cachedAnalysis = (async () => {
+      const [strings, symbols, fileFormat, architecture, dependencies, size] = await Promise.all([
+        this.extractStrings(),
+        this.extractSymbols(),
+        this.detectFileFormat(),
+        this.detectArchitecture(),
+        this.detectDependencies(),
+        this.getFileSize()
+      ]);
+      if (this.analysisStartHr) {
+        const diff = process.hrtime(this.analysisStartHr);
+        this.diagnostics.totalAnalysisTimeMs = (diff[0] * 1e3) + (diff[1] / 1e6);
+      }
+      return { strings, symbols, fileFormat, architecture, dependencies, size };
+    })();
+    return this.cachedAnalysis;
   }
 
   private async extractStrings(): Promise<string[]> {

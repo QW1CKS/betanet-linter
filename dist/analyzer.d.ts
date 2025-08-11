@@ -1,7 +1,13 @@
+import { AnalyzerDiagnostics } from './types';
 export declare class BinaryAnalyzer {
     private binaryPath;
     private verbose;
+    private cachedAnalysis;
+    private diagnostics;
+    private analysisStartHr;
     constructor(binaryPath: string, verbose?: boolean);
+    getDiagnostics(): AnalyzerDiagnostics;
+    private detectTools;
     analyze(): Promise<{
         strings: string[];
         symbols: string[];

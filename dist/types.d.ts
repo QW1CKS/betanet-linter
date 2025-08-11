@@ -18,6 +18,7 @@ export interface ComplianceResult {
         failed: number;
         critical: number;
     };
+    diagnostics?: AnalyzerDiagnostics;
 }
 export interface SBOMComponent {
     name: string;
@@ -31,6 +32,18 @@ export interface SBOM {
     format: 'cyclonedx' | 'spdx';
     data: any;
     generated: string;
+}
+export interface ToolStatus {
+    name: string;
+    available: boolean;
+    durationMs?: number;
+    error?: string;
+}
+export interface AnalyzerDiagnostics {
+    tools: ToolStatus[];
+    analyzeInvocations: number;
+    cached: boolean;
+    totalAnalysisTimeMs?: number;
 }
 export interface CheckOptions {
     verbose?: boolean;
