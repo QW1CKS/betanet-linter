@@ -154,10 +154,11 @@ Imports of types not referenced.
 Impact: Minor clutter.
 Action: Remove unused imports; enable lint rule.
 
-[X] ISSUE-027 | CODE | Repeated 'Missing:' message assembly
+[✓] ISSUE-027 | CODE | Repeated 'Missing:' message assembly
 Pattern duplicated across checks.
 Impact: Boilerplate, harder to adjust formatting.
 Action: Utility helper for assembling missing features list.
+Resolution (2025-08-11): Added src/format.ts with missingList(); refactored compliance.ts & check-registry.ts to import helper removing duplicated inline join/filter logic.
 
 [✓] ISSUE-028 | CODE | Magic numbers / strings
 Resolution (2025-08-11): Extracted constants (constants.ts): DEFAULT_TOOL_TIMEOUT_MS, DEFAULT_STRINGS_TIMEOUT_MS, DEFAULT_LDD_TIMEOUT_MS, DEFAULT_HASH_TIMEOUT_MS, VERSION_KEYWORDS, SEVERITY_LEVELS, SEVERITY_EMOJI. Replaced inline literals in analyzer, sbom-generator, index table rendering.

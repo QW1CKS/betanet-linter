@@ -1,5 +1,6 @@
 import { BinaryAnalyzer } from './analyzer';
 import { ComplianceCheck, ComplianceResult, CheckOptions } from './types';
+import { missingList } from './format';
 
 export class ComplianceChecker {
   private analyzer: BinaryAnalyzer;
@@ -75,12 +76,12 @@ export class ComplianceChecker {
       passed,
       details: passed 
         ? "✅ Found HTX implementation with TLS 1.3 and ECH support"
-        : `❌ Missing: ${[
+        : `❌ Missing: ${missingList([
             !hasTCP443 && 'TCP-443',
             !hasQUIC443 && 'QUIC-443', 
             !hasTLS13 && 'TLS 1.3',
             !hasECH && 'ECH'
-          ].filter(Boolean).join(', ')}`,
+          ])}`,
       severity: 'critical'
     };
   }
@@ -133,11 +134,11 @@ export class ComplianceChecker {
       passed,
       details: passed
         ? "✅ Found ChaCha20-Poly1305 frame encryption implementation"
-        : `❌ Missing: ${[
+        : `❌ Missing: ${missingList([
             !hasChaCha20 && 'ChaCha20',
             !hasPoly1305 && 'Poly1305',
             !hasFrameEncryption && 'Frame encryption'
-          ].filter(Boolean).join(', ')}`,
+          ])}`,
       severity: 'critical'
     };
   }
@@ -194,10 +195,10 @@ export class ComplianceChecker {
       passed,
       details: passed
         ? "✅ Both transport endpoints found"
-        : `❌ Missing: ${[
+        : `❌ Missing: ${missingList([
             !hasHTXEndpoint && '/betanet/htx/1.0.0',
             !hasHTXQUICEndpoint && '/betanet/htxquic/1.0.0'
-          ].filter(Boolean).join(', ')}`,
+          ])}`,
       severity: 'critical'
     };
   }
@@ -226,10 +227,10 @@ export class ComplianceChecker {
       passed,
       details: passed
         ? "✅ Found deterministic DHT bootstrap implementation"
-        : `❌ Missing: ${[
+        : `❌ Missing: ${missingList([
             !hasDHT && 'DHT implementation',
             !hasDeterministic && 'Deterministic seeding'
-          ].filter(Boolean).join(', ')}`,
+          ])}`,
       severity: 'major'
     };
   }
@@ -258,10 +259,10 @@ export class ComplianceChecker {
       passed,
       details: passed
         ? "✅ Found alias ledger with consensus verification"
-        : `❌ Missing: ${[
+        : `❌ Missing: ${missingList([
             !hasAlias && 'Alias ledger',
             !hasConsensus && 'Consensus mechanism'
-          ].filter(Boolean).join(', ')}`,
+          ])}`,
       severity: 'major'
     };
   }
@@ -290,10 +291,10 @@ export class ComplianceChecker {
       passed,
       details: passed
         ? "✅ Found Cashu and Lightning payment support"
-        : `❌ Missing: ${[
+        : `❌ Missing: ${missingList([
             !hasCashu && 'Cashu support',
             !hasLightning && 'Lightning support'
-          ].filter(Boolean).join(', ')}`,
+          ])}`,
       severity: 'major'
     };
   }
@@ -322,10 +323,10 @@ export class ComplianceChecker {
       passed,
       details: passed
         ? "✅ Found reproducible build and SLSA provenance support"
-        : `❌ Missing: ${[
+        : `❌ Missing: ${missingList([
             !hasReproducible && 'Reproducible build evidence',
             !hasVersioning && 'Version/provenance info'
-          ].filter(Boolean).join(', ')}`,
+          ])}`,
       severity: 'minor'
     };
   }

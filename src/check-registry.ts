@@ -6,6 +6,7 @@ import { BinaryAnalyzer } from './analyzer';
 import { TRANSPORT_ENDPOINT_VERSIONS, OPTIONAL_TRANSPORTS, POST_QUANTUM_MANDATORY_DATE, POST_QUANTUM_MANDATORY_EPOCH_MS, parseOverridePQDate } from './constants';
 import { evaluatePrivacyTokens } from './heuristics';
 import { ComplianceCheck } from './types';
+import { missingList } from './format';
 
 export interface CheckDefinitionMeta {
   id: number;
@@ -18,10 +19,7 @@ export interface CheckDefinitionMeta {
   evaluate: (analyzer: BinaryAnalyzer, now: Date) => Promise<ComplianceCheck>;
 }
 
-// Helper to assemble missing list strings
-function missingList(parts: Array<string | false>): string {
-  return parts.filter(Boolean).join(', ');
-}
+// missingList helper moved to format.ts (ISSUE-027) for reuse across modules
 
 export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   {
