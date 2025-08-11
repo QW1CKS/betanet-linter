@@ -12,3 +12,25 @@ export const SPEC_VERSION_SUPPORTED_BASE = "1.0"; // baseline fully targeted
 export const SPEC_VERSION_PARTIAL = "1.1"; // partially covered heuristically
 
 export const DISCLAIMER_TEXT = `This tool provides heuristic static binary analysis. Some Betanet ${SPEC_VERSION_PARTIAL} requirements (e.g., dynamic TLS calibration, path count enforcement, voucher cryptographic structure) are only partially inferred or not yet implemented.`;
+
+// Pending Betanet 1.1 specific deltas not yet fully implemented as discrete checks.
+// Sourced from issues-inconsistencies.txt (spec delta tracking section).
+export const SPEC_11_PENDING_ISSUES: { id: string; title: string }[] = [
+  { id: 'ISSUE-051', title: 'Privacy hop heuristic refinement (granularity & false-positive reduction)' },
+  { id: 'ISSUE-053', title: 'Voucher structural validation (format/length/signature heuristic)' },
+  { id: 'ISSUE-054', title: 'PoW difficulty context refinement (bounded regex parsing)' }
+];
+
+// Helper to parse dotted semantic-ish spec versions (major.minor[.patch]) into numeric tuple
+export function parseSpecVersion(v: string): number[] {
+  return v.split('.').map(n => parseInt(n, 10) || 0);
+}
+
+export function isVersionLE(a: string, b: string): boolean {
+  const pa = parseSpecVersion(a); const pb = parseSpecVersion(b);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const av = pa[i] || 0; const bv = pb[i] || 0;
+    if (av < bv) return true; if (av > bv) return false;
+  }
+  return true; // equal
+}

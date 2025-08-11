@@ -57,7 +57,6 @@ Implemented:
 - Severity filtering support (scoring isolation)
 
 Deferred:
-- Multi-license expression parsing
 - PURL ecosystem enrichment beyond generic/system libs
 - Configurable validation policy escalation
 
@@ -70,7 +69,6 @@ Implemented:
 - Added degradation tests & diagnostics exposure
 
 Deferred:
-- Fail-on-degraded env (CLI flag exists)
 - Per-check try/catch wrap (current evaluators stable; can harden later) (ISSUE-036)
 - Memory streaming optimization (acceptable for current binary sizes) (ISSUE-038)
 
@@ -102,7 +100,7 @@ Goals:
 ## Plan 9 (Optional): Observability & Performance Deep Dive
 (Optional revisit of deferred items)
 - Per-check and per-command timing + histogram
-- forceRefresh/ invalidate cache API
+- forceRefresh / invalidate cache API (DONE in Plan 10)
 - Performance regression test (ISSUE-025) if not added earlier
 - Structured JSON log output option
 
@@ -125,6 +123,7 @@ Deliverables:
 - (DONE) Force refresh flag & analyzer recreation (Plan 1 deferred item realized)
 - (DONE) Fail-on-degraded env (BETANET_FAIL_ON_DEGRADED) overriding pass
 - (DONE) Multi-license parsing in SBOM (previously deferred in Plan 4)
+- (DONE) Spec version matrix (introducedIn/mandatoryIn) & CLI spec coverage summary (ISSUE-052, ISSUE-055)
 
 Success Criteria:
 - All new heuristic & control flag tests pass (current suite updated to 31 tests) ✅

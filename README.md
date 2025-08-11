@@ -122,6 +122,17 @@ Architecture note: All checks are defined declaratively in a central registry (`
 ### Heuristic & Partial Coverage Disclaimer
 Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., live TLS fingerprint calibration, sustained path diversity rotation, runtime hop enforcement, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Rotation confidence (rotationHits) and path diversity counts are informational only.
 
+### Spec Coverage Summary
+The tool fully covers Betanet 1.0 checks and partially covers emerging 1.1 elements. Runtime output now includes a spec coverage header, e.g.:
+
+```
+Spec Coverage: baseline 1.0 fully covered; latest known 1.1 checks implemented 11/11
+Pending 1.1 refinements: ISSUE-051, ISSUE-053, ISSUE-054
+```
+
+Pending 1.1 refinements map to the backlog entries in `issues-inconsistencies.txt` and represent heuristic depth or structural validation improvements (privacy hop refinement, voucher structural format, PoW difficulty context parsing).
+JSON / YAML outputs include a `specSummary` object with the same fields for programmatic consumption.
+
 ## Output Examples
 
 ### Table Output

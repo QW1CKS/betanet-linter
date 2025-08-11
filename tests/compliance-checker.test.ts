@@ -78,6 +78,11 @@ describe('BetanetComplianceChecker', () => {
   expect(result.summary.total).toBe(11);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
+  // Spec summary should be present
+  expect(result.specSummary).toBeDefined();
+  expect(result.specSummary?.baseline).toBe('1.0');
+  expect(result.specSummary?.latestKnown).toBe('1.1');
+  expect(result.specSummary?.implementedChecks).toBeGreaterThanOrEqual(11);
     });
 
     it('should throw if binary does not exist', async () => {

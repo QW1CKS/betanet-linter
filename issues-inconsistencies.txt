@@ -166,10 +166,10 @@ Minimum string length 4; severity tokens; date string.
 Impact: Reduced clarity.
 Action: Extract constants.
 
-[X] ISSUE-029 | CODE | Post-quantum mandatory date hardcoded
-No configuration layer.
-Impact: Hard to test or update.
-Action: Expose via env var / CLI flag.
+[✓] ISSUE-029 | CODE | Post-quantum mandatory date hardcoded
+RESOLVED: BETANET_PQ_DATE_OVERRIDE env var added; check 10 respects override for early enforcement testing.
+Impact: Testability improved.
+Action: (Done) Consider CLI flag alias in future.
 
 [X] ISSUE-030 | CODE | Long method length (index.ts checkCompliance)
 Could separate filtering logic & aggregation.
@@ -200,10 +200,8 @@ Execa calls may hang.
 Impact: CLI stalls.
 Action: Add timeout & fallback path.
 
-[X] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
-Critical missing tool warnings suppressed by default.
-Impact: Users misinterpret results.
-Action: Always warn once (concise); verbose yields detail.
+[ ] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
+Status unchanged: still primarily verbose-gated; reconsider concise default warning later.
 
 [X] ISSUE-036 | ERROR | Missing try/catch around entire check loop
 Individual check exceptions would abort entire run.
@@ -234,10 +232,10 @@ UX / CLI
 Impact: Inconsistent UX.
 Action: Add same options to 'check'.
 
-[X] ISSUE-041 | UX | Severity threshold not configurable
-All failures equal except severity icon; cannot ignore minor.
-Impact: Limited customization.
-Action: Add --fail-on <critical|major|minor>.
+[✓] ISSUE-041 | UX | Severity threshold not configurable
+RESOLVED: severityMin option / --severity-min flag implemented; scoring filters by severity rank.
+Impact: Customization enabled.
+Action: (Done)
 
 [X] ISSUE-042 | UX | SBOM generation flag naming
 --sbom + --sbom-format vs separate 'sbom' command; redundancy.
@@ -321,10 +319,10 @@ Rendezvous rotation, BeaconSet, voucher/FROST/PoW indicators lack dedicated fals
 Impact: Future heuristic broadening could silently inflate compliance.
 Action: Add fixtures with unrelated use of 'voucher', 'rotation', 'beacon' to assert non-matches; add positive minimal fixtures.
 
-[ ] ISSUE-052 | ARCH | Central feature flag matrix for spec versions
-Currently constants list versions, but no structured matrix mapping each check to (introduced_in, mandatory_in).
-Impact: Harder to evolve when 1.2 introduces new mandatory items.
-Action: Introduce CHECK_REGISTRY with version metadata; drive compliance evaluation through it.
+[✓] ISSUE-052 | ARCH | Central feature flag matrix for spec versions
+IMPLEMENTED: Registry entries now include introducedIn & mandatoryIn fields. Spec coverage summary computed from CHECK_REGISTRY.
+Impact: Future spec (1.2+) evolution now data-driven.
+Action: (Done) Extend when new checks added; consider adding enforcement gating later.
 
 [ ] ISSUE-053 | HEUR | Voucher structural validation absent
 Only detects presence of 'voucher' token; no format, length, signature, or prefix pattern verification.
@@ -336,10 +334,10 @@ Currently any string with 'pow' and '22' may pass threshold intent.
 Impact: Could misclassify generic log text.
 Action: Parse nearby context (e.g., 'pow=22', 'difficulty:22', 'work(22)') with bounded regex capturing.
 
-[ ] ISSUE-055 | UX | Spec version summary not surfaced
-CLI output does not clearly state evaluated spec version(s) and coverage delta.
-Impact: Users may misinterpret partial 1.1 support as full.
-Action: Add header/footer summarizing: Implemented 1.1 checks: X / Planned Y (list pending IDs).
+[✓] ISSUE-055 | UX | Spec version summary not surfaced
+IMPLEMENTED: CLI/table output prints spec coverage line + pending 1.1 refinement issue IDs; JSON/YAML include specSummary object.
+Impact: Transparency improved; users see partial 1.1 coverage.
+Action: (Done) Keep pending issue list synchronized.
 
 [ ] ISSUE-056 | TEST | Stripped / packed binary degradation tests
 No tests simulating stripped symbols (nm/objdump absence) to ensure graceful heuristic fallback.

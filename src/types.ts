@@ -20,6 +20,13 @@ export interface ComplianceResult {
     failed: number;
     critical: number;
   };
+  specSummary?: {
+    baseline: string; // fully covered baseline spec version
+    latestKnown: string; // latest spec version known to tool
+    implementedChecks: number; // number of checks whose introducedIn <= latestKnown
+    totalChecks: number; // total registered checks
+    pendingIssues?: { id: string; title: string }[]; // subset of open enhancement issues for latest spec
+  };
   diagnostics?: AnalyzerDiagnostics;
   checkTimings?: { id: number; durationMs: number }[];
 }

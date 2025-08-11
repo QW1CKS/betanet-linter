@@ -30,7 +30,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'HTX over TCP-443 & QUIC-443',
     description: 'Implements HTX over TCP-443 and QUIC-443 with TLS 1.3 mimic + ECH',
     severity: 'critical',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const networkCaps = await analyzer.checkNetworkCapabilities();
       const passed = networkCaps.hasTLS && networkCaps.hasQUIC && networkCaps.hasHTX && networkCaps.hasECH && networkCaps.port443;
@@ -56,7 +57,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Rotating Access Tickets',
     description: 'Uses rotating access tickets (§5.2)',
     severity: 'major',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const analysis = await analyzer.analyze();
       const strings = analysis.strings.join(' ').toLowerCase();
@@ -83,7 +85,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Inner Frame Encryption',
     description: 'Encrypts inner frames with ChaCha20-Poly1305, 24-bit length, 96-bit nonce',
     severity: 'critical',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const cryptoCaps = await analyzer.checkCryptographicCapabilities();
       const passed = cryptoCaps.hasChaCha20 && cryptoCaps.hasPoly1305;
@@ -106,7 +109,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'SCION Path Management',
     description: 'Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header',
     severity: 'critical',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const scionSupport = await analyzer.checkSCIONSupport();
       const passed = scionSupport.hasSCION && (scionSupport.pathManagement || scionSupport.hasIPTransition) && scionSupport.pathDiversityCount >= 2;
@@ -131,7 +135,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Transport Endpoints',
     description: 'Offers Betanet HTX & HTX-QUIC transports (v1.1.0 preferred, 1.0.0 legacy supported)',
     severity: 'major',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const analysis = await analyzer.analyze();
       const strings = analysis.strings.join(' ');
@@ -159,7 +164,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'DHT Seed Bootstrap',
     description: 'Implements deterministic (1.0) or rotating rendezvous (1.1) DHT seed bootstrap',
     severity: 'major',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const dhtSupport = await analyzer.checkDHTSupport();
       const passed = !!(dhtSupport.hasDHT && (dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation));
@@ -184,7 +190,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Alias Ledger Verification',
     description: 'Verifies alias ledger with 2-of-3 chain consensus',
     severity: 'major',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const ledgerSupport = await analyzer.checkLedgerSupport();
       const passed = ledgerSupport.hasAliasLedger && ledgerSupport.hasConsensus && ledgerSupport.chainSupport;
@@ -208,7 +215,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Payment System',
     description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)',
     severity: 'major',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const paymentSupport = await analyzer.checkPaymentSupport();
       const passed = paymentSupport.hasCashu && paymentSupport.hasLightning && paymentSupport.hasFederation;
@@ -236,7 +244,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Build Provenance',
     description: 'Builds reproducibly and publishes SLSA 3 provenance',
     severity: 'minor',
-    introducedIn: '1.0',
+  introducedIn: '1.0',
+  mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const buildInfo = await analyzer.checkBuildProvenance();
       const passed = buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance;
@@ -260,8 +269,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Post-Quantum Cipher Suites',
     description: 'Presents X25519-Kyber768 suites once the mandatory date is reached',
     severity: 'minor',
-    introducedIn: '1.0',
-    mandatoryIn: POST_QUANTUM_MANDATORY_DATE,
+  introducedIn: '1.0',
+  mandatoryIn: POST_QUANTUM_MANDATORY_DATE,
     evaluate: async (analyzer, now) => {
       const cryptoCaps = await analyzer.checkCryptographicCapabilities();
       // Allow override via env var for testing future enforcement earlier
@@ -295,7 +304,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Privacy Hop Enforcement',
     description: 'Enforces ≥2 (balanced) or ≥3 (strict) mixnet hops with BeaconSet-based diversity',
     severity: 'major',
-    introducedIn: '1.1',
+  introducedIn: '1.1',
+  // Not yet mandatory (heuristic informational) in 1.1 baseline
     evaluate: async (analyzer) => {
       const analysis = await analyzer.analyze();
       const evaluation = evaluatePrivacyTokens(analysis.strings);

@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as yaml from 'js-yaml';
 import * as xml2js from 'xml2js';
 import { CHECK_REGISTRY, getChecksByIds } from './check-registry';
+import { SPEC_VERSION_SUPPORTED_BASE, SPEC_VERSION_PARTIAL, SPEC_11_PENDING_ISSUES, isVersionLE } from './constants';
 import { SBOMGenerator } from './sbom/sbom-generator';
 
 export class BetanetComplianceChecker {
@@ -76,6 +77,16 @@ export class BetanetComplianceChecker {
       return undefined;
     })();
 
+    // Spec coverage summary: counts checks introduced up to partial version
+    const implementedChecks = CHECK_REGISTRY.filter(c => isVersionLE(c.introducedIn, SPEC_VERSION_PARTIAL)).length;
+    const specSummary = {
+      baseline: SPEC_VERSION_SUPPORTED_BASE,
+      latestKnown: SPEC_VERSION_PARTIAL,
+      implementedChecks,
+      totalChecks: CHECK_REGISTRY.length,
+      pendingIssues: SPEC_11_PENDING_ISSUES
+    };
+
   const result: ComplianceResult = {
       binaryPath,
       timestamp: new Date().toISOString(),
@@ -88,6 +99,7 @@ export class BetanetComplianceChecker {
         failed: considered.length - passedChecks.length,
         critical: criticalChecks.length
       },
+      specSummary,
       diagnostics
     };
     result.checkTimings = checkTimings;
@@ -171,6 +183,14 @@ export class BetanetComplianceChecker {
     console.log(`Overall Score: ${results.overallScore}%`);
     console.log(`Status: ${results.passed ? '✅ PASSED' : '❌ FAILED'}`);
     console.log('-'.repeat(60));
+    if (results.specSummary) {
+      const s = results.specSummary;
+      console.log(`Spec Coverage: baseline ${s.baseline} fully covered; latest known ${s.latestKnown} checks implemented ${s.implementedChecks}/${s.totalChecks}`);
+      if (s.pendingIssues && s.pendingIssues.length) {
+        console.log('Pending 1.1 refinements: ' + s.pendingIssues.map(p => p.id).join(', '));
+      }
+      console.log('-'.repeat(60));
+    }
 
     if (format === 'json') {
       console.log(JSON.stringify(results, null, 2));
