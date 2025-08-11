@@ -221,6 +221,23 @@ jobs:
   - `nm` or `objdump` - for symbol extraction
   - `ldd` - for dependency detection
 
+### SBOM Generation Tooling Notes
+
+The SBOM generator uses best-effort external tooling. On Windows (non-WSL) where `strings` / `ldd` are typically unavailable, the linter now silently falls back to a lightweight in-process ASCII scan and skips dynamic dependency enumeration—tests no longer emit warnings. To re-enable verbose troubleshooting messages for missing tools or parsing issues, set:
+
+```powershell
+setx BETANET_DEBUG_SBOM 1
+# restart shell to apply
+```
+
+Or temporarily for a single session:
+
+```powershell
+$env:BETANET_DEBUG_SBOM = '1'
+```
+
+On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhances coverage (strings, nm, objdump, ldd). The generator remains resilient if any tool is absent.
+
 ## Exit Codes
 
 - `0` - All compliance checks passed

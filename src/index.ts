@@ -1,10 +1,11 @@
 import { BinaryAnalyzer } from './analyzer';
-import { ComplianceCheck, ComplianceResult, CheckOptions, SBOMComponent } from './types';
+import { ComplianceCheck, ComplianceResult, CheckOptions } from './types';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import * as xml2js from 'xml2js';
 import { CHECK_REGISTRY, getChecksByIds } from './check-registry';
+import { SBOMGenerator } from './sbom/sbom-generator';
 
 export class BetanetComplianceChecker {
   private _analyzer: BinaryAnalyzer;
@@ -83,121 +84,57 @@ export class BetanetComplianceChecker {
   // Legacy per-check methods removed (Plan 3 consolidation) in favor of registry-based evaluation
 
   async generateSBOM(binaryPath: string, format: 'cyclonedx' | 'spdx' = 'cyclonedx', outputPath?: string): Promise<string> {
+    // Ensure analyzer exists for consistency (even though SBOMGenerator operates independently)
     if (!this.analyzer) {
-  this._analyzer = new BinaryAnalyzer(binaryPath);
+      this._analyzer = new BinaryAnalyzer(binaryPath);
     }
 
-    const analysis = await this.analyzer.analyze();
-    const components = await this.extractComponents(analysis);
+    const generator = new SBOMGenerator();
+    const sbom = await generator.generate(binaryPath, format);
 
     const defaultOutputPath = path.join(
       path.dirname(binaryPath),
       `${path.basename(binaryPath)}-sbom.${format === 'cyclonedx' ? 'xml' : 'spdx'}`
     );
-
     const finalOutputPath = outputPath || defaultOutputPath;
 
     if (format === 'cyclonedx') {
-      await this.generateCycloneDXSBOM(components, finalOutputPath, binaryPath);
+      // Serialize a CycloneDX-style XML (backwards compatible with previous output path & extension)
+      const builder = new xml2js.Builder();
+      const metaComponent = (sbom as any).data?.metadata?.component || {};
+      const components = (sbom as any).data?.components || [];
+      const xmlObj = {
+        bom: {
+          $: { xmlns: 'http://cyclonedx.org/schema/bom/1.4', version: '1' },
+          metadata: {
+            timestamp: new Date().toISOString(),
+            component: {
+              name: metaComponent.name || path.basename(binaryPath),
+              version: metaComponent.version || '1.0.0',
+              type: metaComponent.type || 'application',
+              purl: metaComponent.purl || `pkg:generic/${path.basename(binaryPath)}@1.0.0`,
+              hashes: metaComponent.hashes ? { hash: metaComponent.hashes.map((h: any) => ({ _: h.content, $: { alg: h.alg } })) } : undefined
+            }
+          },
+          components: components.length ? {
+            component: components.map((c: any) => ({
+              name: c.name || 'unknown',
+              version: c.version || 'unknown',
+              type: c.type || 'library',
+              purl: c.purl,
+              properties: undefined
+            }))
+          } : undefined
+        }
+      };
+      const xml = builder.buildObject(xmlObj);
+      await fs.writeFile(finalOutputPath, xml);
     } else {
-      await this.generateSPDXSBOM(components, finalOutputPath, binaryPath);
+      // SPDX already text from generator
+      await fs.writeFile(finalOutputPath, (sbom as any).data);
     }
 
     return finalOutputPath;
-  }
-
-  private async extractComponents(analysis: any): Promise<SBOMComponent[]> {
-    const components: SBOMComponent[] = [];
-
-    // Add detected dependencies
-    for (const dep of analysis.dependencies) {
-      const name = path.basename(dep);
-      const version = this.extractVersionFromPath(dep);
-      
-      components.push({
-        name,
-        version: version || 'unknown',
-        type: 'library',
-        supplier: 'unknown'
-      });
-    }
-
-    // Add detected cryptographic libraries
-    const cryptoCaps = await this.analyzer.checkCryptographicCapabilities();
-    if (cryptoCaps.hasChaCha20) {
-      components.push({
-        name: 'ChaCha20-Poly1305',
-        version: '1.0',
-        type: 'library',
-        license: 'Public Domain'
-      });
-    }
-    if (cryptoCaps.hasEd25519) {
-      components.push({
-        name: 'Ed25519',
-        version: '1.0',
-        type: 'library',
-        license: 'BSD-3-Clause'
-      });
-    }
-
-    return components;
-  }
-
-  private extractVersionFromPath(path: string): string | null {
-    const versionMatch = path.match(/(\d+\.\d+\.\d+)/);
-    return versionMatch ? versionMatch[1] : null;
-  }
-
-  private async generateCycloneDXSBOM(components: SBOMComponent[], outputPath: string, binaryPath: string): Promise<void> {
-    const builder = new xml2js.Builder();
-    
-    const sbom = {
-      'bom': {
-        '$': { 'xmlns': 'http://cyclonedx.org/schema/bom/1.4', 'version': '1' },
-        'metadata': {
-          'timestamp': new Date().toISOString(),
-          'component': {
-            'name': path.basename(binaryPath),
-            'version': '1.0.0',
-            'type': 'application',
-            'purl': `pkg:generic/${path.basename(binaryPath)}@1.0.0`
-          }
-        },
-        'components': {
-          'component': components.map(comp => ({
-            'name': comp.name,
-            'version': comp.version,
-            'type': comp.type,
-            'license': comp.license ? [{ 'name': comp.license }] : undefined
-          }))
-        }
-      }
-    };
-
-    const xml = builder.buildObject(sbom);
-    await fs.writeFile(outputPath, xml);
-  }
-
-  private async generateSPDXSBOM(components: SBOMComponent[], outputPath: string, binaryPath: string): Promise<void> {
-    const spdxContent = `SPDXVersion: SPDX-2.3
-DataLicense: CC0-1.0
-PackageName: ${path.basename(binaryPath)}
-SPDXID: SPDXRef-PACKAGE
-PackageVersion: 1.0.0
-PackageLicenseDeclared: MIT
-
-${components.map((comp, index) => `
-PackageName: ${comp.name}
-SPDXID: SPDXRef-COMPONENT-${index}
-PackageVersion: ${comp.version}
-PackageLicenseDeclared: ${comp.license || 'NOASSERTION'}`).join('\n')}
-
-Relationship: SPDXRef-PACKAGE CONTAINS SPDXRef-COMPONENT-0
-${components.slice(1).map((_, index) => `Relationship: SPDXRef-PACKAGE CONTAINS SPDXRef-COMPONENT-${index + 1}`).join('\n')}
-`;
-
-    await fs.writeFile(outputPath, spdxContent);
   }
 
   displayResults(results: ComplianceResult, format: 'json' | 'table' | 'yaml' = 'table'): void {

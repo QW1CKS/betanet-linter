@@ -73,12 +73,9 @@ export class SBOMGenerator {
   private async extractComponents(binaryPath: string): Promise<any[]> {
     const components: any[] = [];
 
-    try {
-      // Extract strings to find version information
-      const { stdout } = await execa('strings', [binaryPath]);
-      const lines = stdout.split('\n');
-
-      // Look for version patterns
+    // Helper: add version matches to components
+    const addVersions = (text: string) => {
+      const lines = text.split('\n');
       const versionPatterns = [
         /(\d+\.\d+\.\d+)/,
         /v(\d+\.\d+\.\d+)/,
@@ -86,55 +83,77 @@ export class SBOMGenerator {
         /(\d+\.\d+\.\d+[-_]\w+)/,
         /([a-zA-Z]+)\s+(\d+\.\d+\.\d+)/i
       ];
-
       const foundVersions = new Set<string>();
-
       for (const line of lines) {
         for (const pattern of versionPatterns) {
           const match = line.match(pattern);
-          if (match && match[1]) {
-            foundVersions.add(match[1]);
-          }
+            if (match && match[1]) {
+              foundVersions.add(match[1]);
+            }
         }
       }
-
-      // Convert found versions to components
       foundVersions.forEach(version => {
         components.push({
           type: 'library',
           name: 'Unknown',
-          version: version,
+          version,
           purl: `pkg:generic/unknown@${version}`,
           detected: true
         });
       });
+    };
 
-      // Try to get more detailed component info using ldd
+    const debug = process.env.BETANET_DEBUG_SBOM === '1';
+
+    // On Windows, skip external *nix tools and attempt lightweight fallback
+    if (process.platform === 'win32') {
       try {
-        const { stdout: lddOutput } = await execa('ldd', [binaryPath]);
-        const lddLines = lddOutput.split('\n');
-
-        for (const line of lddLines) {
-          const libMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
-          if (libMatch) {
-            const libName = libMatch[1];
-            const libPath = libMatch[2];
-            
-            components.push({
-              type: 'library',
-              name: libName,
-              path: libPath,
-              purl: `pkg:generic/${libName}`,
-              system: true
-            });
+        if (await fs.pathExists(binaryPath)) {
+          const data = await fs.readFile(binaryPath);
+          const ascii: string[] = [];
+          let current = '';
+          for (const byte of data) {
+            if (byte >= 32 && byte <= 126) { current += String.fromCharCode(byte); } else { if (current.length >= 4) ascii.push(current); current = ''; }
           }
+          if (current.length >= 4) ascii.push(current);
+          addVersions(ascii.join('\n'));
         }
       } catch (e) {
-        // ldd failed, continue without library info
+        if (debug) console.warn('SBOM fallback (windows strings) failed:', (e as any)?.message);
       }
+      return components;
+    }
 
-    } catch (error: unknown) {
-      console.warn('Error extracting components:', (error as any)?.message);
+    // Non-Windows: attempt `strings`
+    try {
+      const { stdout } = await execa('strings', [binaryPath]);
+      addVersions(stdout);
+    } catch (e: any) {
+      const msg = (e as any)?.message || '';
+      if (debug) console.warn('SBOM strings exec skipped:', msg);
+    }
+
+    // Attempt ldd for component library names (best-effort)
+    try {
+      const { stdout: lddOutput } = await execa('ldd', [binaryPath]);
+      const lddLines = lddOutput.split('\n');
+      for (const line of lddLines) {
+        const libMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
+        if (libMatch) {
+          const libName = libMatch[1];
+          const libPath = libMatch[2];
+          components.push({
+            type: 'library',
+            name: libName,
+            path: libPath,
+            purl: `pkg:generic/${libName}`,
+            system: true
+          });
+        }
+      }
+    } catch (e) {
+      // Silent unless debug
+      if (debug) console.warn('SBOM ldd exec skipped:', (e as any)?.message);
     }
 
     return components;
@@ -143,29 +162,29 @@ export class SBOMGenerator {
   private async extractDependencies(binaryPath: string): Promise<any[]> {
     const dependencies: any[] = [];
 
-    try {
-      // Try to get dynamic dependencies
-      const { stdout: lddOutput } = await execa('ldd', [binaryPath]);
-      const lddLines = lddOutput.split('\n');
+    const debug = process.env.BETANET_DEBUG_SBOM === '1';
 
-      for (const line of lddLines) {
-        const depMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
-        if (depMatch) {
-          const libName = depMatch[1];
-          const libPath = depMatch[2];
-          
-          dependencies.push({
-            ref: libName,
-            path: libPath,
-            type: 'dynamic'
-          });
+    if (process.platform !== 'win32') {
+      try {
+        const { stdout: lddOutput } = await execa('ldd', [binaryPath]);
+        const lddLines = lddOutput.split('\n');
+        for (const line of lddLines) {
+          const depMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
+          if (depMatch) {
+            const libName = depMatch[1];
+            const libPath = depMatch[2];
+            dependencies.push({ ref: libName, path: libPath, type: 'dynamic' });
+          }
         }
+      } catch (e) {
+        if (debug) console.warn('SBOM dependency ldd skipped:', (e as any)?.message);
       }
+    }
 
-      // Try to get package dependencies if this is a packaged binary
+    // Local package metadata (works cross-platform)
+    try {
       const packageFiles = ['package.json', 'requirements.txt', 'Cargo.toml', 'go.mod'];
       const binaryDir = path.dirname(binaryPath);
-
       for (const pkgFile of packageFiles) {
         const pkgPath = path.join(binaryDir, pkgFile);
         if (await fs.pathExists(pkgPath)) {
@@ -173,9 +192,8 @@ export class SBOMGenerator {
           dependencies.push(...pkgDeps);
         }
       }
-
-    } catch (error: unknown) {
-      console.warn('Error extracting dependencies:', (error as any)?.message);
+    } catch (e) {
+      if (debug) console.warn('SBOM package parsing issue:', (e as any)?.message);
     }
 
     return dependencies;

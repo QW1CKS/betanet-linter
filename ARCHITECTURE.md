@@ -3,12 +3,12 @@
 ```
 betanet-linter/
 ├── src/
-│   ├── index.ts              # Orchestrator: registry-driven compliance + basic SBOM
+│   ├── index.ts              # Orchestrator: registry-driven compliance + SBOM delegation
 │   ├── check-registry.ts     # Declarative check metadata + evaluate() functions
 │   ├── analyzer.ts           # Binary analysis (memoized)
 │   ├── heuristics.ts         # Heuristic pattern detection (Plan 2)
 │   ├── constants.ts          # Spec/version constants (Betanet 1.0 + partial 1.1)
-│   ├── sbom/                 # Advanced SBOM generator (consolidation target)
+│   ├── sbom/                 # Advanced SBOM generator (active)
 │   └── types.ts              # TypeScript type definitions
 ├── bin/
 │   └── cli.js                # Command-line interface
@@ -30,7 +30,7 @@ betanet-linter/
 - **BetanetComplianceChecker** (`src/index.ts`)
    - Orchestrates compliance using the Check Registry (no per-check methods)
    - Partial Betanet 1.1 heuristics (transport versions, rendezvous indicators, payment extensions)
-   - Aggregates results (score, pass/fail, diagnostics) & provides basic SBOM output (temporary)
+   - Aggregates results (score, pass/fail, diagnostics) & delegates SBOM generation to sbom generator
    - Lazy analyzer instantiation → enables dependency injection during tests
 
 - **Check Registry** (`src/check-registry.ts`)
@@ -69,11 +69,11 @@ All checks (now 11 including Privacy Hop Enforcement) are declaratively defined 
 
 ### 4. SBOM Generation
 
-Transition state:
-1. Inline minimal SBOM (index.ts) – simple CycloneDX XML + basic SPDX tag-value.
-2. Advanced generator (`sbom/sbom-generator.ts`) – hashing, richer component & dependency extraction, JSON-ready structures.
-
-Plan 4 will migrate fully to the advanced generator, adding license & sanitization enhancements.
+Unified path via `sbom/sbom-generator.ts` providing:
+1. Binary hashing (SHA-256)
+2. Component & dependency extraction (best-effort via host tools: strings, ldd)
+3. CycloneDX (serialized to XML) & SPDX tag-value outputs
+4. Extensible structure for future license & dedupe heuristics
 
 ### 5. GitHub Action Template
 
