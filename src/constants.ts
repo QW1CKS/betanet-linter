@@ -80,3 +80,12 @@ export function sanitizeName(name: string): string {
   }
   return cleaned;
 }
+
+// ISSUE-028: Extract commonly repeated literals / magic values
+export const SEVERITY_LEVELS = ['critical','major','minor'] as const;
+export const SEVERITY_EMOJI: Record<string,string> = { critical: '🔴', major: '🟡', minor: '🟢' };
+export const DEFAULT_TOOL_TIMEOUT_MS = 2000; // baseline tool version/availability checks
+export const DEFAULT_STRINGS_TIMEOUT_MS = 5000; // strings extraction upper bound
+export const DEFAULT_LDD_TIMEOUT_MS = 5000; // dependency resolution
+export const DEFAULT_HASH_TIMEOUT_MS = 4000; // hashing external process
+export const VERSION_KEYWORDS = ['version','ver','v','release','rev','commit']; // version context detection keywords

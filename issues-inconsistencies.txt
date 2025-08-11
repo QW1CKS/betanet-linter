@@ -159,10 +159,9 @@ Pattern duplicated across checks.
 Impact: Boilerplate, harder to adjust formatting.
 Action: Utility helper for assembling missing features list.
 
-[X] ISSUE-028 | CODE | Magic numbers / strings
-Minimum string length 4; severity tokens; date string.
-Impact: Reduced clarity.
-Action: Extract constants.
+[✓] ISSUE-028 | CODE | Magic numbers / strings
+Resolution (2025-08-11): Extracted constants (constants.ts): DEFAULT_TOOL_TIMEOUT_MS, DEFAULT_STRINGS_TIMEOUT_MS, DEFAULT_LDD_TIMEOUT_MS, DEFAULT_HASH_TIMEOUT_MS, VERSION_KEYWORDS, SEVERITY_LEVELS, SEVERITY_EMOJI. Replaced inline literals in analyzer, sbom-generator, index table rendering.
+Impact: Centralized configuration & easier tuning.
 
 [✓] ISSUE-029 | CODE | Post-quantum mandatory date hardcoded
 RESOLVED: BETANET_PQ_DATE_OVERRIDE env var added; check 10 respects override for early enforcement testing.

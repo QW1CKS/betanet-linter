@@ -2,7 +2,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { AnalyzerDiagnostics } from './types';
 import { safeExec, isToolSkipped } from './safe-exec';
-import { FALLBACK_MAX_BYTES, DEFAULT_FALLBACK_STRING_MIN_LEN } from './constants';
+import { FALLBACK_MAX_BYTES, DEFAULT_FALLBACK_STRING_MIN_LEN, DEFAULT_TOOL_TIMEOUT_MS } from './constants';
 import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
 // Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 
@@ -61,7 +61,7 @@ export class BinaryAnalyzer {
           this.diagnostics.skippedTools = [...(this.diagnostics.skippedTools || []), t.name];
           return;
         }
-        const res = await safeExec(t.name, t.args, 2000);
+  const res = await safeExec(t.name, t.args, DEFAULT_TOOL_TIMEOUT_MS);
         if (!res.failed) {
           this.diagnostics.tools.push({ name: t.name, available: true, durationMs: Date.now() - start });
         } else {

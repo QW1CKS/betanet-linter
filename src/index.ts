@@ -7,6 +7,7 @@ import * as xml2js from 'xml2js';
 import { CHECK_REGISTRY, getChecksByIds } from './check-registry';
 import { SPEC_VERSION_SUPPORTED_BASE, SPEC_VERSION_PARTIAL, SPEC_11_PENDING_ISSUES, isVersionLE } from './constants';
 import { SBOMGenerator } from './sbom/sbom-generator';
+import { SEVERITY_EMOJI } from './constants';
 
 export class BetanetComplianceChecker {
   private _analyzer: BinaryAnalyzer;
@@ -311,8 +312,7 @@ export class BetanetComplianceChecker {
     
     results.checks.forEach(check => {
       const status = check.passed ? '✅' : '❌';
-      const severity = check.severity === 'critical' ? '🔴' : 
-                      check.severity === 'major' ? '🟡' : '🟢';
+  const severity = SEVERITY_EMOJI[check.severity] || '';
       const degradedMark = check.degradedHints && check.degradedHints.length ? ' (degraded)' : '';
       
       console.log(`${status} ${severity} [${check.id}] ${check.name}${degradedMark}`);

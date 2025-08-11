@@ -5,7 +5,7 @@ import { SBOM } from '../types';
 import { BinaryAnalyzer } from '../analyzer';
 import { safeExec } from '../safe-exec';
 import { evaluatePrivacyTokens } from '../heuristics';
-import { sanitizeName } from '../constants';
+import { sanitizeName, VERSION_KEYWORDS, DEFAULT_STRINGS_TIMEOUT_MS, DEFAULT_LDD_TIMEOUT_MS, DEFAULT_HASH_TIMEOUT_MS } from '../constants';
 
 export class SBOMGenerator {
   async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json' = 'cyclonedx', analyzer?: BinaryAnalyzer): Promise<SBOM> {
@@ -103,7 +103,7 @@ export class SBOMGenerator {
   private async getBinaryInfo(binaryPath: string): Promise<any> {
     try {
       const [fileInfoRes, stat] = await Promise.all([
-        safeExec('file', [binaryPath], 3000),
+  safeExec('file', [binaryPath], 3000),
         fs.stat(binaryPath)
       ]);
       const fileType = fileInfoRes.failed ? 'Unknown' : fileInfoRes.stdout;
@@ -131,7 +131,7 @@ export class SBOMGenerator {
 
   private async calculateHash(binaryPath: string): Promise<string> {
     try {
-      const hashRes = await safeExec('sha256sum', [binaryPath], 4000);
+  const hashRes = await safeExec('sha256sum', [binaryPath], DEFAULT_HASH_TIMEOUT_MS);
       if (!hashRes.failed && hashRes.stdout) {
         return hashRes.stdout.split(' ')[0];
       }
@@ -161,8 +161,8 @@ export class SBOMGenerator {
       { re: /\b(\d{4}\.\d{1,2}\.\d{1,2})\b/g, score: 2, normalize: m => m[1] }, // date style
       { re: /\b([0-9a-f]{7,12})\b/g, score: 1, normalize: m => m[1] } // short git hash
     ];
-    const KEYWORD_WINDOW = 24; // chars window to look back for keyword
-    const keywords = ['version', 'ver', 'v', 'release', 'rev', 'commit'];
+  const KEYWORD_WINDOW = 24; // chars window to look back for keyword
+  const keywords = VERSION_KEYWORDS;
 
     const collectVersions = (text: string) => {
       versionRegexes.forEach(vr => {
@@ -207,7 +207,7 @@ export class SBOMGenerator {
 
     // Non-Windows: attempt `strings`
     try {
-      const res = await safeExec('strings', [binaryPath], 5000);
+  const res = await safeExec('strings', [binaryPath], DEFAULT_STRINGS_TIMEOUT_MS);
       if (!res.failed) {
         collectVersions(res.stdout);
       } else {
@@ -220,7 +220,7 @@ export class SBOMGenerator {
 
     // Attempt ldd for component library names (best-effort)
     try {
-      const lddRes = await safeExec('ldd', [binaryPath], 5000);
+  const lddRes = await safeExec('ldd', [binaryPath], DEFAULT_LDD_TIMEOUT_MS);
       if (lddRes.failed) throw new Error(lddRes.errorMessage || 'ldd-failed');
       const lddLines = lddRes.stdout.split('\n');
       for (const line of lddLines) {
@@ -280,7 +280,7 @@ export class SBOMGenerator {
 
     if (process.platform !== 'win32') {
       try {
-    const lddRes = await safeExec('ldd', [binaryPath], 5000);
+  const lddRes = await safeExec('ldd', [binaryPath], DEFAULT_LDD_TIMEOUT_MS);
     if (lddRes.failed) throw new Error(lddRes.errorMessage || 'ldd-failed');
     const lddLines = lddRes.stdout.split('\n');
         for (const line of lddLines) {
