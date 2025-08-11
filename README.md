@@ -1,9 +1,14 @@
 
 # Betanet Compliance Linter
 
-> **Quickstart:**
+
+> **Quickstart (from source):**
 > ```bash
-> npm install -g betanet-compliance-linter
+> git clone <repository-url>
+> cd betanet-linter
+> npm install
+> npm run build
+> npm link
 > betanet-lint --version   # verify installation
 > betanet-lint check ./your-binary --sbom --format cyclonedx-json --output json > compliance.json
 > ```
@@ -40,21 +45,10 @@ MIT License. See [LICENSE](./LICENSE) for details.
 - 🧪 **Dynamic Probe (Optional)**: `--dynamic-probe` lightly invokes the binary with `--help` to enrich heuristic surface (no network / destructive actions)
 - 🏷️ **SBOM Feature Tagging**: Adds `betanet.feature` properties (e.g. `transport-quic`, `crypto-pq-hybrid`, `payment-lightning`, `privacy-hop`) to CycloneDX / SPDX outputs for downstream audit traceability
 
+
 ## Installation
 
-### Global Installation
-
-```bash
-npm install -g betanet-compliance-linter
-```
-
-### Local Installation
-
-```bash
-npm install betanet-compliance-linter
-```
-
-### From Source
+Install from source (recommended):
 
 ```bash
 git clone <repository-url>
@@ -66,17 +60,8 @@ npm link
 
 ## Usage
 
-### Quickstart (Fast Path)
 
-```bash
-npm install -g betanet-compliance-linter
-betanet-lint --version   # verify installation
-betanet-lint check ./your-binary --sbom --format cyclonedx-json --output json > compliance.json
-```
-
-Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
-
-`--format` is now the canonical flag for SBOM format selection. The older `--sbom-format` still works but is deprecated and will emit a warning; it will be removed in a future minor release.
+> **Note:** This is betanet-linter v1.0.0, targeting Betanet 1.0 compliance (not Betanet 1.1).
 
 ### Basic Compliance Check
 
