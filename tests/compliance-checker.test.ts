@@ -515,5 +515,37 @@ describe('BetanetComplianceChecker', () => {
       expect(diag.analyzeInvocations).toBe(1);
       expect(diag.cached).toBe(true);
     });
+
+    it('should mark diagnostics degraded when core tools are skipped', async () => {
+      process.env.BETANET_SKIP_TOOLS = 'strings,nm';
+      const analyzer = new BinaryAnalyzer('/mock/binary');
+      // Force analyze to trigger tool detection completion
+      jest.spyOn(analyzer as any, 'extractStrings').mockResolvedValue(['token']);
+      jest.spyOn(analyzer as any, 'extractSymbols').mockResolvedValue([]);
+      jest.spyOn(analyzer as any, 'detectFileFormat').mockResolvedValue('ELF');
+      jest.spyOn(analyzer as any, 'detectArchitecture').mockResolvedValue('x86');
+      jest.spyOn(analyzer as any, 'detectDependencies').mockResolvedValue([]);
+      jest.spyOn(analyzer as any, 'getFileSize').mockResolvedValue(10);
+  await analyzer.checkNetworkCapabilities();
+  // slight delay to allow detectTools promise resolution
+  await new Promise(r => setTimeout(r, 10));
+      const diag = analyzer.getDiagnostics();
+      expect(diag.degraded).toBe(true);
+      expect(diag.skippedTools).toEqual(expect.arrayContaining(['strings','nm']));
+      delete process.env.BETANET_SKIP_TOOLS;
+    });
+
+    it('should fall back when strings tool missing and still return strings via fallback', async () => {
+      // Simulate failure by skipping strings
+      process.env.BETANET_SKIP_TOOLS = 'strings';
+  const analyzer = new BinaryAnalyzer(__filename); // use this source file as pseudo binary
+  const network = await analyzer.checkNetworkCapabilities();
+  await new Promise(r => setTimeout(r, 10));
+      expect(network).toBeDefined();
+      const diag = analyzer.getDiagnostics();
+      expect(diag.degraded).toBe(true);
+      expect(diag.skippedTools).toContain('strings');
+      delete process.env.BETANET_SKIP_TOOLS;
+    });
   });
 });

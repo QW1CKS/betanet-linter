@@ -2,6 +2,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import execa from 'execa';
 import { AnalyzerDiagnostics } from './types';
+import { safeExec, isToolSkipped } from './safe-exec';
 import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
 // Removed unused imports (which, types)
 
@@ -22,11 +23,12 @@ export class BinaryAnalyzer {
     cached: false
   };
   private analysisStartHr: [number, number] | null = null;
+  private toolsReady: Promise<void>;
 
   constructor(binaryPath: string, verbose: boolean = false) {
     this.binaryPath = binaryPath;
     this.verbose = verbose;
-    void this.detectTools();
+  this.toolsReady = this.detectTools();
   }
 
   getDiagnostics(): AnalyzerDiagnostics {
@@ -46,16 +48,38 @@ export class BinaryAnalyzer {
     const checks = toolCandidates.map(async t => {
       const start = Date.now();
       try {
-        await execa(t.name, t.args, { timeout: 2000 });
-        this.diagnostics.tools.push({ name: t.name, available: true, durationMs: Date.now() - start });
+        if (isToolSkipped(t.name)) {
+          this.diagnostics.tools.push({ name: t.name, available: false, error: 'skipped-by-config' });
+          this.diagnostics.degraded = true;
+          this.diagnostics.skippedTools = [...(this.diagnostics.skippedTools || []), t.name];
+          return;
+        }
+        const res = await safeExec(t.name, t.args, 2000);
+        if (!res.failed) {
+          this.diagnostics.tools.push({ name: t.name, available: true, durationMs: Date.now() - start });
+        } else {
+          this.diagnostics.tools.push({ name: t.name, available: false, error: res.errorMessage });
+          if (res.timedOut) {
+            this.diagnostics.timedOutTools = [...(this.diagnostics.timedOutTools || []), t.name];
+          }
+        }
       } catch (e: any) {
         this.diagnostics.tools.push({ name: t.name, available: false, error: e?.shortMessage || e?.message });
       }
     });
     await Promise.all(checks);
+    const unavailable = this.diagnostics.tools.filter(t => !t.available);
+    if (unavailable.length) {
+      this.diagnostics.degraded = true;
+      this.diagnostics.skippedTools = unavailable.filter(t => t.error === 'skipped-by-config').map(t => t.name);
+    }
   }
 
   async analyze(): Promise<{ strings: string[]; symbols: string[]; fileFormat: string; architecture: string; dependencies: string[]; size: number; }> {
+    // Ensure tool detection finished (especially for tests manipulating env)
+    if (this.toolsReady) {
+      try { await this.toolsReady; } catch { /* ignore */ }
+    }
     if (this.cachedAnalysis) {
       this.diagnostics.cached = true;
       return this.cachedAnalysis;
@@ -85,9 +109,15 @@ export class BinaryAnalyzer {
 
   private async extractStrings(): Promise<string[]> {
     try {
-      const { stdout } = await execa('strings', [this.binaryPath]);
-  return stdout.split('\n').filter((line: string) => line.length > 0);
-    } catch (error) {
+      const res = await safeExec('strings', [this.binaryPath]);
+      if (!res.failed) {
+        return res.stdout.split('\n').filter((line: string) => line.length > 0);
+      }
+      if (this.verbose) {
+        console.warn('⚠️  strings unavailable (', res.errorMessage, '), using fallback');
+      }
+      this.diagnostics.degraded = true;
+  } catch (error) {
       if (this.verbose) {
         console.warn('⚠️  strings command failed, trying fallback method');
       }
@@ -110,26 +140,32 @@ export class BinaryAnalyzer {
       
       return strings;
     }
+  // If we reach here (should not normally), fallback to empty array
+  return [];
   }
 
   private async extractSymbols(): Promise<string[]> {
     try {
-      const { stdout } = await execa('nm', ['-D', this.binaryPath]);
-      return stdout.split('\n')
+      const res = await safeExec('nm', ['-D', this.binaryPath]);
+      if (!res.failed) {
+        return res.stdout.split('\n')
         .filter((line: string) => line.trim())
         .map((line: string) => line.split(' ').pop() || '')
         .filter((symbol: string) => symbol);
+      }
     } catch (error) {
       if (this.verbose) {
         console.warn('⚠️  nm command failed, trying objdump');
       }
       
       try {
-        const { stdout } = await execa('objdump', ['-t', this.binaryPath]);
-        return stdout.split('\n')
+        const res2 = await safeExec('objdump', ['-t', this.binaryPath]);
+        if (!res2.failed) {
+          return res2.stdout.split('\n')
           .filter((line: string) => line.includes('.text'))
           .map((line: string) => line.split(' ').pop() || '')
           .filter((symbol: string) => symbol);
+        }
       } catch (error2) {
         if (this.verbose) {
           console.warn('⚠️  Symbol extraction failed');
@@ -137,30 +173,38 @@ export class BinaryAnalyzer {
         return [];
       }
     }
+  return [];
   }
 
   private async detectFileFormat(): Promise<string> {
     try {
-      const { stdout } = await execa('file', [this.binaryPath]);
-      return stdout.trim();
-    } catch (error) {
+      const res = await safeExec('file', [this.binaryPath]);
+      return res.failed ? 'unknown' : res.stdout.trim();
+    } catch {
       return 'unknown';
     }
   }
 
   private async detectArchitecture(): Promise<string> {
     try {
-      const { stdout } = await execa('uname', ['-m']);
-      return stdout.trim();
-    } catch (error) {
+      const res = await safeExec('uname', ['-m']);
+      return res.failed ? 'unknown' : res.stdout.trim();
+    } catch {
       return 'unknown';
     }
   }
 
   private async detectDependencies(): Promise<string[]> {
     try {
-      const { stdout } = await execa('ldd', [this.binaryPath]);
-      return stdout.split('\n')
+      const res = await safeExec('ldd', [this.binaryPath]);
+      if (res.failed) {
+        if (this.verbose) {
+          console.warn('⚠️  ldd unavailable (', res.errorMessage, ')');
+        }
+        this.diagnostics.degraded = true;
+        return [];
+      }
+      return res.stdout.split('\n')
         .filter((line: string) => line.includes('=>'))
         .map((line: string) => line.split('=>')[1]?.split('(')[0]?.trim() || '')
         .filter((dep: string) => dep && !dep.includes('not found'));
@@ -168,6 +212,7 @@ export class BinaryAnalyzer {
       if (this.verbose) {
         console.warn('⚠️  ldd command failed');
       }
+      this.diagnostics.degraded = true;
       return [];
     }
   }

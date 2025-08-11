@@ -51,6 +51,9 @@ export interface AnalyzerDiagnostics {
   analyzeInvocations: number; // how many times analyze() logic executed (should be 1 after memoization)
   cached: boolean; // whether subsequent calls used cache
   totalAnalysisTimeMs?: number; // elapsed time for first analysis
+  degraded?: boolean; // whether any external tooling missing or timed out
+  skippedTools?: string[]; // tools explicitly skipped via config
+  timedOutTools?: string[]; // tools that exceeded timeout
 }
 
 export interface CheckOptions {

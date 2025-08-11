@@ -248,6 +248,23 @@ On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhan
 - `2` - Error in execution (invalid arguments, file not found, etc.)
 - `3` - SBOM shape validation failed (non-strict); use `--strict-sbom` to escalate to 2
 
+## Environment Variables
+
+- `BETANET_DEBUG_SBOM=1` - Enable verbose SBOM generator logging
+- `BETANET_TOOL_TIMEOUT_MS=5000` - Override per external tool invocation timeout (ms)
+- `BETANET_SKIP_TOOLS=strings,nm` - Comma-separated list of external tools to skip (graceful degradation)
+
+### Diagnostics & Degradation
+
+Compliance results include a `diagnostics` object with tooling and performance metadata:
+
+- `degraded`: true if any external tool was missing, skipped, or timed out
+- `skippedTools`: tools skipped via configuration
+- `timedOutTools`: tools that exceeded the timeout
+- `tools[]`: per-tool availability + durations
+
+Degraded mode lowers confidence but does not trigger failure. Future option may allow failing on degradation.
+
 ## Development
 
 ### Building from Source
