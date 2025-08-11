@@ -9,16 +9,26 @@ export class SBOMGenerator {
     const components = await this.extractComponents(binaryPath);
     const dependencies = await this.extractDependencies(binaryPath);
 
+    // Attempt per-component hashing when a concrete path exists
+    await this.addComponentHashes(components);
+    // Sanitize & dedupe
+    const finalComponents = this.dedupeComponents(components);
+    // Detect license for root package
+    const rootLicense = await this.detectLicense(binaryPath);
+    if (rootLicense) {
+      (binaryInfo as any).license = rootLicense;
+    }
+
     if (format === 'cyclonedx') {
       return {
         format: 'cyclonedx',
-        data: this.generateCycloneDX(binaryInfo, components, dependencies),
+        data: this.generateCycloneDX(binaryInfo, finalComponents, dependencies),
         generated: new Date().toISOString()
       };
     } else {
       return {
         format: 'spdx',
-        data: this.generateSPDX(binaryInfo, components, dependencies),
+        data: this.generateSPDX(binaryInfo, finalComponents, dependencies),
         generated: new Date().toISOString()
       };
     }
@@ -199,6 +209,60 @@ export class SBOMGenerator {
     return dependencies;
   }
 
+  private async addComponentHashes(components: any[]): Promise<void> {
+    for (const comp of components) {
+      if (comp.path && !comp.hash) {
+        try {
+          const exists = await fs.pathExists(comp.path);
+          if (exists) {
+            comp.hash = await this.calculateHash(comp.path);
+          }
+        } catch { /* ignore */ }
+      }
+    }
+  }
+
+  private dedupeComponents(components: any[]): any[] {
+    const map = new Map<string, any>();
+    for (const c of components) {
+      const name = (c.name || 'unknown').trim();
+      const version = (c.version || 'unknown').trim();
+      const key = `${name.toLowerCase()}@${version}`;
+      if (!map.has(key)) {
+        map.set(key, { ...c, name, version });
+      } else {
+        const existing = map.get(key);
+        // Merge flags
+        existing.system = existing.system || c.system;
+        existing.detected = existing.detected || c.detected;
+        if (!existing.hash && c.hash) existing.hash = c.hash;
+        if (!existing.path && c.path) existing.path = c.path;
+      }
+    }
+    return Array.from(map.values());
+  }
+
+  private async detectLicense(binaryPath: string): Promise<string | null> {
+    try {
+      const maxRead = 64 * 1024; // 64KB
+      const fd = await fs.open(binaryPath, 'r');
+      const buffer = Buffer.alloc(maxRead);
+      const { bytesRead } = await fs.read(fd, buffer, 0, maxRead, 0);
+      await fs.close(fd);
+      const text = buffer.slice(0, bytesRead).toString('utf8');
+      const licenses = [
+        'Apache-2.0','MIT','BSD-3-Clause','BSD-2-Clause','GPL-3.0-only','GPL-3.0-or-later',
+        'LGPL-3.0-only','LGPL-3.0-or-later','MPL-2.0','AGPL-3.0-only','AGPL-3.0-or-later','Unlicense','ISC'
+      ];
+      for (const id of licenses) {
+        if (text.includes(id)) return id;
+      }
+      // Secondary simple patterns
+      if (/permission is hereby granted/i.test(text)) return 'MIT';
+    } catch {/* ignore */}
+    return null;
+  }
+
   private async parsePackageFile(packagePath: string): Promise<any[]> {
     const ext = path.extname(packagePath);
     const dependencies: any[] = [];
@@ -300,6 +364,7 @@ export class SBOMGenerator {
               content: binaryInfo.hash
             }
           ],
+          licenses: binaryInfo.license ? [{ license: { id: binaryInfo.license } }] : undefined,
           properties: [
             {
               name: 'binary:size',
@@ -317,6 +382,8 @@ export class SBOMGenerator {
         name: comp.name,
         version: comp.version || 'unknown',
         purl: comp.purl,
+        hashes: comp.hash ? [{ alg: 'SHA-256', content: comp.hash }] : undefined,
+        licenses: comp.license ? [{ license: { id: comp.license } }] : undefined,
         properties: comp.detected ? [{
           name: 'detected',
           value: 'true'
@@ -382,12 +449,21 @@ export class SBOMGenerator {
     spdxText += `PackageDownloadLocation: NOASSERTION\n`;
     spdxText += `FilesAnalyzed: false\n`;
     spdxText += `PackageLicenseConcluded: NOASSERTION\n`;
-    spdxText += `PackageLicenseDeclared: NOASSERTION\n`;
+  spdxText += `PackageLicenseDeclared: ${binaryInfo.license || 'NOASSERTION'}\n`;
     spdxText += `PackageCopyrightText: NOASSERTION\n`;
     if (binaryInfo.hash) {
       spdxText += `PackageChecksum: SHA256: ${binaryInfo.hash}\n`;
     }
 
+    // Append detected component licenses if any
+    components.forEach((c, idx) => {
+      if (c.license) {
+        spdxText += `PackageName: ${c.name}\n`;
+        spdxText += `SPDXID: SPDXRef-COMP-${idx}\n`;
+        spdxText += `PackageVersion: ${c.version || 'unknown'}\n`;
+        spdxText += `PackageLicenseDeclared: ${c.license}\n`;
+      }
+    });
     return spdxText;
   }
 

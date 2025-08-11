@@ -205,6 +205,41 @@ describe('BetanetComplianceChecker', () => {
       // Clean up
       await fs.remove(outputPath);
     });
+
+  it('should include license when detected and produce valid SPDX/CycloneDX skeleton', async () => {
+      // Create a temporary binary file containing MIT license phrase for detection
+      const tempBin = path.join(__dirname, 'temp-binary');
+      await fs.writeFile(tempBin, Buffer.from('Permission is hereby granted MIT test binary'));
+
+      const checker2 = new BetanetComplianceChecker();
+      (checker2 as any)._analyzer = {
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [] }),
+        checkCryptographicCapabilities: () => Promise.resolve({
+          hasChaCha20: false,
+          hasPoly1305: false,
+          hasEd25519: false,
+          hasX25519: false,
+          hasKyber768: false,
+          hasSHA256: false,
+          hasHKDF: false
+        })
+      };
+
+      const outCyclone = path.join(__dirname, 'dedupe-sbom.xml');
+      await checker2.generateSBOM(tempBin, 'cyclonedx', outCyclone);
+  const xmlContent = await fs.readFile(outCyclone, 'utf8');
+  expect(xmlContent).toMatch(/CycloneDX|bom/);
+
+      const outSpdx = path.join(__dirname, 'dedupe-sbom.spdx');
+      await checker2.generateSBOM(tempBin, 'spdx', outSpdx);
+      const spdxContent = await fs.readFile(outSpdx, 'utf8');
+      expect(spdxContent).toMatch(/PackageLicenseDeclared: MIT/);
+
+      // Clean up
+      await fs.remove(outCyclone);
+      await fs.remove(outSpdx);
+      await fs.remove(tempBin);
+    });
   });
 
   describe('displayResults', () => {

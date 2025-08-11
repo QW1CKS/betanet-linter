@@ -1,0 +1,82 @@
+Betanet Linter Chat Archive
+Date: 2025-08-11
+
+Purpose: Offline continuation anchor. Contains condensed chronology of user prompts, assistant actions, code changes, decisions, and roadmap status up to completion of Plan 2.
+
+=== 1. INITIAL DISCOVERY ===
+User requested a codebase overview (#codebase). Assistant summarized repository: TypeScript CLI linter (BetanetComplianceChecker) with analyzers, SBOM generation, compliance checks, tests.
+
+=== 2. BACKLOG CREATION ===
+User asked for exhaustive list of errors/inconsistencies. Assistant generated issues-inconsistencies.txt with 50 categorized issues (ARCH, PERF, HEUR, API, SBOM, TEST, CODE, PLATFORM, ERROR, SEC, UX, EDGE, DOC). Added checkboxes; then user requested all marked as open with [X].
+
+=== 3. LOCAL EXECUTION & SETUP ===
+User wanted to run linter & tests. Missing jest (no node_modules) -> guided npm install. TypeScript build errors (execa import style, implicit any). Assistant refactored imports to default execa, typed lambdas, added SBOM interface, added ts-jest dev dependency. Build & tests passed (8 tests initially).
+
+=== 4. PERFORMANCE & DIAGNOSTICS (PLAN 1) ===
+Selected Plan 1. Implemented:
+- Memoization of BinaryAnalyzer.analyze() (ISSUE-004) with cached promise, elapsed timing.
+- Diagnostics: tool availability detection (strings, nm, objdump, ldd, file, uname), timing, invocation count (ISSUE-031, 032, 043).
+- Division-by-zero guard for overall score (ISSUE-015).
+- Defensive access to getDiagnostics for test mocks.
+Tests remained green (8/8).
+User commit message chosen (user-entered, with a typo kept): "emoize analyzer; add tool availability & timing diagnostics; zero-check guard".
+Deferred micro-enhancements: per-check timing, per-command timeouts in each helper, forceRefresh flag.
+
+=== 5. HEURISTIC PRECISION (PLAN 2) ===
+Implemented Plan 2 to reduce false positives:
+- Added src/heuristics.ts with structured regex/multi-indicator detection for network, crypto, SCION, DHT, ledger, payment, build provenance.
+- Refactored analyzer capability methods to use heuristics functions.
+- Strengthened Kyber detection (requires kyber token; removed plain '768' trigger) (ISSUE-006).
+- Boundary-aware port 443 detection (ISSUE-007).
+- Multi-indicator QUIC/TLS/ECH & HTX heuristics (ISSUE-008).
+- Improved SCION path and IP-transition heuristics (ISSUE-009).
+- Improved DHT deterministic bootstrap & seed heuristics (ISSUE-010).
+- Narrowed Lightning/payment detection (ISSUE-012).
+- Added negative tests: prevent Kyber768 false positive (just '768'), prevent port 443 detection from version string (v1.443.0). Test count increased to 10 (all passing).
+Updated plans.md to mark Plan 2 DONE and recommend Plan 3 next.
+Commit message chosen (Option A): "feat(heuristics): add heuristics module and tighten detection; add false-positive tests".
+
+=== 6. CURRENT STATE SUMMARY ===
+Tests: 10 passing.
+Implemented Plans: 1 (Performance & Diagnostics), 2 (Heuristic Precision).
+Plans file (plans.md) reflects status; Plan 3 next (Architecture Consolidation).
+Diagnostics now available in compliance report (tool availability, timings, cache usage).
+Negative test coverage introduced for targeted false positives.
+
+=== 7. OUTSTANDING / DEFERRED ITEMS ===
+From Plan 1: per-check timing, per-command timeouts on every helper, forceRefresh / cache invalidation API.
+Upcoming Plan 3 goals: remove duplicate compliance engine (compliance.ts), centralize severity & check metadata constants, unify SBOM logic.
+Later plans: SBOM quality (valid SPDX/CycloneDX JSON, hashing, license detection), robustness (timeouts, streaming extraction), security (sanitization, hashes, config), UX (CLI flags), docs (disclaimers, CONTRIBUTING), observability deep dive.
+
+=== 8. KEY FILE CHANGES (HIGH-LEVEL) ===
+- package.json: added ts-jest (earlier).
+- src/analyzer.ts: memoization, diagnostics, heuristics refactor.
+- src/index.ts: zero-check guard, diagnostics inclusion in result.
+- src/types.ts: added diagnostics interfaces.
+- src/heuristics.ts: new heuristics module (Plan 2).
+- tests/compliance-checker.test.ts: added false-positive tests for Kyber / port 443.
+- plans.md: created then updated with Plan 1 DONE, later Plan 2 DONE.
+
+=== 9. GLOSSARY OF IMPLEMENTED ISSUES ===
+ISSUE-004, 006, 007, 008, 009, 010, 012, 015, 024, 031, 032, 043 implemented or partially satisfied via Plan 1 & 2 changes.
+
+=== 10. NEXT RECOMMENDED ACTION ===
+Proceed with Plan 3 (Architecture Consolidation) before expanding SBOM or robustness features to reduce rework.
+
+=== 11. REPLAY INSTRUCTIONS FOR CONTINUATION ===
+If resuming from archive:
+1. Verify repository at commit including heuristics module (expect src/heuristics.ts present, tests=10 passing).
+2. Confirm plans.md shows Plan 2 (DONE).
+3. Begin Plan 3: remove/ deprecate compliance.ts, introduce constants for check metadata, integrate single SBOM pathway.
+4. After Plan 3, proceed sequentially or reprioritize based on user goals.
+
+=== 12. ORIGINAL COMMIT MESSAGES USED ===
+Plan 1 commit (user-chosen): "emoize analyzer; add tool availability & timing diagnostics; zero-check guard"
+Plan 2 commit (chosen Option A): "feat(heuristics): add heuristics module and tighten detection; add false-positive tests"
+
+=== 13. NOTES ===
+- Typos in commit messages retained intentionally (e.g., "emoize").
+- Diagnostics currently only timed for initial analyze + tool detection; per-check timing deferred.
+- Negative tests rely on mock analyzer injections via getter.
+
+End of Archive.
