@@ -52,7 +52,7 @@ Install from source (recommended):
 
 ```bash
 git clone <repository-url>
-cd betanet<TAB>
+cd betanet-linter
 npm install
 npm run build
 npm link
