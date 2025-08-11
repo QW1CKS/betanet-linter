@@ -25,13 +25,25 @@ program
   .option('--dynamic-probe', 'Attempt lightweight runtime probe (e.g. --help) to enrich heuristics')
   .option('-v, --verbose', 'Verbose output')
   .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
+  .option('-c, --checks <checks>', 'Comma-separated list of check IDs to include')
+  .option('-x, --exclude <checks>', 'Comma-separated list of check IDs to exclude')
   .action(async (binaryPath, options) => {
     try {
       const checker = new BetanetComplianceChecker();
       console.log('='.repeat(50));
-      
+      // Build checkFilters if inclusion/exclusion specified (ISSUE-040)
+      let checkFilters = undefined;
+      if (options.checks || options.exclude) {
+        checkFilters = {};
+        if (options.checks) {
+          checkFilters.include = options.checks.split(',').map(n => parseInt(n.trim(),10)).filter(n => !isNaN(n));
+        }
+        if (options.exclude) {
+          checkFilters.exclude = options.exclude.split(',').map(n => parseInt(n.trim(),10)).filter(n => !isNaN(n));
+        }
+      }
       const results = await checker.checkCompliance(binaryPath, {
-        checkFilters: options.checkFilters,
+        checkFilters,
         verbose: options.verbose,
         severityMin: options.severityMin,
         forceRefresh: options.forceRefresh,

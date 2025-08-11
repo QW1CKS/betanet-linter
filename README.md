@@ -73,13 +73,20 @@ betanet-lint check /path/to/binary --output table
 
 ### Selective Checking
 
+You can now filter directly on the `check` command (ISSUE-040):
+
 ```bash
-# Run only specific checks (e.g., checks 1, 3, 5)
-betanet-lint validate /path/to/binary --checks 1,3,5
+# Run only specific checks (e.g., checks 1,3,5)
+betanet-lint check /path/to/binary --checks 1,3,5
 
 # Exclude specific checks (e.g., exclude check 10)
-betanet-lint validate /path/to/binary --exclude 10
+betanet-lint check /path/to/binary --exclude 10
+
+# Combine include + exclude (exclude takes effect after include)
+betanet-lint check /path/to/binary --checks 1,2,3,4,5 --exclude 3
 ```
+
+Legacy `validate` command remains as an alias but may be deprecated in a future release.
 
 ### Generate SBOM Only
 

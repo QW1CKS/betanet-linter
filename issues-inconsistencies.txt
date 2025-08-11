@@ -231,10 +231,8 @@ Action: Compute SHA-256 of binary + dependencies.
 
 UX / CLI
 --------
-[X] ISSUE-040 | UX | Filters only on 'validate' command
-'check' lacks --checks / --exclude parity.
-Impact: Inconsistent UX.
-Action: Add same options to 'check'.
+[✓] ISSUE-040 | UX | Filters only on 'validate' command
+Resolved: Added --checks / --exclude parity to 'check' command (CLI), enabling selective inclusion/exclusion without using validate alias.
 
 [✓] ISSUE-041 | UX | Severity threshold not configurable
 RESOLVED: severityMin option / --severity-min flag implemented; scoring filters by severity rank.

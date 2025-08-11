@@ -439,6 +439,30 @@ describe('BetanetComplianceChecker', () => {
     });
   });
 
+  describe('CLI filter parity (ISSUE-040)', () => {
+    const { spawnSync } = require('child_process');
+    it('should allow --checks on check command', () => {
+      const bin = path.join(__dirname, 'temp-existing-bin');
+      fs.writeFileSync(bin, Buffer.from('dummy'));
+      const res = spawnSync('node', [path.join(__dirname, '..', 'bin', 'cli.js'), 'check', bin, '--checks', '1,3', '--output', 'json']);
+      expect(res.status).toBeGreaterThanOrEqual(0); // process may exit 0 or 1 depending on pass/fail
+      const stdout = res.stdout.toString();
+      // Count occurrences of '"id":' to ensure only two checks captured in JSON output
+      const ids = stdout.match(/"id"\s*:\s*([0-9]+)/g) || [];
+      // Expect exactly two unique IDs (1 and 3)
+  const uniq = Array.from(new Set(ids.map((s: string) => (s.match(/([0-9]+)/) || [,''])[1])));
+      expect(uniq).toEqual(expect.arrayContaining(['1','3']));
+      expect(uniq.length).toBe(2);
+    });
+    it('should allow --exclude on check command', () => {
+      const bin = path.join(__dirname, 'temp-existing-bin');
+      fs.writeFileSync(bin, Buffer.from('dummy'));
+      const res = spawnSync('node', [path.join(__dirname, '..', 'bin', 'cli.js'), 'check', bin, '--exclude', '10', '--output', 'json']);
+      const stdout = res.stdout.toString();
+      expect(stdout).not.toMatch(/"id"\s*:\s*10/);
+    });
+  });
+
   describe('heuristics false-positive protection', () => {
     it('should not flag Kyber768 when only number 768 appears without kyber token', async () => {
       const checker = new BetanetComplianceChecker();
