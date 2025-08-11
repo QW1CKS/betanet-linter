@@ -73,7 +73,7 @@ Action: Require combination and maybe structured metadata file detection.
 Impact: False positives.
 Action: Prefer 'lnpay', 'lightning', 'lnnode', 'lnurl', 'bolt' patterns.
 
-[ ] ISSUE-051 | HEUR | Privacy hop enforcement heuristic coarse
+[ ] ISSUE-051 | HEUR | Privacy hop enforcement heuristic coarse (Deferred)
 Current detection relies on simple token presence (nym/mix/beaconset/diversity) which may appear in unrelated contexts.
 Impact: Potential false positives/negatives for new check 11.
 Action: Consider structured pattern grouping (BeaconSet+epoch parsing, VRF/seed terms, hop count tokens) & minimum entropy indicators.
@@ -324,12 +324,12 @@ IMPLEMENTED: Registry entries now include introducedIn & mandatoryIn fields. Spe
 Impact: Future spec (1.2+) evolution now data-driven.
 Action: (Done) Extend when new checks added; consider adding enforcement gating later.
 
-[ ] ISSUE-053 | HEUR | Voucher structural validation absent
+[ ] ISSUE-053 | HEUR | Voucher structural validation absent (Deferred)
 Only detects presence of 'voucher' token; no format, length, signature, or prefix pattern verification.
 Impact: Overstates payment readiness.
 Action: Define expected voucher regex (e.g., base58/hex length), optional checksum heuristic.
 
-[ ] ISSUE-054 | HEUR | PoW difficulty heuristic shallow
+[ ] ISSUE-054 | HEUR | PoW difficulty heuristic shallow (Deferred)
 Currently any string with 'pow' and '22' may pass threshold intent.
 Impact: Could misclassify generic log text.
 Action: Parse nearby context (e.g., 'pow=22', 'difficulty:22', 'work(22)') with bounded regex capturing.
@@ -339,7 +339,7 @@ IMPLEMENTED: CLI/table output prints spec coverage line + pending 1.1 refinement
 Impact: Transparency improved; users see partial 1.1 coverage.
 Action: (Done) Keep pending issue list synchronized.
 
-[ ] ISSUE-056 | TEST | Stripped / packed binary degradation tests
+[ ] ISSUE-056 | TEST | Stripped / packed binary degradation tests (Deferred)
 No tests simulating stripped symbols (nm/objdump absence) to ensure graceful heuristic fallback.
 Impact: 1.1 heuristics may rely too heavily on symbol names.
 Action: Provide synthetic minimal binary or mock analyzer output to simulate missing symbols.
@@ -349,17 +349,17 @@ RESOLVED: Parallel aggregation implemented (see ISSUE-005). Wall time test added
 Impact: Scaling latency controlled.
 Action: (Done) Add runtime timing histogram later.
 
-[ ] ISSUE-058 | SBOM | Versioned component mapping for new transports / payment modules
+[ ] ISSUE-058 | SBOM | Versioned component mapping for new transports / payment modules (Deferred)
 SBOM does not classify 1.1-specific modules (e.g., WebRTC transport, payment adapter) distinctly.
 Impact: Limited traceability of which spec-era features binary includes.
 Action: Extend component classifier to tag modules by spec feature set.
 
-[ ] ISSUE-059 | EDGE | Static-only approach misses dynamic 1.1 behaviors
+[ ] ISSUE-059 | EDGE | Static-only approach misses dynamic 1.1 behaviors (Deferred)
 Rotation scheduling, path diversity, and real PoW verification are runtime phenomena.
 Impact: False negatives for binaries using late-bound or generated strings.
 Action: (Future) Introduce optional dynamic probe mode (exec with --dry-scan env) or plugin architecture.
 
-[ ] ISSUE-060 | DOC | README lacks 1.1 delta coverage table
+[ ] ISSUE-060 | DOC | README lacks 1.1 delta coverage table (Deferred)
 Documentation lists partial support but not a matrix of implemented vs pending 1.1 features.
 Impact: Contributors lack at-a-glance roadmap.
 Action: Add table referencing ISSUE-051..060 statuses; auto-update suggestion script.
