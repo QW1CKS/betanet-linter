@@ -42,18 +42,27 @@ export class BetanetComplianceChecker {
     const definitions = getChecksByIds(checkIdsToRun);
     const checks: ComplianceCheck[] = [];
     const now = new Date();
+    const checkTimings: { id: number; durationMs: number }[] = [];
     for (const def of definitions) {
+      const start = performance.now();
       const result = await def.evaluate(this._analyzer, now);
+      const duration = performance.now() - start;
+      result.durationMs = duration;
+      checkTimings.push({ id: result.id, durationMs: duration });
       checks.push(result);
     }
 
     // Calculate overall results
-    const passedChecks = checks.filter(c => c.passed);
-    const criticalChecks = checks.filter(c => c.severity === 'critical' && !c.passed);
+    // Apply severity minimum filter for scoring (display still shows all for transparency)
+    const severityRank = { minor: 1, major: 2, critical: 3 } as const;
+    const min = options.severityMin ? severityRank[options.severityMin] : 1;
+    const considered = checks.filter(c => severityRank[c.severity] >= min);
+    const passedChecks = considered.filter(c => c.passed);
+    const criticalChecks = considered.filter(c => c.severity === 'critical' && !c.passed);
     
-  // Guard against zero checks (filters may exclude all)
-  const overallScore = checks.length === 0 ? 0 : Math.round((passedChecks.length / checks.length) * 100);
-  const passed = checks.length > 0 && passedChecks.length === checks.length && criticalChecks.length === 0;
+  // Guard against zero considered checks
+  const overallScore = considered.length === 0 ? 0 : Math.round((passedChecks.length / considered.length) * 100);
+  const passed = considered.length > 0 && passedChecks.length === considered.length && criticalChecks.length === 0;
 
     const diagnostics = ((): any => {
       const a: any = this.analyzer;
@@ -70,22 +79,23 @@ export class BetanetComplianceChecker {
       passed,
       checks,
       summary: {
-        total: checks.length,
+        total: considered.length,
         passed: passedChecks.length,
-        failed: checks.length - passedChecks.length,
+        failed: considered.length - passedChecks.length,
         critical: criticalChecks.length
       },
       diagnostics
     };
+    result.checkTimings = checkTimings;
 
     return result;
   }
 
   // Legacy per-check methods removed (Plan 3 consolidation) in favor of registry-based evaluation
 
-  async generateSBOM(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' = 'cyclonedx', outputPath?: string): Promise<string> {
+  async generateSBOM(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json' = 'cyclonedx', outputPath?: string): Promise<string> {
     // Ensure analyzer exists for consistency (even though SBOMGenerator operates independently)
-    if (!this.analyzer) {
+  if (!this.analyzer) {
       this._analyzer = new BinaryAnalyzer(binaryPath);
     }
 
@@ -95,6 +105,7 @@ export class BetanetComplianceChecker {
     const defaultOutputPath = (() => {
       if (format === 'cyclonedx') return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.xml`);
       if (format === 'cyclonedx-json') return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.cdx.json`);
+      if (format === 'spdx-json') return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.spdx.json`);
       return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.spdx`);
     })();
     const finalOutputPath = outputPath || defaultOutputPath;
@@ -132,6 +143,8 @@ export class BetanetComplianceChecker {
       await fs.writeFile(finalOutputPath, xml);
     } else if (format === 'cyclonedx-json') {
       // Write raw JSON structure produced internally (data object)
+      await fs.writeFile(finalOutputPath, JSON.stringify((sbom as any).data, null, 2));
+    } else if (format === 'spdx-json') {
       await fs.writeFile(finalOutputPath, JSON.stringify((sbom as any).data, null, 2));
     } else {
       // SPDX already text from generator

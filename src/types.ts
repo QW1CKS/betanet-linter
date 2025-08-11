@@ -5,6 +5,7 @@ export interface ComplianceCheck {
   passed: boolean;
   details: string;
   severity: 'critical' | 'major' | 'minor';
+  durationMs?: number; // execution time for the check
 }
 
 export interface ComplianceResult {
@@ -20,6 +21,7 @@ export interface ComplianceResult {
     critical: number;
   };
   diagnostics?: AnalyzerDiagnostics;
+  checkTimings?: { id: number; durationMs: number }[];
 }
 
 export interface SBOMComponent {
@@ -29,11 +31,12 @@ export interface SBOMComponent {
   license?: string;
   supplier?: string;
   hashes?: string[];
+  licenses?: string[]; // enriched multi-license capture
 }
 
 // Generic SBOM structure used by sbom-generator.ts
 export interface SBOM {
-  format: 'cyclonedx' | 'spdx' | 'cyclonedx-json';
+  format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json';
   data: any; // Underlying JSON / XML / text representation
   generated: string; // ISO timestamp
 }
@@ -62,9 +65,10 @@ export interface CheckOptions {
     include?: number[];
     exclude?: number[];
   };
+  severityMin?: 'minor' | 'major' | 'critical';
 }
 
 export interface SBOMOptions {
-  format: 'cyclonedx' | 'spdx' | 'cyclonedx-json';
+  format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json';
   outputPath?: string;
 }

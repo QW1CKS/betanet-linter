@@ -4,7 +4,7 @@ import execa from 'execa';
 import { SBOM } from '../types';
 
 export class SBOMGenerator {
-  async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' = 'cyclonedx'): Promise<SBOM> {
+  async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json' = 'cyclonedx'): Promise<SBOM> {
     const binaryInfo = await this.getBinaryInfo(binaryPath);
     const components = await this.extractComponents(binaryPath);
     const dependencies = await this.extractDependencies(binaryPath);
@@ -25,10 +25,16 @@ export class SBOMGenerator {
         data: this.generateCycloneDX(binaryInfo, finalComponents, dependencies),
         generated: new Date().toISOString()
       };
-    } else {
+    } else if (format === 'spdx') {
       return {
         format: 'spdx',
-        data: this.generateSPDX(binaryInfo, finalComponents, dependencies),
+        data: this.generateSPDXTagValue(binaryInfo, finalComponents, dependencies),
+        generated: new Date().toISOString()
+      };
+    } else { // spdx-json
+      return {
+        format: 'spdx-json',
+        data: this.generateSPDXJson(binaryInfo, finalComponents, dependencies),
         generated: new Date().toISOString()
       };
     }
@@ -402,7 +408,7 @@ export class SBOMGenerator {
     };
   }
 
-  private generateSPDX(binaryInfo: any, components: any[], dependencies: any[]): string {
+  private generateSPDXTagValue(binaryInfo: any, components: any[], dependencies: any[]): string {
     const spdxContent = {
       SPDXID: 'SPDXRef-DOCUMENT',
       spdxVersion: 'SPDX-2.3',
@@ -465,6 +471,50 @@ export class SBOMGenerator {
       }
     });
     return spdxText;
+  }
+
+  private generateSPDXJson(binaryInfo: any, components: any[], dependencies: any[]): any {
+    const docId = `SPDXRef-DOCUMENT`;
+    const packageId = `SPDXRef-PACKAGE-${binaryInfo.name}`;
+    return {
+      SPDXID: docId,
+      spdxVersion: 'SPDX-2.3',
+      dataLicense: 'CC0-1.0',
+      name: binaryInfo.name,
+      documentNamespace: `https://spdx.org/spdxdocs/${binaryInfo.name}-${this.generateUUID()}`,
+      creationInfo: {
+        created: new Date().toISOString(),
+        creators: ['Tool: betanet-compliance-linter']
+      },
+      packages: [
+        {
+          name: binaryInfo.name,
+          SPDXID: packageId,
+          versionInfo: '1.0.0',
+          filesAnalyzed: false,
+          downloadLocation: 'NOASSERTION',
+          checksums: binaryInfo.hash ? [{ algorithm: 'SHA256', checksumValue: binaryInfo.hash }] : [],
+          licenseDeclared: binaryInfo.license || 'NOASSERTION',
+          licenseConcluded: 'NOASSERTION',
+          copyrightText: 'NOASSERTION'
+        },
+        ...components.map((c, idx) => ({
+          name: c.name,
+          SPDXID: `SPDXRef-COMP-${idx}`,
+          versionInfo: c.version || 'unknown',
+          filesAnalyzed: false,
+          downloadLocation: 'NOASSERTION',
+          licenseDeclared: c.license || 'NOASSERTION',
+          licenseConcluded: 'NOASSERTION',
+          copyrightText: 'NOASSERTION'
+        }))
+      ],
+      relationships: dependencies.map(dep => ({
+        spdxElementId: packageId,
+        relationshipType: 'DEPENDS_ON',
+        relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
+      }))
+    };
   }
 
   private generateUUID(): string {

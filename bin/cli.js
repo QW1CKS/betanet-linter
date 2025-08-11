@@ -17,14 +17,16 @@ program
   .option('-s, --sbom', 'Generate Software Bill of Materials')
     .option('--validate-sbom', 'Validate generated SBOM structure (shape)')
     .option('--strict-sbom', 'Fail if SBOM fails strict schema shape validation (implies --validate-sbom)')
+  .option('--severity-min <level>', 'Minimum severity to include in scoring (minor|major|critical)', 'minor')
+  .option('--fail-on-degraded', 'Exit non-zero if analysis degraded (missing/timeout tools)')
   .option('-v, --verbose', 'Verbose output')
-  .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx)', 'cyclonedx')
+  .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .action(async (binaryPath, options) => {
     try {
       const checker = new BetanetComplianceChecker();
       console.log('='.repeat(50));
       
-      const results = await checker.checkCompliance(binaryPath, options);
+  const results = await checker.checkCompliance(binaryPath, { checkFilters: options.checkFilters, verbose: options.verbose, severityMin: options.severityMin });
       
       if (options.sbom) {
         const sbomPath = await checker.generateSBOM(binaryPath, options.sbomFormat);
@@ -37,6 +39,9 @@ program
       checker.displayResults(results, options.output);
       
       // Exit with appropriate code
+      if (options.failOnDegraded && results.diagnostics?.degraded) {
+        process.exit(1);
+      }
       process.exit(results.passed ? 0 : 1);
     } catch (error) {
       console.error('❌ Error:', error.message);
@@ -48,7 +53,7 @@ program
   .command('sbom')
   .description('Generate Software Bill of Materials for a binary')
   .argument('<binary>', 'Path to the binary')
-  .option('-f, --format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx)', 'cyclonedx')
+  .option('-f, --format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
     .option('--validate-sbom', 'Validate SBOM structure (shape)')
     .option('--strict-sbom', 'Fail on strict validation errors (implies --validate-sbom)')
   .option('-o, --output <path>', 'Output file path')

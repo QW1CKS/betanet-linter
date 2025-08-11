@@ -284,6 +284,28 @@ describe('BetanetComplianceChecker', () => {
       const strict = validateSPDXTagValueStrict(bad);
       expect(strict.valid).toBe(false);
     });
+
+    it('should generate SPDX JSON SBOM', async () => {
+      const mockAnalyzer = {
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [] }),
+        checkCryptographicCapabilities: () => Promise.resolve({
+          hasChaCha20: false,
+          hasPoly1305: false,
+          hasEd25519: false,
+          hasX25519: false,
+          hasKyber768: false,
+          hasSHA256: false,
+          hasHKDF: false
+        })
+      };
+      (checker as any)._analyzer = mockAnalyzer;
+      const outputPath = path.join(__dirname, 'test-sbom.spdx.json');
+      const result = await checker.generateSBOM('/tmp/fakebin', 'spdx-json', outputPath);
+      expect(result).toBe(outputPath);
+      const json = JSON.parse(await fs.readFile(outputPath, 'utf8'));
+      expect(json.spdxVersion).toBe('SPDX-2.3');
+      await fs.remove(outputPath);
+    });
   });
 
   describe('displayResults', () => {
@@ -546,6 +568,27 @@ describe('BetanetComplianceChecker', () => {
       expect(diag.degraded).toBe(true);
       expect(diag.skippedTools).toContain('strings');
       delete process.env.BETANET_SKIP_TOOLS;
+    });
+  });
+
+  describe('severity filtering', () => {
+    it('should adjust scoring based on severityMin', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      const full = await checker.checkCompliance('/mock/bin');
+      const critOnly = await checker.checkCompliance('/mock/bin', { severityMin: 'critical' });
+      expect(full.summary.total).toBeGreaterThanOrEqual(critOnly.summary.total);
+      // If only critical considered and one passes, score should differ
+      expect(full.overallScore).not.toBe(critOnly.overallScore);
     });
   });
 });

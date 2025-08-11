@@ -82,8 +82,11 @@ betanet-lint sbom /path/to/binary --format cyclonedx
 # CycloneDX JSON format
 betanet-lint sbom /path/to/binary --format cyclonedx-json
 
-# SPDX format
+# SPDX tag-value format
 betanet-lint sbom /path/to/binary --format spdx
+
+# SPDX JSON format
+betanet-lint sbom /path/to/binary --format spdx-json
 
 # Custom output path
 betanet-lint sbom /path/to/binary --output /custom/path/sbom.xml
@@ -253,6 +256,7 @@ On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhan
 - `BETANET_DEBUG_SBOM=1` - Enable verbose SBOM generator logging
 - `BETANET_TOOL_TIMEOUT_MS=5000` - Override per external tool invocation timeout (ms)
 - `BETANET_SKIP_TOOLS=strings,nm` - Comma-separated list of external tools to skip (graceful degradation)
+ - `BETANET_FAIL_ON_DEGRADED=1` - (Future) Treat degraded analysis as failure (currently use --fail-on-degraded CLI flag)
 
 ### Diagnostics & Degradation
 
