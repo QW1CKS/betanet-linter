@@ -14,9 +14,12 @@ export class SBOMGenerator {
     // Sanitize & dedupe
     const finalComponents = this.dedupeComponents(components);
     // Detect license for root package
-    const rootLicense = await this.detectLicense(binaryPath);
-    if (rootLicense) {
-      (binaryInfo as any).license = rootLicense;
+    const rootLicenseInfo = await this.detectLicense(binaryPath);
+    if (rootLicenseInfo) {
+      (binaryInfo as any).license = rootLicenseInfo.primary;
+      if (rootLicenseInfo.all && rootLicenseInfo.all.length > 1) {
+        (binaryInfo as any).licenses = rootLicenseInfo.all;
+      }
     }
 
   if (format === 'cyclonedx' || format === 'cyclonedx-json') {
@@ -248,7 +251,7 @@ export class SBOMGenerator {
     return Array.from(map.values());
   }
 
-  private async detectLicense(binaryPath: string): Promise<string | null> {
+  private async detectLicense(binaryPath: string): Promise<{ primary: string; all: string[] } | null> {
     try {
       const maxRead = 64 * 1024; // 64KB
       const fd = await fs.open(binaryPath, 'r');
@@ -256,15 +259,26 @@ export class SBOMGenerator {
       const { bytesRead } = await fs.read(fd, buffer, 0, maxRead, 0);
       await fs.close(fd);
       const text = buffer.slice(0, bytesRead).toString('utf8');
-      const licenses = [
+      const candidates = [
         'Apache-2.0','MIT','BSD-3-Clause','BSD-2-Clause','GPL-3.0-only','GPL-3.0-or-later',
         'LGPL-3.0-only','LGPL-3.0-or-later','MPL-2.0','AGPL-3.0-only','AGPL-3.0-or-later','Unlicense','ISC'
       ];
-      for (const id of licenses) {
-        if (text.includes(id)) return id;
+      const found: string[] = [];
+      // Capture composite expressions like "Apache-2.0 OR MIT" or "Apache-2.0 AND MIT"
+      const compositeMatch = text.match(/((?:[A-Za-z0-9\.-]+\s+(?:OR|AND)\s+)+[A-Za-z0-9\.-]+)/);
+      if (compositeMatch) {
+        const expr = compositeMatch[1];
+        expr.split(/\s+(?:OR|AND)\s+/).forEach(token => {
+          if (candidates.includes(token) && !found.includes(token)) found.push(token);
+        });
       }
-      // Secondary simple patterns
-      if (/permission is hereby granted/i.test(text)) return 'MIT';
+      for (const id of candidates) {
+        if (text.includes(id) && !found.includes(id)) found.push(id);
+      }
+      if (found.length === 0 && /permission is hereby granted/i.test(text)) found.push('MIT');
+      if (found.length) {
+        return { primary: found[0], all: found };
+      }
     } catch {/* ignore */}
     return null;
   }
@@ -370,7 +384,7 @@ export class SBOMGenerator {
               content: binaryInfo.hash
             }
           ],
-          licenses: binaryInfo.license ? [{ license: { id: binaryInfo.license } }] : undefined,
+          licenses: binaryInfo.licenses ? binaryInfo.licenses.map((l: string) => ({ license: { id: l } })) : (binaryInfo.license ? [{ license: { id: binaryInfo.license } }] : undefined),
           properties: [
             {
               name: 'binary:size',
@@ -455,7 +469,7 @@ export class SBOMGenerator {
     spdxText += `PackageDownloadLocation: NOASSERTION\n`;
     spdxText += `FilesAnalyzed: false\n`;
     spdxText += `PackageLicenseConcluded: NOASSERTION\n`;
-  spdxText += `PackageLicenseDeclared: ${binaryInfo.license || 'NOASSERTION'}\n`;
+  spdxText += `PackageLicenseDeclared: ${(binaryInfo.licenses && binaryInfo.licenses.length > 1) ? binaryInfo.licenses.join(' OR ') : (binaryInfo.license || 'NOASSERTION')}\n`;
     spdxText += `PackageCopyrightText: NOASSERTION\n`;
     if (binaryInfo.hash) {
       spdxText += `PackageChecksum: SHA256: ${binaryInfo.hash}\n`;
@@ -494,7 +508,7 @@ export class SBOMGenerator {
           filesAnalyzed: false,
           downloadLocation: 'NOASSERTION',
           checksums: binaryInfo.hash ? [{ algorithm: 'SHA256', checksumValue: binaryInfo.hash }] : [],
-          licenseDeclared: binaryInfo.license || 'NOASSERTION',
+          licenseDeclared: binaryInfo.licenses && binaryInfo.licenses.length > 1 ? binaryInfo.licenses.join(' OR ') : (binaryInfo.license || 'NOASSERTION'),
           licenseConcluded: 'NOASSERTION',
           copyrightText: 'NOASSERTION'
         },

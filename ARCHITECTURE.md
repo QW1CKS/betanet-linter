@@ -29,7 +29,9 @@ betanet-linter/
 
 - **BetanetComplianceChecker** (`src/index.ts`)
    - Orchestrates compliance using the Check Registry (no per-check methods)
-   - Partial Betanet 1.1 heuristics (transport versions, rendezvous indicators, payment extensions)
+   - Partial Betanet 1.1 heuristics (transport versions, rendezvous rotation hits, path diversity count, optional WebRTC, privacy weighting, PQ date override)
+   - Supports analyzer cache invalidation via `forceRefresh` flag
+   - Honors `BETANET_FAIL_ON_DEGRADED=1` to override pass when tooling degraded
    - Aggregates results (score, pass/fail, diagnostics) & delegates SBOM generation to sbom generator
    - Lazy analyzer instantiation → enables dependency injection during tests
 
@@ -65,7 +67,8 @@ All checks (now 11 including Privacy Hop Enforcement) are declaratively defined 
 7. **Alias Ledger** - Checks for consensus-based ledger verification
 8. **Payment System** - Detects Cashu and Lightning support
 9. **Build Provenance** - Validates SLSA and reproducible build support
-10. **Post-Quantum** - Checks for X25519-Kyber768 (mandatory after 2027-01-01)
+10. **Post-Quantum** - Checks for X25519-Kyber768 (mandatory after 2027-01-01, override with `BETANET_PQ_DATE_OVERRIDE`)
+11. **Privacy Hop Enforcement** - Weighted multi-token heuristic (mix, beacon/epoch, diversity) with scoring visibility
 
 ### 4. SBOM Generation
 
@@ -73,7 +76,7 @@ Unified path via `sbom/sbom-generator.ts` providing:
 1. Binary hashing (SHA-256)
 2. Component & dependency extraction (best-effort via host tools: strings, ldd)
 3. CycloneDX (serialized to XML) & SPDX tag-value outputs
-4. Extensible structure for future license & dedupe heuristics
+4. Extensible structure for future license & dedupe heuristics (multi-license expression parsing implemented; CycloneDX lists each, SPDX joins with OR)
 
 ### 5. GitHub Action Template
 
@@ -149,4 +152,5 @@ Each compliance check uses a combination of:
 
 - Single-pass memoized analysis (analyze() cached)
 - Diagnostics object: analyze invocation count, cache hit flag, tool availability
-- Future: per-check timings, command timeouts, force refresh option
+- Implemented: per-analysis memoization, force refresh option, environment fail-on-degraded gate
+- Future: parallel capability evaluation, per-check timing export in machine-readable format

@@ -66,6 +66,7 @@ export interface CheckOptions {
     exclude?: number[];
   };
   severityMin?: 'minor' | 'major' | 'critical';
+  forceRefresh?: boolean; // if true, re-run analysis ignoring cache
 }
 
 export interface SBOMOptions {

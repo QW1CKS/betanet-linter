@@ -26,7 +26,7 @@ export class BetanetComplianceChecker {
       throw new Error(`Binary not found at path: ${binaryPath}`);
     }
     // Allow tests or callers to pre-inject a mock analyzer; only create if absent
-    if (!this._analyzer) {
+    if (!this._analyzer || options.forceRefresh) {
       this._analyzer = new BinaryAnalyzer(binaryPath, options.verbose);
     }
 
@@ -76,7 +76,7 @@ export class BetanetComplianceChecker {
       return undefined;
     })();
 
-    const result: ComplianceResult = {
+  const result: ComplianceResult = {
       binaryPath,
       timestamp: new Date().toISOString(),
       overallScore,
@@ -92,6 +92,10 @@ export class BetanetComplianceChecker {
     };
     result.checkTimings = checkTimings;
 
+    // If env BETANET_FAIL_ON_DEGRADED set, override pass/fail (but keep original scoring)
+    if (process.env.BETANET_FAIL_ON_DEGRADED === '1' && result.diagnostics?.degraded) {
+      result.passed = false;
+    }
     return result;
   }
 

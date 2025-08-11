@@ -107,7 +107,7 @@ Goals:
 - Structured JSON log output option
 
 ---
-## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (IN PROGRESS)
+## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (MOSTLY COMPLETE)
 Goals:
 - Optional WebRTC transport signal surfaced (informational) (ISSUE-051)
 - Stronger Rendezvous / BeaconSet rotation heuristic (epoch diversity + rotation verbs) (ISSUE-052)
@@ -117,20 +117,22 @@ Goals:
 
 Deliverables:
 - (DONE) Updated check 5 details to surface optional WebRTC (transport list)
-- (DONE) Updated check 6 with rotationHits & BeaconSet evidence in details
-- (DONE) Adjusted check 11 algorithm with weighted token scoring
-- (DONE) New optional config: BETANET_PQ_DATE_OVERRIDE
-- (PARTIAL) Additional negative tests (existing suite covers core; may add more generic-word suppression later)
+- (DONE) Updated check 6 with rotationHits & BeaconSet evidence in details including hits count
+- (DONE) Adjusted check 11 algorithm with weighted token scoring & diversity requirements
+- (DONE) New optional config: BETANET_PQ_DATE_OVERRIDE (env) for early PQ enforcement
+- (DONE) Path diversity threshold test & enforcement (≥2 markers) for check 4
+- (DONE) Negative rotate test (rotate tokens without DHT base no longer passes)
+- (DONE) Force refresh flag & analyzer recreation (Plan 1 deferred item realized)
+- (DONE) Fail-on-degraded env (BETANET_FAIL_ON_DEGRADED) overriding pass
+- (DONE) Multi-license parsing in SBOM (previously deferred in Plan 4)
 
 Success Criteria:
-- All new heuristic tests pass (current suite: 24 tests passing including new heuristics)
-- No regression in existing tests (verified)
-- Diagnostics stable (unchanged logic)
+- All new heuristic & control flag tests pass (current suite updated to 31 tests) ✅
+- No regression in existing tests (verified) ✅
+- Diagnostics stable (unchanged apart from env gating) ✅
 
-Next Increment:
-- Add explicit tests for path diversity threshold & WebRTC optional endpoint surfacing.
-- Add negative test for incidental 'rotate' without DHT context (already partially covered).
-
-### Recommended Next Step
-Implement Plan 10 heuristics (WebRTC, rotation, path diversity, privacy refinement, PQ override) with accompanying tests.
+Residual / Future (optional):
+- Additional false-positive suppression heuristics (generic keyword filtering)
+- Confidence scoring per heuristic token group
+- Structured JSON export for per-check timings (Observability plan)
 

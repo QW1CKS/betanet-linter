@@ -535,6 +535,148 @@ describe('BetanetComplianceChecker', () => {
       expect(privacyCheck).toBeDefined();
       expect(privacyCheck?.passed).toBe(false);
     });
+
+    it('should show optional WebRTC when endpoint present in transports (check 5 details)', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: true }),
+        analyze: () => Promise.resolve({ strings: ['/betanet/htx/1.1.0', '/betanet/htxquic/1.1.0', '/betanet/webrtc/1.0.0'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, rendezvousRotation: false, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      const tmp = path.join(__dirname, 'temp-webrtc');
+      await fs.writeFile(tmp, Buffer.from('dummy'));    
+      const result = await checker.checkCompliance(tmp);
+      const transport = result.checks.find(c => c.id === 5);
+      expect(transport?.details).toMatch(/optional: webrtc/);
+    });
+
+    it('should enforce path diversity threshold in check 4', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
+        analyze: () => Promise.resolve({ strings: ['scion pathid:abc as123'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 1 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, rendezvousRotation: false, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      const tmp = path.join(__dirname, 'temp-diversity');
+      await fs.writeFile(tmp, Buffer.from('dummy'));
+      const result = await checker.checkCompliance(tmp);
+      const scion = result.checks.find(c => c.id === 4);
+      expect(scion?.passed).toBe(false);
+      expect(scion?.details).toContain('≥2 path diversity markers');
+    });
+
+    it('should show rotationHits in DHT check details when rotating', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
+        analyze: () => Promise.resolve({ strings: ['dht rendezvous rotate epoch beaconset'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: false, rendezvousRotation: true, beaconSetIndicator: true, seedManagement: true, rotationHits: 3 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      const tmp = path.join(__dirname, 'temp-rotation');
+      await fs.writeFile(tmp, Buffer.from('dummy'));
+      const result = await checker.checkCompliance(tmp);
+      const dht = result.checks.find(c => c.id === 6);
+      expect(dht?.details).toMatch(/hits=3/);
+    });
+
+    it('should enforce PQ override date (env BETANET_PQ_DATE_OVERRIDE)', async () => {
+      process.env.BETANET_PQ_DATE_OVERRIDE = '2024-01-01';
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: false, hasSHA256: true, hasHKDF: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      const tmp = path.join(__dirname, 'temp-pq-override');
+      await fs.writeFile(tmp, Buffer.from('dummy'));
+      const result = await checker.checkCompliance(tmp);
+      const pq = result.checks.find(c => c.id === 10);
+      expect(pq?.severity).toBe('critical');
+      expect(pq?.passed).toBe(false);
+      delete process.env.BETANET_PQ_DATE_OVERRIDE;
+    });
+
+    it('should replace injected analyzer when forceRefresh is true', async () => {
+      const checker = new BetanetComplianceChecker();
+      const stub: any = {
+        marker: 'stub',
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false, hasWebRTC: false }),
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      (checker as any)._analyzer = stub;
+      const tmp = path.join(__dirname, 'temp-force');
+      await fs.writeFile(tmp, Buffer.from('dummy'));
+      await checker.checkCompliance(tmp); // uses stub
+      expect((checker as any)._analyzer.marker).toBe('stub');
+      await checker.checkCompliance(tmp, { forceRefresh: true });
+      expect((checker as any)._analyzer.marker).toBeUndefined();
+    });
+
+    it('should fail pass status when degraded and BETANET_FAIL_ON_DEGRADED=1', async () => {
+      process.env.BETANET_FAIL_ON_DEGRADED = '1';
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
+        analyze: () => Promise.resolve({ strings: ['/betanet/htx/1.1.0','/betanet/htxquic/1.1.0'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        getDiagnostics: () => ({ degraded: true, tools: [], analyzeInvocations: 1, cached: false })
+      };
+      const tmp = path.join(__dirname, 'temp-degraded');
+      await fs.writeFile(tmp, Buffer.from('dummy'));
+      const result = await checker.checkCompliance(tmp);
+      expect(result.passed).toBe(false);
+      delete process.env.BETANET_FAIL_ON_DEGRADED;
+    });
+
+    it('should not falsely pass DHT rotation with isolated rotate token and no dht base', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false, hasWebRTC: false }),
+        analyze: () => Promise.resolve({ strings: ['rotate epoch'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, rendezvousRotation: true, beaconSetIndicator: true, seedManagement: false, rotationHits: 2 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      const tmp = path.join(__dirname, 'temp-rotate-alone');
+      await fs.writeFile(tmp, Buffer.from('dummy'));
+      const result = await checker.checkCompliance(tmp);
+      const dht = result.checks.find(c => c.id === 6);
+      expect(dht?.passed).toBe(false);
+    });
   });
 
   describe('performance memoization', () => {

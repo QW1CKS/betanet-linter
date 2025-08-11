@@ -316,7 +316,7 @@ Implemented 1.1-Relevant Deltas (status captured in code & docs; no new issue ID
 
 New / Pending 1.1-Specific Issues
 ---------------------------------
-[ ] ISSUE-051 | HEUR | Missing negative tests for new 1.1 heuristics
+[✓] ISSUE-051 | HEUR | Missing negative tests for new 1.1 heuristics
 Rendezvous rotation, BeaconSet, voucher/FROST/PoW indicators lack dedicated false-positive regression tests.
 Impact: Future heuristic broadening could silently inflate compliance.
 Action: Add fixtures with unrelated use of 'voucher', 'rotation', 'beacon' to assert non-matches; add positive minimal fixtures.

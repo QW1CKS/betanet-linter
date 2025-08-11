@@ -18,6 +18,7 @@ program
     .option('--validate-sbom', 'Validate generated SBOM structure (shape)')
     .option('--strict-sbom', 'Fail if SBOM fails strict schema shape validation (implies --validate-sbom)')
   .option('--severity-min <level>', 'Minimum severity to include in scoring (minor|major|critical)', 'minor')
+  .option('--force-refresh', 'Ignore cached analysis and re-run extraction')
   .option('--fail-on-degraded', 'Exit non-zero if analysis degraded (missing/timeout tools)')
   .option('-v, --verbose', 'Verbose output')
   .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
@@ -26,7 +27,7 @@ program
       const checker = new BetanetComplianceChecker();
       console.log('='.repeat(50));
       
-  const results = await checker.checkCompliance(binaryPath, { checkFilters: options.checkFilters, verbose: options.verbose, severityMin: options.severityMin });
+  const results = await checker.checkCompliance(binaryPath, { checkFilters: options.checkFilters, verbose: options.verbose, severityMin: options.severityMin, forceRefresh: options.forceRefresh });
       
       if (options.sbom) {
         const sbomPath = await checker.generateSBOM(binaryPath, options.sbomFormat);

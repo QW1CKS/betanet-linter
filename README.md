@@ -7,10 +7,13 @@ A comprehensive CLI tool for checking Betanet specification compliance in binary
 - ✅ **Complete Compliance Checking**: Validates all 10 Betanet specification requirements
 - 🔍 **Binary Analysis**: Deep analysis of executable binaries for compliance patterns
 - 📋 **SBOM Generation**: Creates Software Bill of Materials in CycloneDX or SPDX formats
-- 📊 **Multiple Output Formats**: JSON, YAML, and table-based reports
+- � **Multi-License Detection**: Extracts multiple SPDX license identifiers (e.g. Apache-2.0 OR MIT) and surfaces all
+- �📊 **Multiple Output Formats**: JSON, YAML, and table-based reports
 - 🎯 **Selective Checking**: Run specific checks or exclude certain requirements
 - 🤖 **GitHub Action Ready**: Automated compliance checking in CI/CD pipelines
 - 📈 **Detailed Reporting**: Pass/fail status with detailed explanations
+- 🔄 **Force Refresh**: Use `--force-refresh` to bypass memoized baseline analysis for updated binaries
+- 🛡️ **Degraded Fail Gate**: Set `BETANET_FAIL_ON_DEGRADED=1` to force failure when tooling is degraded
 
 ## Installation
 
@@ -244,6 +247,8 @@ $env:BETANET_DEBUG_SBOM = '1'
 
 On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhances coverage (strings, nm, objdump, ldd). The generator remains resilient if any tool is absent.
 
+Multi-license detection: Composite SPDX expressions (e.g. `Apache-2.0 OR MIT`) are split. CycloneDX lists each as a separate license entry. SPDX tag-value & JSON collapse the list with `OR` for `licenseDeclared`.
+
 ## Exit Codes
 
 - `0` - All compliance checks passed
@@ -256,8 +261,8 @@ On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhan
 - `BETANET_DEBUG_SBOM=1` - Enable verbose SBOM generator logging
 - `BETANET_TOOL_TIMEOUT_MS=5000` - Override per external tool invocation timeout (ms)
 - `BETANET_SKIP_TOOLS=strings,nm` - Comma-separated list of external tools to skip (graceful degradation)
- - `BETANET_FAIL_ON_DEGRADED=1` - (Future) Treat degraded analysis as failure (currently use --fail-on-degraded CLI flag)
- - `BETANET_PQ_DATE_OVERRIDE=YYYY-MM-DD` - Override post-quantum mandatory enforcement date (for early testing)
+- `BETANET_FAIL_ON_DEGRADED=1` - Treat degraded analysis as failure (overrides otherwise passing result)
+- `BETANET_PQ_DATE_OVERRIDE=YYYY-MM-DD` - Override post-quantum mandatory enforcement date (for early testing)
 
 ### Diagnostics & Degradation
 
@@ -268,7 +273,7 @@ Compliance results include a `diagnostics` object with tooling and performance m
 - `timedOutTools`: tools that exceeded the timeout
 - `tools[]`: per-tool availability + durations
 
-Degraded mode lowers confidence but does not trigger failure. Future option may allow failing on degradation.
+Degraded mode lowers confidence and normally does not trigger failure; set `BETANET_FAIL_ON_DEGRADED=1` (or `--fail-on-degraded`) to enforce failure.
 
 ## Development
 
@@ -308,7 +313,7 @@ MIT License - see LICENSE file for details.
 
 ## Support
 
-For issues, questions, or contributions, please open an issue on the GitHub repository.
+For issues, questions, or contributions, please open an issue on the GitHub repository. Include whether the run was degraded and any `rotationHits` / `pathDiversityCount` values for heuristic discussions.
 
 ## Betanet Specification
 
