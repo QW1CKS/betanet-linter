@@ -218,10 +218,11 @@ Names derived via path.basename without sanitization.
 Impact: Potential formatting injection in reports.
 Action: Sanitize component names (allow alphanum + -._ ).
 
-[X] ISSUE-038 | SEC | Large binary full read for fallback strings
+[✓] ISSUE-038 | SEC | Large binary full read for fallback strings
 Reads entire file into memory; potential memory exhaustion.
 Impact: DoS risk on huge binaries.
 Action: Stream parse in chunks with size limit guard.
+Resolution: Streaming fallback with 32MiB cap (configurable via BETANET_FALLBACK_STRINGS_MAX_BYTES) added; truncation flagged via diagnostics (strings-fallback-truncated) (2025-08-11).
 
 [X] ISSUE-039 | SEC | No hash computation for integrity
 SBOM lacks integrity proofs.

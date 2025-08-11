@@ -51,6 +51,7 @@ betanet-linter/
 - Concise degraded summary printed when degraded=true
  - Unified external command timeout via `safeExec` (file, strings, ldd, nm, objdump, sha256sum) configurable with `BETANET_TOOL_TIMEOUT_MS` (ISSUE-034)
  - Planned: per-check inline degraded hints (ISSUE-035 partial)
+ - Streaming fallback string extraction with 32MiB default cap (configurable via BETANET_FALLBACK_STRINGS_MAX_BYTES) replacing prior full-file read (ISSUE-038)
    - Each entry exposes `evaluate(analyzer, now)` returning a `ComplianceCheck`
    - Handles dynamic severity escalation (post-quantum critical date) & version acceptances (transport 1.0 / 1.1)
 

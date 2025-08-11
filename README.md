@@ -308,6 +308,7 @@ Feature tagging: For every detected capability, the SBOM appends `betanet.featur
 - `BETANET_FAIL_ON_DEGRADED=1` - Treat degraded analysis as failure (overrides otherwise passing result)
 - `BETANET_PQ_DATE_OVERRIDE=YYYY-MM-DD` - Override post-quantum mandatory enforcement date (for early testing)
   - Accepts ISO date or full timestamp; evaluated in UTC (ISSUE-016 fix)
+- `BETANET_FALLBACK_STRINGS_MAX_BYTES=33554432` - Cap (in bytes) for streaming fallback string extraction when external `strings` tool is unavailable (prevents excessive memory use)
 
 ### Diagnostics & Degradation
 
@@ -325,7 +326,7 @@ Compliance results include a `diagnostics` object with tooling and performance m
 
 Degraded mode lowers confidence and normally does not trigger failure; set `BETANET_FAIL_ON_DEGRADED=1` (or `--fail-on-degraded`) to enforce failure.
 
-All external tool invocations (strings, nm, objdump, ldd, file, sha256sum) pass through a unified `safeExec` wrapper with a configurable timeout to prevent hangs (ISSUE-034). Missing or timed-out tools contribute to degradation reasons.
+All external tool invocations (strings, nm, objdump, ldd, file, sha256sum) pass through a unified `safeExec` wrapper with a configurable timeout to prevent hangs (ISSUE-034). Missing or timed-out tools contribute to degradation reasons. When `strings` is unavailable the linter now performs a streaming, size‑capped ASCII scan (default 32MiB) instead of reading the entire binary (ISSUE-038); truncation adds a `strings-fallback-truncated` degradation reason.
 
 ## Development
 

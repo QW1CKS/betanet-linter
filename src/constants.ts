@@ -48,3 +48,12 @@ export function isVersionLE(a: string, b: string): boolean {
   }
   return true; // equal
 }
+
+// Fallback string extraction limits (ISSUE-038)
+export const DEFAULT_FALLBACK_STRING_MIN_LEN = 4;
+export const FALLBACK_MAX_BYTES = (() => {
+  const env = process.env.BETANET_FALLBACK_STRINGS_MAX_BYTES;
+  const parsed = env ? parseInt(env, 10) : NaN;
+  if (!isNaN(parsed) && parsed > 0) return parsed;
+  return 32 * 1024 * 1024; // 32 MiB cap by default
+})();

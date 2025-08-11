@@ -2,6 +2,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import { AnalyzerDiagnostics } from './types';
 import { safeExec, isToolSkipped } from './safe-exec';
+import { FALLBACK_MAX_BYTES, DEFAULT_FALLBACK_STRING_MIN_LEN } from './constants';
 import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
 // Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 
@@ -118,6 +119,7 @@ export class BinaryAnalyzer {
   }
 
   private async extractStrings(dynamicProbe: boolean): Promise<string[]> {
+    // Primary path: external 'strings'
     try {
       const res = await safeExec('strings', [this.binaryPath]);
       if (!res.failed) {
@@ -131,45 +133,67 @@ export class BinaryAnalyzer {
           } catch {/* ignore */}
         }
         return out;
+      } else {
+        if (this.verbose) console.warn('⚠️  strings unavailable (', res.errorMessage, ') falling back to streaming scan');
+        this.diagnostics.degraded = true;
+        this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-missing'];
       }
-      if (this.verbose) {
-        console.warn('⚠️  strings unavailable (', res.errorMessage, '), using fallback');
-      }
+    } catch {
+      if (this.verbose) console.warn('⚠️  strings invocation error, using fallback streaming scan');
       this.diagnostics.degraded = true;
-  this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-missing'];
-  } catch (error) {
-      if (this.verbose) {
-        console.warn('⚠️  strings command failed, trying fallback method');
-      }
-      // Fallback: read file and extract printable strings
-  const buffer = await fs.readFile(this.binaryPath);
-      const strings: string[] = [];
-      let currentString = '';
-      
-      for (let i = 0; i < buffer.length; i++) {
-        const byte = buffer[i];
-        if (byte >= 32 && byte <= 126) { // Printable ASCII
-          currentString += String.fromCharCode(byte);
-        } else {
-          if (currentString.length >= 4) { // Minimum string length
-            strings.push(currentString);
-          }
-          currentString = '';
-        }
-      }
-      
-      if (dynamicProbe) {
-        try {
-          const probe = await safeExec(this.binaryPath, ['--help']);
-          if (!probe.failed && probe.stdout) {
-            strings.push(...probe.stdout.split('\n').slice(0, 500));
-          }
-        } catch {/* ignore */}
-      }
-      return strings;
+      this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-error'];
     }
-  // If we reach here (should not normally), fallback to empty array
-  return [];
+
+    // Fallback: streaming scan with size cap to avoid OOM (ISSUE-038)
+    const strings: string[] = [];
+    let current = '';
+    let bytesReadTotal = 0;
+    let truncated = false;
+    const minLen = DEFAULT_FALLBACK_STRING_MIN_LEN;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const stream = fs.createReadStream(this.binaryPath, { highWaterMark: 64 * 1024 });
+        stream.on('data', (chunk: any) => {
+          if (truncated) return; // already reached cap
+          const buf: Buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          bytesReadTotal += buf.length;
+          for (let i = 0; i < buf.length; i++) {
+            const byte = buf[i];
+            if (byte >= 32 && byte <= 126) {
+              current += String.fromCharCode(byte);
+            } else {
+              if (current.length >= minLen) strings.push(current);
+              current = '';
+            }
+          }
+          if (bytesReadTotal >= FALLBACK_MAX_BYTES) {
+            truncated = true;
+            stream.destroy();
+          }
+        });
+        stream.on('end', () => {
+          if (current.length >= minLen) strings.push(current);
+          resolve();
+        });
+        stream.on('error', err => reject(err));
+      });
+    } catch (e) {
+      if (this.verbose) console.warn('⚠️  streaming fallback failed:', (e as any)?.message);
+      this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-fallback-error'];
+    }
+    if (truncated) {
+      this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-fallback-truncated'];
+      (this.diagnostics as any).fallbackStringsTruncated = true;
+    }
+    if (dynamicProbe) {
+      try {
+        const probe = await safeExec(this.binaryPath, ['--help']);
+        if (!probe.failed && probe.stdout) {
+          strings.push(...probe.stdout.split('\n').slice(0, 500));
+        }
+      } catch {/* ignore */}
+    }
+    return strings;
   }
 
   private async extractSymbols(): Promise<string[]> {

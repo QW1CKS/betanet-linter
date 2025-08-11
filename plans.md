@@ -70,7 +70,7 @@ Implemented:
 
 Deferred:
 - Per-check try/catch wrap (current evaluators stable; can harden later) (ISSUE-036)
-- Memory streaming optimization (acceptable for current binary sizes) (ISSUE-038)
+Completed (moved from deferred): Memory streaming optimization / capped fallback strings (ISSUE-038)
 
 ## Plan 6: Security & Trust Enhancements (Partially Addressed)
 Goals:
