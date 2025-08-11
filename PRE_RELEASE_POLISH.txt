@@ -1,0 +1,104 @@
+Pre-1.0 Release Polish & Finalization Checklist
+=============================================
+Purpose: Capture remaining high-impact, low-effort tasks to confidently tag v1.0.0 while meeting the $4,000 bounty scope and stabilizing CLI/outputs.
+
+CORE (Must Complete Before Tagging 1.0.0)
+----------------------------------------
+1. ISSUE-042: Flag naming finalization
+   - Action: Introduce --format (alias of current --sbom-format) on `check` / SBOM generation.
+   - Keep --sbom-format as deprecated alias (emit one-line deprecation notice when used; remove in a later minor release).
+   - Documentation: Update README flag examples & GitHub Action template.
+   - Tests: Add CLI test invoking both forms to ensure parity.
+   - Success Criteria: Users can invoke either flag; README shows only --format; no breaking change.
+
+2. Add --version flag / command
+   - Action: Expose package.json version via `betanet-lint --version` and `betanet-lint version`.
+   - Tests: Assert semantic version pattern output.
+   - Success Criteria: Command exits 0, prints version only.
+
+3. ISSUE-044 (Edge): Zero-component SPDX relationship guard
+   - Action: If dependency/component lists are empty, avoid emitting malformed relationship entries.
+   - Tests: Generate SBOM against a minimal dummy binary producing zero components; assert valid SPDX & CycloneDX shapes.
+   - Success Criteria: No stray DEPENDS_ON entries referencing non-existent components.
+
+4. Licensing hygiene
+   - Action: Ensure LICENSE file present (e.g., Apache-2.0 or MIT as per package.json). Verify package.json "license" field matches.
+   - README: Add short license section.
+   - Success Criteria: Repository root contains LICENSE; npm pack would pass license checks.
+
+5. CHANGELOG.md 1.0.0 entry
+   - Action: Add top section summarizing: 11 checks, SBOM (CycloneDX/SPDX), diagnostics, degraded hints, security hardening, feature tags.
+   - Success Criteria: Clear diff from prior pre-release entries (if any); links to issues closed (035, 037, 040, etc.).
+
+6. README Quickstart block
+   - Action: Add concise install + run snippet (npm i -g / npx + sample output). Mention GitHub Action usage link.
+   - Success Criteria: New users can copy-paste to produce a report & SBOM in under 3 commands.
+
+SECONDARY (Nice-to-Have, Time Permitting Pre-1.0)
+-----------------------------------------------
+7. ISSUE-028: Extract remaining magic numbers / strings
+   - Consolidate: voucher / PoW threshold markers, minimum string length (already partly in constants), any repeated timeout defaults, heuristic token lists.
+   - Benefit: Easier future tuning; reduces hidden divergence.
+
+8. ISSUE-027: Helper for consistent "Missing:" message assembly
+   - Action: Introduce utility buildMissing(list: string[]): string and apply across evaluators.
+   - Benefit: Faster formatting changes later; reduces duplication.
+
+9. ISSUE-030: Refactor long checkCompliance method (index.ts)
+   - Action: Extract queue/parallel runner into function; isolate scoring and degradation mapping.
+   - Benefit: Maintainability; lowers cognitive load for contributors.
+
+10. ISSUE-021: SBOM version inference refinement
+    - Action: Improve regex context (e.g., require library token near version); dedupe improbable versions; maybe classify as metadata instead of components.
+    - Benefit: Reduces noise / false positives in SBOM component list.
+
+DOCUMENT & DISCLOSE (If Deferring Secondary Items)
+--------------------------------------------------
+- README "Limitations" subsection: Note version inference is heuristic; dynamic runtime behaviors (ISSUE-059) out of scope for static 1.0.
+- Provide roadmap pointer to plans.md for deferred refactors & dynamic probe concept.
+
+SECURITY & TRUST VERIFICATION
+-----------------------------
+- Confirm sanitized names (ISSUE-037) cover all SBOM emission paths (tag-value, JSON, XML, purl strings).
+- Run a final pass with BETANET_FAIL_ON_DEGRADED=1 on a known degraded environment (simulate missing `strings`) to confirm exit override.
+- Optional: Add a short SECURITY.md (link to issues for reporting). (Can be post-1.0.)
+
+QA / RELEASE PROCESS
+--------------------
+- Tag candidate (v1.0.0-rc1) after CORE items merged & tests green.
+- Smoke tests:
+  * Windows (no `strings`/`ldd`) – ensure graceful degraded hints.
+  * Linux with full toolchain – ensure no degraded flag.
+  * Large binary (>32MB fallback threshold) – confirm truncation diagnostics present.
+- Run `npm pack` locally; inspect contents (no extraneous temp dirs, includes README, LICENSE, types).
+
+ACCEPTANCE CRITERIA SUMMARY
+---------------------------
+- CLI: Stable flags (with transitional alias), `--version` works, quickstart instructions validated.
+- SBOM: Valid outputs for empty-component edge & sanitized names everywhere.
+- Docs: CHANGELOG 1.0.0, README quickstart + limitations, license section.
+- Tests: All existing (43) plus new ones for flag alias, version flag, zero-component SBOM.
+- Backlog: ISSUE-042, 044 marked resolved (and 1.0.0 changelog references them).
+
+POST-1.0 (Early 1.1 Roadmap Hints)
+----------------------------------
+- Dynamic probe / plugin mode (ISSUE-059).
+- Confidence metrics per check & structured JSON diagnostics export.
+- UTF-8 string decoding enhancement (ISSUE-047).
+- Performance histogram / timing artifact.
+
+IMPLEMENTATION ORDER (Recommended)
+----------------------------------
+1) ISSUE-042 (flag alias) + --version.
+2) ISSUE-044 (edge guard) + tests.
+3) Docs: CHANGELOG + README quickstart + license verification.
+4) Tag v1.0.0-rc1 & smoke test; adjust.
+5) (Optional) 028 & 027 if time before final tag.
+
+Status Snapshot (as of creation)
+--------------------------------
+- Total tests: 43 PASS.
+- Resolved security & robustness: timeouts (034), sanitized names (037), streaming fallback (038), degraded hints (035), filters parity (040).
+- Remaining CORE polish items: 042, 044, plus version flag & docs tasks (non-issue operational items).
+
+End of file.
