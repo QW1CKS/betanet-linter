@@ -263,10 +263,11 @@ Mapping and building XML without streaming.
 Impact: Memory spike.
 Action: Stream or chunk if components > threshold.
 
-[X] ISSUE-047 | EDGE | Unicode strings handling
+[✓] ISSUE-047 | EDGE | Unicode strings handling
 Fallback extraction only treats bytes 32-126 ASCII.
 Impact: Misses UTF-8 indicators.
 Action: Improve parsing to decode UTF-8 sequences.
+Resolution (2025-08-11): Added UTF-8 aware fallback extraction with multi-byte decoding, control & surrogate filtering, env BETANET_FORCE_FALLBACK_STRINGS to force path for tests, diagnostics unicodeEnriched flag.
 
 DOCUMENTATION
 -------------

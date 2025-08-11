@@ -119,51 +119,111 @@ export class BinaryAnalyzer {
   }
 
   private async extractStrings(dynamicProbe: boolean): Promise<string[]> {
-    // Primary path: external 'strings'
-    try {
-      const res = await safeExec('strings', [this.binaryPath]);
-      if (!res.failed) {
-        let out = res.stdout.split('\n').filter((line: string) => line.length > 0);
-        if (dynamicProbe) {
-          try {
-            const probe = await safeExec(this.binaryPath, ['--help']);
-            if (!probe.failed && probe.stdout) {
-              out = out.concat(probe.stdout.split('\n').slice(0, 500));
-            }
-          } catch {/* ignore */}
+    const forceFallback = process.env.BETANET_FORCE_FALLBACK_STRINGS === '1';
+    if (!forceFallback) {
+      // Primary path: external 'strings'
+      try {
+        const res = await safeExec('strings', [this.binaryPath]);
+        if (!res.failed) {
+          let out = res.stdout.split('\n').filter((line: string) => line.length > 0);
+          if (dynamicProbe) {
+            try {
+              const probe = await safeExec(this.binaryPath, ['--help']);
+              if (!probe.failed && probe.stdout) {
+                out = out.concat(probe.stdout.split('\n').slice(0, 500));
+              }
+            } catch {/* ignore */}
+          }
+          return out;
+        } else {
+          if (this.verbose) console.warn('⚠️  strings unavailable (', res.errorMessage, ') falling back to streaming scan');
+          this.diagnostics.degraded = true;
+          this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-missing'];
         }
-        return out;
-      } else {
-        if (this.verbose) console.warn('⚠️  strings unavailable (', res.errorMessage, ') falling back to streaming scan');
+      } catch {
+        if (this.verbose) console.warn('⚠️  strings invocation error, using fallback streaming scan');
         this.diagnostics.degraded = true;
-        this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-missing'];
+        this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-error'];
       }
-    } catch {
-      if (this.verbose) console.warn('⚠️  strings invocation error, using fallback streaming scan');
-      this.diagnostics.degraded = true;
-      this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-error'];
     }
 
-    // Fallback: streaming scan with size cap to avoid OOM (ISSUE-038)
+    // Fallback: streaming scan with size cap & UTF-8 decoding (ISSUE-038 + ISSUE-047)
     const strings: string[] = [];
     let current = '';
     let bytesReadTotal = 0;
     let truncated = false;
     const minLen = DEFAULT_FALLBACK_STRING_MIN_LEN;
+    const maxSegmentLen = 4096; // guard against pathological very long runs
+
+    function flush() {
+      if (current.length >= minLen) strings.push(current);
+      current = '';
+    }
+
+    function appendChar(ch: string) {
+      current += ch;
+      if (current.length >= maxSegmentLen) flush();
+    }
+
+    function isAcceptableCodePoint(cp: number): boolean {
+      if (cp < 32) return false; // control chars
+      if (cp >= 0xD800 && cp <= 0xDFFF) return false; // surrogates
+      if (cp === 0xFEFF) return false; // BOM
+      if (cp > 0x10FFFF) return false;
+      return true;
+    }
+
     try {
       await new Promise<void>((resolve, reject) => {
         const stream = fs.createReadStream(this.binaryPath, { highWaterMark: 64 * 1024 });
         stream.on('data', (chunk: any) => {
-          if (truncated) return; // already reached cap
+          if (truncated) return;
           const buf: Buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
           bytesReadTotal += buf.length;
           for (let i = 0; i < buf.length; i++) {
             const byte = buf[i];
-            if (byte >= 32 && byte <= 126) {
-              current += String.fromCharCode(byte);
+            if (byte <= 0x7F) { // ASCII
+              if (byte >= 32 && byte <= 126) {
+                appendChar(String.fromCharCode(byte));
+              } else {
+                flush();
+              }
+              continue;
+            }
+            // Multi-byte UTF-8 start? Determine expected length
+            let needed = 0;
+            if (byte >= 0xC2 && byte <= 0xDF) needed = 1; // 2-byte
+            else if (byte >= 0xE0 && byte <= 0xEF) needed = 2; // 3-byte
+            else if (byte >= 0xF0 && byte <= 0xF4) needed = 3; // 4-byte
+            else {
+              // Invalid start byte - treat as delimiter
+              flush();
+              continue;
+            }
+            if (i + needed >= buf.length) {
+              // Incomplete sequence at chunk boundary; flush and break to next chunk
+              flush();
+              break;
+            }
+            let cp = byte & (needed === 1 ? 0x1F : needed === 2 ? 0x0F : 0x07);
+            let valid = true;
+            for (let j = 1; j <= needed; j++) {
+              const nb = buf[i + j];
+              if ((nb & 0xC0) !== 0x80) { valid = false; break; }
+              cp = (cp << 6) | (nb & 0x3F);
+            }
+            if (!valid) {
+              flush();
+              i += needed; // skip attempted bytes
+              continue;
+            }
+            i += needed; // advance past continuation bytes
+            if (isAcceptableCodePoint(cp)) {
+              try {
+                appendChar(String.fromCodePoint(cp));
+              } catch { flush(); }
             } else {
-              if (current.length >= minLen) strings.push(current);
-              current = '';
+              flush();
             }
           }
           if (bytesReadTotal >= FALLBACK_MAX_BYTES) {
@@ -171,10 +231,7 @@ export class BinaryAnalyzer {
             stream.destroy();
           }
         });
-        stream.on('end', () => {
-          if (current.length >= minLen) strings.push(current);
-          resolve();
-        });
+        stream.on('end', () => { flush(); resolve(); });
         stream.on('error', err => reject(err));
       });
     } catch (e) {
@@ -185,6 +242,7 @@ export class BinaryAnalyzer {
       this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-fallback-truncated'];
       (this.diagnostics as any).fallbackStringsTruncated = true;
     }
+    (this.diagnostics as any).unicodeEnriched = true;
     if (dynamicProbe) {
       try {
         const probe = await safeExec(this.binaryPath, ['--help']);
