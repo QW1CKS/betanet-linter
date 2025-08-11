@@ -8,9 +8,11 @@ describe('BetanetComplianceChecker', () => {
   let checker: BetanetComplianceChecker;
   let mockBinaryPath: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     checker = new BetanetComplianceChecker();
-    mockBinaryPath = '/mock/path/to/binary';
+    const tmp = path.join(__dirname, 'temp-existing-bin');
+    await fs.writeFile(tmp, Buffer.from('test binary data kyber768 mix beaconset diversity lightning cashu federation'));
+    mockBinaryPath = tmp;
   });
 
   describe('checkCompliance', () => {
@@ -76,6 +78,11 @@ describe('BetanetComplianceChecker', () => {
   expect(result.summary.total).toBe(11);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
+    });
+
+    it('should throw if binary does not exist', async () => {
+      const localChecker = new BetanetComplianceChecker();
+      await expect(localChecker.checkCompliance('/non/existent/path/binary')).rejects.toThrow(/Binary not found/);
     });
 
     it('should filter checks when include option is provided', async () => {
@@ -396,6 +403,8 @@ describe('BetanetComplianceChecker', () => {
   describe('heuristics false-positive protection', () => {
     it('should not flag Kyber768 when only number 768 appears without kyber token', async () => {
       const checker = new BetanetComplianceChecker();
+  const tmp = path.join(__dirname, 'temp-no-kyber');
+  await fs.writeFile(tmp, Buffer.from('version768 build data')); 
   (checker as any)._analyzer = {
   analyze: () => Promise.resolve({ strings: ['version768 build'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
@@ -406,7 +415,7 @@ describe('BetanetComplianceChecker', () => {
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
   };
-      const result = await checker.checkCompliance('/mock/bin');
+  const result = await checker.checkCompliance(tmp);
       // Post-quantum check is ID 10
       const postQuantum = result.checks.find(c => c.id === 10);
       expect(postQuantum).toBeDefined();
@@ -417,6 +426,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should not treat random 443 in version string as port indicator (should remain missing)', async () => {
       const checker = new BetanetComplianceChecker();
+  const tmp = path.join(__dirname, 'temp-port443');
+  await fs.writeFile(tmp, Buffer.from('v1.443.0 build data'));
   (checker as any)._analyzer = {
   analyze: () => Promise.resolve({ strings: ['v1.443.0 build'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
@@ -427,7 +438,7 @@ describe('BetanetComplianceChecker', () => {
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
   };
-      const result = await checker.checkCompliance('/mock/bin');
+  const result = await checker.checkCompliance(tmp);
       const htxCheck = result.checks.find(c => c.id === 1);
       expect(htxCheck).toBeDefined();
       if (htxCheck) {
@@ -439,6 +450,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should not pass DHT bootstrap when only beacon/rendezvous tokens appear without DHT base token', async () => {
       const checker = new BetanetComplianceChecker();
+  const tmp = path.join(__dirname, 'temp-dht');
+  await fs.writeFile(tmp, Buffer.from('beaconset rotate rendezvous'));
   (checker as any)._analyzer = {
   analyze: () => Promise.resolve({ strings: ['beaconset rotate rendezvous'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
@@ -449,7 +462,7 @@ describe('BetanetComplianceChecker', () => {
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
   };
-      const result = await checker.checkCompliance('/mock/bin');
+  const result = await checker.checkCompliance(tmp);
       const dhtCheck = result.checks.find(c => c.id === 6);
       expect(dhtCheck).toBeDefined();
       if (dhtCheck) {
@@ -460,6 +473,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should not pass Payment System when only voucher/FROST/PoW indicators appear without core payment tokens', async () => {
       const checker = new BetanetComplianceChecker();
+  const tmp = path.join(__dirname, 'temp-pay');
+  await fs.writeFile(tmp, Buffer.from('voucher frost-ed25519 pow22'));
   (checker as any)._analyzer = {
   analyze: () => Promise.resolve({ strings: ['voucher frost-ed25519 pow22'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
@@ -470,7 +485,7 @@ describe('BetanetComplianceChecker', () => {
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false, hasVoucherFormat: true, hasFROST: true, hasPoW22: true }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
   };
-      const result = await checker.checkCompliance('/mock/bin');
+  const result = await checker.checkCompliance(tmp);
       const paymentCheck = result.checks.find(c => c.id === 8);
       expect(paymentCheck).toBeDefined();
       if (paymentCheck) {
@@ -483,6 +498,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should pass Privacy Hop Enforcement with sufficient mix/beacon/diversity tokens', async () => {
       const checker = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-privacy-pass');
+      await fs.writeFile(tmp, Buffer.from('nym mixnode hop beaconset epoch diversity distinct'));
       (checker as any)._analyzer = {
         analyze: () => Promise.resolve({ strings: ['nym mixnode hop beaconset epoch diversity distinct'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: async () => ({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
@@ -493,7 +510,7 @@ describe('BetanetComplianceChecker', () => {
         checkPaymentSupport: async () => ({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: async () => ({ hasSLSA: false, reproducible: false, provenance: false })
       };
-      const result = await checker.checkCompliance('/mock/bin');
+  const result = await checker.checkCompliance(tmp);
       const privacyCheck = result.checks.find(c => c.id === 11);
       expect(privacyCheck).toBeDefined();
       expect(privacyCheck?.passed).toBe(true);
@@ -501,6 +518,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should fail Privacy Hop Enforcement with insufficient diversity tokens', async () => {
       const checker = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-privacy-fail');
+      await fs.writeFile(tmp, Buffer.from('mix beaconset'));
       (checker as any)._analyzer = {
         analyze: () => Promise.resolve({ strings: ['mix beaconset'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: async () => ({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
@@ -511,7 +530,7 @@ describe('BetanetComplianceChecker', () => {
         checkPaymentSupport: async () => ({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: async () => ({ hasSLSA: false, reproducible: false, provenance: false })
       };
-      const result = await checker.checkCompliance('/mock/bin');
+  const result = await checker.checkCompliance(tmp);
       const privacyCheck = result.checks.find(c => c.id === 11);
       expect(privacyCheck).toBeDefined();
       expect(privacyCheck?.passed).toBe(false);
@@ -584,8 +603,10 @@ describe('BetanetComplianceChecker', () => {
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
       };
-      const full = await checker.checkCompliance('/mock/bin');
-      const critOnly = await checker.checkCompliance('/mock/bin', { severityMin: 'critical' });
+  const tmp = path.join(__dirname, 'temp-severity');
+  await fs.writeFile(tmp, Buffer.from('dummy severity test'));
+  const full = await checker.checkCompliance(tmp);
+  const critOnly = await checker.checkCompliance(tmp, { severityMin: 'critical' });
       expect(full.summary.total).toBeGreaterThanOrEqual(critOnly.summary.total);
       // If only critical considered and one passes, score should differ
       expect(full.overallScore).not.toBe(critOnly.overallScore);

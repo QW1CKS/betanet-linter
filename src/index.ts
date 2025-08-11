@@ -21,6 +21,10 @@ export class BetanetComplianceChecker {
   }
 
   async checkCompliance(binaryPath: string, options: CheckOptions = {}): Promise<ComplianceResult> {
+    // Binary existence pre-check (Plan 5 robustness)
+    if (!(await fs.pathExists(binaryPath))) {
+      throw new Error(`Binary not found at path: ${binaryPath}`);
+    }
     // Allow tests or callers to pre-inject a mock analyzer; only create if absent
     if (!this._analyzer) {
       this._analyzer = new BinaryAnalyzer(binaryPath, options.verbose);

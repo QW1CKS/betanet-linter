@@ -44,38 +44,49 @@ Pending / Deferred:
 
 Outcome: Severities & names normalized via registry; no second engine remains.
 
-## Plan 4: SBOM Quality & Integrity
-Goals:
-- (Done) Delegate SBOM generation to `sbom/sbom-generator.ts`
-- Produce valid SPDX 2.3 (JSON or tag-value with completeness) & CycloneDX (JSON/XML) (ISSUE-017)
-- Ensure hashing for components (binary hash already present) (ISSUE-018, 039)
-- License detection heuristics (ISSUE-019)
-- Sanitize, dedupe & version quality improvements (ISSUE-037, 045, 021)
+## Plan 4 (DONE): SBOM Quality & Integrity
+Implemented:
+- Dedicated generator module `sbom/sbom-generator.ts` (ISSUE-017)
+- CycloneDX XML & JSON + SPDX tag-value + SPDX JSON export
+- Component & binary SHA-256 hashing (ISSUE-018, 039)
+- License heuristic detection (ISSUE-019)
+- Component dedupe & sanitization (ISSUE-037, 045, 021)
+- SBOM shape + strict validators (CycloneDX / SPDX)
+- CLI flags: `--sbom`, `--sbom-format`, `--validate-sbom`, `--strict-sbom`
+- Exit code 3 for non-strict shape failures
+- Severity filtering support (scoring isolation)
 
-Deliverables:
-- Hash + license utility functions
-- Sanitization & dedupe helpers
-- Schema validation tests (SPDX, CycloneDX)
+Deferred:
+- Multi-license expression parsing
+- PURL ecosystem enrichment beyond generic/system libs
+- Configurable validation policy escalation
 
-## Plan 5: Robustness & Error Handling
-Goals:
+## Plan 5 (DONE): Robustness & Error Handling
+Implemented:
+- `safe-exec` wrapper with configurable timeout (BETANET_TOOL_TIMEOUT_MS) (ISSUE-034)
+- Dynamic tool skipping (BETANET_SKIP_TOOLS) & degradation metadata (ISSUE-035)
 - Binary existence pre-check (ISSUE-033)
-- Global per-command timeout & graceful fallback (ISSUE-034)
-- Always-on concise warnings (ISSUE-035)
-- Per-check try/catch safety (ISSUE-036)
-- Memory-safe string extraction (ISSUE-038)
+- Analyzer fallback for strings & dependency detection; graceful degradation flags
+- Added degradation tests & diagnostics exposure
 
-Deliverables:
-- wrapper exec utility with timeout, error shape
-- Updated analyzer extraction logic with streaming fallback
+Deferred:
+- Fail-on-degraded env (CLI flag exists)
+- Per-check try/catch wrap (current evaluators stable; can harden later) (ISSUE-036)
+- Memory streaming optimization (acceptable for current binary sizes) (ISSUE-038)
 
-## Plan 6: Security & Trust Enhancements
+## Plan 6: Security & Trust Enhancements (Partially Addressed)
 Goals:
 - Hash computation integrated into SBOM (if not already in Plan 4)
 - Sanitization & input validation (ISSUE-037)
 - Configurable post-quantum date & environment-driven thresholds (ISSUE-029, 030)
 
-## Plan 7: UX & CLI Improvements
+## Plan 7: UX & CLI Improvements (Partially Addressed)
+Progress:
+- Severity threshold flag implemented (`--severity-min`) (ISSUE-041)
+- Unified SBOM format flag semantics
+Pending:
+- More granular diagnostics verbosity levels
+- Consistent naming audit
 Goals:
 - Parity for filters on 'check' command (ISSUE-040)
 - Severity threshold flag (ISSUE-041)
@@ -96,6 +107,25 @@ Goals:
 - Structured JSON log output option
 
 ---
+## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (NEXT)
+Goals:
+- Optional WebRTC transport signal surfaced (informational) (ISSUE-051)
+- Stronger Rendezvous / BeaconSet rotation heuristic (epoch diversity + rotation verbs) (ISSUE-052)
+- Path diversity enhancement for SCION/IP-transition (distinct path/AS tokens) (ISSUE-053)
+- Privacy hop enforcement refinement (negative signal suppression, diversity weighting) (ISSUE-054)
+- PQ date override flag/env for pre-mandatory testing (ISSUE-055)
+
+Deliverables:
+- Updated check 5 & 6 details including WebRTC & rotation evidence
+- Adjusted check 11 algorithm with improved token weighting
+- New optional config: BETANET_PQ_DATE_OVERRIDE
+- Additional negative tests preventing false positives from generic words
+
+Success Criteria:
+- All new heuristic tests pass (extended suite > current 24)
+- No regression in existing tests (backward compatibility)
+- Diagnostics still stable (degradation unaffected)
+
 ### Recommended Next Step
-Advance Plan 4 tasks: add component hashing & license token scan; introduce schema validation tests.
+Implement Plan 10 heuristics (WebRTC, rotation, path diversity, privacy refinement, PQ override) with accompanying tests.
 
