@@ -75,6 +75,18 @@ class BetanetComplianceChecker {
         // Guard against zero checks (filters may exclude all)
         const overallScore = checks.length === 0 ? 0 : Math.round((passedChecks.length / checks.length) * 100);
         const passed = checks.length > 0 && passedChecks.length === checks.length && criticalChecks.length === 0;
+        const diagnostics = (() => {
+            const a = this.analyzer;
+            if (a && typeof a.getDiagnostics === 'function') {
+                try {
+                    return a.getDiagnostics();
+                }
+                catch {
+                    return undefined;
+                }
+            }
+            return undefined;
+        })();
         const result = {
             binaryPath,
             timestamp: new Date().toISOString(),
@@ -87,7 +99,7 @@ class BetanetComplianceChecker {
                 failed: checks.length - passedChecks.length,
                 critical: criticalChecks.length
             },
-            diagnostics: this.analyzer?.getDiagnostics()
+            diagnostics
         };
         return result;
     }

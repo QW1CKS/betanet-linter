@@ -1,7 +1,8 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import execa from 'execa';
-import { AnalyzerDiagnostics, ToolStatus } from './types';
+import { AnalyzerDiagnostics } from './types';
+import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
 // Removed unused imports (which, types)
 
 export class BinaryAnalyzer {
@@ -183,17 +184,8 @@ export class BinaryAnalyzer {
     hasECH: boolean;
     port443: boolean;
   }> {
-    const analysis = await this.analyze();
-    const strings = analysis.strings.join(' ').toLowerCase();
-    const symbols = analysis.symbols.join(' ').toLowerCase();
-
-    return {
-      hasTLS: strings.includes('tls') || strings.includes('ssl') || symbols.includes('tls'),
-      hasQUIC: strings.includes('quic') || symbols.includes('quic'),
-      hasHTX: strings.includes('htx') || strings.includes('/betanet/htx'),
-      hasECH: strings.includes('ech') || strings.includes('encrypted_client_hello'),
-      port443: strings.includes('443') || symbols.includes('443')
-    };
+  const analysis = await this.analyze();
+  return detectNetwork({ strings: analysis.strings, symbols: analysis.symbols });
   }
 
   async checkCryptographicCapabilities(): Promise<{
@@ -205,19 +197,8 @@ export class BinaryAnalyzer {
     hasSHA256: boolean;
     hasHKDF: boolean;
   }> {
-    const analysis = await this.analyze();
-    const strings = analysis.strings.join(' ').toLowerCase();
-    const symbols = analysis.symbols.join(' ').toLowerCase();
-
-    return {
-      hasChaCha20: strings.includes('chacha20') || symbols.includes('chacha'),
-      hasPoly1305: strings.includes('poly1305') || symbols.includes('poly'),
-      hasEd25519: strings.includes('ed25519') || symbols.includes('ed25519'),
-      hasX25519: strings.includes('x25519') || symbols.includes('x25519'),
-      hasKyber768: strings.includes('kyber') || strings.includes('768'),
-      hasSHA256: strings.includes('sha256') || strings.includes('sha-256'),
-      hasHKDF: strings.includes('hkdf') || symbols.includes('hkdf')
-    };
+  const analysis = await this.analyze();
+  return detectCrypto({ strings: analysis.strings, symbols: analysis.symbols });
   }
 
   async checkSCIONSupport(): Promise<{
@@ -225,15 +206,8 @@ export class BinaryAnalyzer {
     pathManagement: boolean;
     hasIPTransition: boolean;
   }> {
-    const analysis = await this.analyze();
-    const strings = analysis.strings.join(' ').toLowerCase();
-    const symbols = analysis.symbols.join(' ').toLowerCase();
-
-    return {
-      hasSCION: strings.includes('scion') || symbols.includes('scion'),
-      pathManagement: strings.includes('path') && (strings.includes('maintenance') || strings.includes('disjoint')),
-      hasIPTransition: strings.includes('ip-transition') || strings.includes('transition')
-    };
+  const analysis = await this.analyze();
+  return detectSCION({ strings: analysis.strings, symbols: analysis.symbols });
   }
 
   async checkDHTSupport(): Promise<{
@@ -241,15 +215,8 @@ export class BinaryAnalyzer {
     deterministicBootstrap: boolean;
     seedManagement: boolean;
   }> {
-    const analysis = await this.analyze();
-    const strings = analysis.strings.join(' ').toLowerCase();
-    const symbols = analysis.symbols.join(' ').toLowerCase();
-
-    return {
-      hasDHT: strings.includes('dht') || symbols.includes('dht'),
-      deterministicBootstrap: strings.includes('deterministic') && strings.includes('bootstrap'),
-      seedManagement: strings.includes('seed') && strings.includes('bootstrap')
-    };
+  const analysis = await this.analyze();
+  return detectDHT({ strings: analysis.strings, symbols: analysis.symbols });
   }
 
   async checkLedgerSupport(): Promise<{
@@ -257,15 +224,8 @@ export class BinaryAnalyzer {
     hasConsensus: boolean;
     chainSupport: boolean;
   }> {
-    const analysis = await this.analyze();
-    const strings = analysis.strings.join(' ').toLowerCase();
-    const symbols = analysis.symbols.join(' ').toLowerCase();
-
-    return {
-      hasAliasLedger: strings.includes('alias') && strings.includes('ledger'),
-      hasConsensus: strings.includes('consensus') || strings.includes('2-of-3'),
-      chainSupport: strings.includes('chain') && strings.includes('verification')
-    };
+  const analysis = await this.analyze();
+  return detectLedger({ strings: analysis.strings, symbols: analysis.symbols });
   }
 
   async checkPaymentSupport(): Promise<{
@@ -273,15 +233,8 @@ export class BinaryAnalyzer {
     hasLightning: boolean;
     hasFederation: boolean;
   }> {
-    const analysis = await this.analyze();
-    const strings = analysis.strings.join(' ').toLowerCase();
-    const symbols = analysis.symbols.join(' ').toLowerCase();
-
-    return {
-      hasCashu: strings.includes('cashu') || symbols.includes('cashu'),
-      hasLightning: strings.includes('lightning') || strings.includes('ln'),
-      hasFederation: strings.includes('federation') || strings.includes('federated')
-    };
+  const analysis = await this.analyze();
+  return detectPayment({ strings: analysis.strings, symbols: analysis.symbols });
   }
 
   async checkBuildProvenance(): Promise<{
@@ -289,14 +242,7 @@ export class BinaryAnalyzer {
     reproducible: boolean;
     provenance: boolean;
   }> {
-    const analysis = await this.analyze();
-    const strings = analysis.strings.join(' ').toLowerCase();
-    const symbols = analysis.symbols.join(' ').toLowerCase();
-
-    return {
-      hasSLSA: strings.includes('slsa') || strings.includes('provenance'),
-      reproducible: strings.includes('reproducible') || strings.includes('deterministic'),
-      provenance: strings.includes('build') && strings.includes('provenance')
-    };
+  const analysis = await this.analyze();
+  return detectBuildProvenance({ strings: analysis.strings, symbols: analysis.symbols });
   }
 }

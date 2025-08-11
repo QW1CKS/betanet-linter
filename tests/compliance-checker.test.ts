@@ -270,4 +270,49 @@ describe('BetanetComplianceChecker', () => {
       consoleSpy.mockRestore();
     });
   });
+
+  describe('heuristics false-positive protection', () => {
+    it('should not flag Kyber768 when only number 768 appears without kyber token', async () => {
+      const checker = new BetanetComplianceChecker();
+      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
+        analyze: () => Promise.resolve({ strings: ['version768 build'], symbols: [], dependencies: [] }),
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      });
+      const result = await checker.checkCompliance('/mock/bin');
+      // Post-quantum check is ID 10
+      const postQuantum = result.checks.find(c => c.id === 10);
+      expect(postQuantum).toBeDefined();
+      if (postQuantum) {
+        expect(postQuantum.details).not.toContain('Kyber');
+      }
+    });
+
+    it('should not treat random 443 in version string as port indicator (should remain missing)', async () => {
+      const checker = new BetanetComplianceChecker();
+      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
+        analyze: () => Promise.resolve({ strings: ['v1.443.0 build'], symbols: [], dependencies: [] }),
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      });
+      const result = await checker.checkCompliance('/mock/bin');
+      const htxCheck = result.checks.find(c => c.id === 1);
+      expect(htxCheck).toBeDefined();
+      if (htxCheck) {
+        expect(htxCheck.passed).toBe(false);
+        // Failure details should list 'port 443' as missing (not falsely detected)
+        expect(htxCheck.details).toContain('port 443');
+      }
+    });
+  });
 });

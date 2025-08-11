@@ -16,16 +16,18 @@ Deferred (optional micro-enhancements):
 
 Rationale for deferral: Each adds marginal value now; can batch into a later "Observability Hardening" step if needed.
 
-## Plan 2: Heuristic Precision & False Positive Reduction
-Goals:
-- Tighten Kyber, port 443, QUIC/TLS/ECH, SCION, DHT, payment detection (ISSUE-006 through ISSUE-012)
-- Introduce a heuristics scoring util + regex library of patterns
-- Add negative test fixtures (ISSUE-024)
+## Plan 2 (DONE): Heuristic Precision & False Positive Reduction
+Implemented:
+- Refined Kyber detection (requires kyber token; removed plain '768' trigger) (ISSUE-006)
+- Port 443 detection now boundary-aware (ISSUE-007)
+- Added multi-indicator QUIC/TLS/ECH & HTX heuristics (ISSUE-008)
+- Strengthened SCION path & IP-transition patterns (ISSUE-009)
+- Improved DHT bootstrap & seed heuristics (ISSUE-010)
+- Narrowed payment (Lightning) detection to explicit tokens (ISSUE-012)
+- Introduced heuristics module `src/heuristics.ts`
+- Added negative tests preventing Kyber768 & port 443 false positives (ISSUE-024)
 
-Deliverables:
-- New heuristics module (e.g., src/heuristics.ts)
-- Updated checks consuming structured detection results
-- Tests covering true vs false positives and edge cases
+Deferred (future enhancement ideas): scoring weights, confidence metrics per capability.
 
 ## Plan 3: Architecture Consolidation
 Goals:
@@ -89,5 +91,5 @@ Goals:
 
 ---
 ### Recommended Next Step
-Proceed with Plan 2 (Heuristic Precision). Optional micro-enhancements from Plan 1 can wait unless you need immediate profiling detail. Adding them now would marginally increase code complexity before heuristics stabilization.
+Begin Plan 3 (Architecture Consolidation): unify compliance engine & centralize constants before expanding SBOM work, to reduce future refactor churn.
 
