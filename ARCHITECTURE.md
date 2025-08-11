@@ -3,10 +3,12 @@
 ```
 betanet-linter/
 ├── src/
-│   ├── index.ts              # Main compliance checker class
-│   ├── analyzer.ts           # Binary analysis functionality
+│   ├── index.ts              # Orchestrator: registry-driven compliance + basic SBOM
+│   ├── check-registry.ts     # Declarative check metadata + evaluate() functions
+│   ├── analyzer.ts           # Binary analysis (memoized)
 │   ├── heuristics.ts         # Heuristic pattern detection (Plan 2)
-│   ├── constants.ts          # Central spec/version constants (Betanet 1.0 + partial 1.1)
+│   ├── constants.ts          # Spec/version constants (Betanet 1.0 + partial 1.1)
+│   ├── sbom/                 # Advanced SBOM generator (consolidation target)
 │   └── types.ts              # TypeScript type definitions
 ├── bin/
 │   └── cli.js                # Command-line interface
@@ -23,13 +25,18 @@ betanet-linter/
 
 ## Key Components
 
-### 1. Core Classes
+### 1. Core Modules
 
 - **BetanetComplianceChecker** (`src/index.ts`)
-   - Main class orchestrating compliance checking (1.0 baseline; partial 1.1 support for updated transport versions & optional WebRTC)
-   - Implements all 10 compliance checks from Betanet spec §11
-   - Handles result generation and display
-   - Manages SBOM generation
+   - Orchestrates compliance using the Check Registry (no per-check methods)
+   - Partial Betanet 1.1 heuristics (transport versions, rendezvous indicators, payment extensions)
+   - Aggregates results (score, pass/fail, diagnostics) & provides basic SBOM output (temporary)
+   - Lazy analyzer instantiation → enables dependency injection during tests
+
+- **Check Registry** (`src/check-registry.ts`)
+   - Central list of 10 compliance checks (id, key, name, description, severity, version metadata)
+   - Each entry exposes `evaluate(analyzer, now)` returning a `ComplianceCheck`
+   - Handles dynamic severity escalation (post-quantum critical date) & version acceptances (transport 1.0 / 1.1)
 
 - **BinaryAnalyzer** (`src/analyzer.ts`)
   - Performs deep binary analysis
@@ -47,7 +54,7 @@ betanet-linter/
 
 ### 3. Compliance Checks
 
-Each of the 10 checks is implemented as a separate method in `BetanetComplianceChecker`:
+All checks are declaratively defined in the registry (data + evaluate function). Orchestrator iterates filtered subset (include/exclude). This allows adding a new check by appending one object—no orchestration changes.
 
 1. **HTX Implementation** - Checks for TLS, QUIC, HTX, ECH, and port 443 support
 2. **Access Tickets** - Detects ticket rotation mechanisms
@@ -62,10 +69,11 @@ Each of the 10 checks is implemented as a separate method in `BetanetComplianceC
 
 ### 4. SBOM Generation
 
-- **CycloneDX Format** - Industry-standard XML format
-- **SPDX Format** - Alternative text-based format
-- **Component Detection** - Automatically detects dependencies and libraries
-- **Customizable Output** - Configurable output paths and formats
+Transition state:
+1. Inline minimal SBOM (index.ts) – simple CycloneDX XML + basic SPDX tag-value.
+2. Advanced generator (`sbom/sbom-generator.ts`) – hashing, richer component & dependency extraction, JSON-ready structures.
+
+Plan 4 will migrate fully to the advanced generator, adding license & sanitization enhancements.
 
 ### 5. GitHub Action Template
 
@@ -131,17 +139,14 @@ Each compliance check uses a combination of:
 
 ## Extensibility
 
-The architecture is designed to be easily extensible:
-
-- **New Compliance Checks** - Add methods to `BetanetComplianceChecker`
-- **New Analysis Techniques** - Extend `BinaryAnalyzer`
-- **New Output Formats** - Add display methods
-- **New SBOM Formats** - Extend SBOM generation methods
+- **New Check**: Add object to `CHECK_REGISTRY`.
+- **Heuristics**: Extend or refine functions in `heuristics.ts` used by evaluate functions.
+- **Analyzer Capability**: Add new analyzer helper returning structured detection facts.
+- **Reporting**: Extend `displayResults` for new output formats (e.g., markdown/HTML).
+- **SBOM**: Add exporters in sbom module and route through checker.
 
 ## Performance & Diagnostics
 
-- **Memoized Analysis** - Single extraction pass cached to avoid redundant external tool invocations
-- **Parallel Extraction** - Core extraction tasks (strings, symbols, deps, file metadata) run concurrently
-- **Tool Diagnostics** - Availability & timing of key external tools captured once
-- **Efficient String Processing** - Regex-based heuristics with boundary checks to reduce false positives
-- **Memory Management** - Fallback string extraction avoids excessive allocations
+- Single-pass memoized analysis (analyze() cached)
+- Diagnostics object: analyze invocation count, cache hit flag, tool availability
+- Future: per-check timings, command timeouts, force refresh option

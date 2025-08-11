@@ -29,27 +29,34 @@ Implemented:
 
 Deferred (future enhancement ideas): scoring weights, confidence metrics per capability.
 
-## Plan 3: Architecture Consolidation
-Goals:
-- Remove or formally deprecate duplicate compliance engine (compliance.ts) (ISSUE-001, 013, 014)
-- Centralize severity and naming constants
-- Single SBOM generation pathway (ISSUE-002, 020)
+## Plan 3 (IN PROGRESS): Architecture Consolidation
+Completed:
+- Removed duplicate compliance engine (compliance.ts) (ISSUE-001, 013, 014)
+- Removed legacy sbom.ts (ISSUE-020 duplicate path eliminated)
+- Added centralized check registry (`src/check-registry.ts`) with all metadata & evaluate() functions
+- Added analyzer injection (lazy creation) resolving mocking fragility (ISSUE-022)
+- Division-by-zero guard leveraged by registry (ISSUE-015)
 
-Deliverables:
-- constants.ts (severity map, check metadata)
-- Deprecated notice or removal commit
+Pending / Deferred:
+- Migrate basic inline SBOM in `index.ts` to advanced generator (moved to Plan 4)
+- Extract helper utilities from `index.ts` (ISSUE-030)
+- Externalize magic strings/dates (ISSUE-028, 029)
+
+Outcome: Severities & names normalized via registry; no second engine remains.
 
 ## Plan 4: SBOM Quality & Integrity
 Goals:
-- Produce valid SPDX 2.3 JSON + CycloneDX JSON (ISSUE-017)
-- Component hashing (ISSUE-018, ISSUE-039)
-- License detection improvements (ISSUE-019)
-- Deduplicate & sanitize component names (ISSUE-037, 045)
+- Consolidate on `sbom/sbom-generator.ts` (retire inline SBOM in index.ts)
+- Produce valid SPDX 2.3 (JSON or tag-value with completeness) & CycloneDX (JSON/XML) (ISSUE-017)
+- Ensure hashing for binary + components (ISSUE-018, 039)
+- License detection heuristics (ISSUE-019)
+- Sanitize, dedupe & version quality improvements (ISSUE-037, 045, 021)
 
 Deliverables:
-- sbom/ exporter modules
-- Hash + license utilities
-- Tests validating schema shape
+- Unified SBOM service module & adapter in checker
+- Hash + license utility functions
+- Sanitization & dedupe helpers
+- Schema validation tests (SPDX, CycloneDX)
 
 ## Plan 5: Robustness & Error Handling
 Goals:
@@ -91,5 +98,5 @@ Goals:
 
 ---
 ### Recommended Next Step
-Begin Plan 3 (Architecture Consolidation): unify compliance engine & centralize constants before expanding SBOM work, to reduce future refactor churn.
+Finalize Plan 3 by swapping SBOM path or explicitly delegating to advanced generator; then initiate Plan 4 tasks (valid formats, hashing, licensing).
 

@@ -96,6 +96,8 @@ betanet-lint check /path/to/binary --verbose
 
 The tool validates 10 core requirements from Betanet specification §11 (1.0 baseline). For Betanet 1.1 it additionally accepts updated transport endpoint versions (`/betanet/htx/1.1.0`, `/betanet/htxquic/1.1.0`) while still recognizing legacy 1.0.0 paths and will optionally note presence of `/betanet/webrtc/1.0.0`.
 
+Architecture note: All checks are defined declaratively in a central registry (`check-registry.ts`). Adding a new requirement means appending one object with an `evaluate()` function—no orchestration refactor. Severities, names, and version gating live alongside evaluation logic for consistency.
+
 1. **HTX over TCP-443 & QUIC-443** - Implements HTX over TCP-443 and QUIC-443 with TLS 1.3 mimic + ECH
 2. **Rotating Access Tickets** - Uses rotating access tickets (§5.2)
 3. **Inner Frame Encryption** - Encrypts inner frames with ChaCha20-Poly1305, 24-bit length, 96-bit nonce
