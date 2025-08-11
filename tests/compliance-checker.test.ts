@@ -71,8 +71,8 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-      expect(result.checks).toHaveLength(10);
-      expect(result.summary.total).toBe(10);
+  expect(result.checks).toHaveLength(11);
+  expect(result.summary.total).toBe(11);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
     });
@@ -121,7 +121,7 @@ describe('BetanetComplianceChecker', () => {
         checkFilters: { exclude: [10] }
       });
 
-      expect(result.checks).toHaveLength(9);
+      expect(result.checks).toHaveLength(10); // 11 total minus excluded 10
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 
@@ -378,6 +378,42 @@ describe('BetanetComplianceChecker', () => {
         expect(paymentCheck.details).toContain('Lightning support');
         expect(paymentCheck.details).toContain('federation support');
       }
+    });
+
+    it('should pass Privacy Hop Enforcement with sufficient mix/beacon/diversity tokens', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        analyze: () => Promise.resolve({ strings: ['nym mixnode hop beaconset epoch diversity distinct'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkNetworkCapabilities: async () => ({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
+        checkCryptographicCapabilities: async () => ({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: async () => ({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
+        checkDHTSupport: async () => ({ hasDHT: false, deterministicBootstrap: false, seedManagement: false }),
+        checkLedgerSupport: async () => ({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: async () => ({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: async () => ({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      const result = await checker.checkCompliance('/mock/bin');
+      const privacyCheck = result.checks.find(c => c.id === 11);
+      expect(privacyCheck).toBeDefined();
+      expect(privacyCheck?.passed).toBe(true);
+    });
+
+    it('should fail Privacy Hop Enforcement with insufficient diversity tokens', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = {
+        analyze: () => Promise.resolve({ strings: ['mix beaconset'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkNetworkCapabilities: async () => ({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
+        checkCryptographicCapabilities: async () => ({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: async () => ({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
+        checkDHTSupport: async () => ({ hasDHT: false, deterministicBootstrap: false, seedManagement: false }),
+        checkLedgerSupport: async () => ({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: async () => ({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: async () => ({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      const result = await checker.checkCompliance('/mock/bin');
+      const privacyCheck = result.checks.find(c => c.id === 11);
+      expect(privacyCheck).toBeDefined();
+      expect(privacyCheck?.passed).toBe(false);
     });
   });
 

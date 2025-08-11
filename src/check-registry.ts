@@ -284,6 +284,43 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         severity
       } as ComplianceCheck;
     }
+  },
+  {
+    id: 11,
+    key: 'privacy-hop-enforcement',
+    name: 'Privacy Hop Enforcement',
+    description: 'Enforces ≥2 (balanced) or ≥3 (strict) mixnet hops with BeaconSet-based diversity',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const analysis = await analyzer.analyze();
+      const lower = analysis.strings.map((s: string) => s.toLowerCase());
+      const joined = lower.join(' ');
+      // Token groups
+      const mixTokens = ['nym', 'mix', 'mixnode', 'hop', 'hopset'];
+      const beaconTokens = ['beaconset', 'epoch', 'drand'];
+      const diversityTokens = ['diversity', 'distinct', 'as-group', 'asgroup'];
+
+      const mixHits = mixTokens.filter(t => joined.includes(t));
+      const beaconHits = beaconTokens.filter(t => joined.includes(t));
+      const diversityHits = diversityTokens.filter(t => joined.includes(t));
+
+      // Heuristic pass rule: at least 2 mix-related + 1 beacon/epoch + 1 diversity indicator
+      const passed = mixHits.length >= 2 && beaconHits.length >= 1 && diversityHits.length >= 1;
+      return {
+        id: 11,
+        name: 'Privacy Hop Enforcement',
+        description: 'Enforces ≥2 (balanced) or ≥3 (strict) mixnet hops with BeaconSet-based diversity',
+        passed,
+        details: passed ? `✅ Found mixnet indicators: mix(${mixHits.join('/')}) beacon(${beaconHits.join('/')}) diversity(${diversityHits.join('/')})` :
+          `❌ Missing: ${missingList([
+            mixHits.length < 2 && '≥2 mix-related tokens',
+            beaconHits.length < 1 && 'BeaconSet/epoch token',
+            diversityHits.length < 1 && 'diversity indicator'
+          ])}`,
+        severity: 'major'
+      };
+    }
   }
 ];
 

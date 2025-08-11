@@ -54,7 +54,7 @@ betanet-linter/
 
 ### 3. Compliance Checks
 
-All checks are declaratively defined in the registry (data + evaluate function). Orchestrator iterates filtered subset (include/exclude). This allows adding a new check by appending one object—no orchestration changes.
+All checks (now 11 including Privacy Hop Enforcement) are declaratively defined in the registry (data + evaluate function). Orchestrator iterates filtered subset (include/exclude). This allows adding a new check by appending one object—no orchestration changes.
 
 1. **HTX Implementation** - Checks for TLS, QUIC, HTX, ECH, and port 443 support
 2. **Access Tickets** - Detects ticket rotation mechanisms

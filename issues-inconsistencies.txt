@@ -73,6 +73,11 @@ Action: Require combination and maybe structured metadata file detection.
 Impact: False positives.
 Action: Prefer 'lnpay', 'lightning', 'lnnode', 'lnurl', 'bolt' patterns.
 
+[ ] ISSUE-051 | HEUR | Privacy hop enforcement heuristic coarse
+Current detection relies on simple token presence (nym/mix/beaconset/diversity) which may appear in unrelated contexts.
+Impact: Potential false positives/negatives for new check 11.
+Action: Consider structured pattern grouping (BeaconSet+epoch parsing, VRF/seed terms, hop count tokens) & minimum entropy indicators.
+
 API / LOGIC INCONSISTENCIES
 ---------------------------
 [✓] ISSUE-013 | API | Severity differences between implementations

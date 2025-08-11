@@ -94,7 +94,7 @@ betanet-lint check /path/to/binary --verbose
 
 ## Compliance Checks
 
-The tool validates 10 core requirements from Betanet specification §11 (1.0 baseline). For Betanet 1.1 it additionally accepts updated transport endpoint versions (`/betanet/htx/1.1.0`, `/betanet/htxquic/1.1.0`) while still recognizing legacy 1.0.0 paths and will optionally note presence of `/betanet/webrtc/1.0.0`.
+The tool validates 11 core requirements from Betanet specification §11 (1.0 baseline + one privacy-layer heuristic for 1.1). For Betanet 1.1 it additionally accepts updated transport endpoint versions (`/betanet/htx/1.1.0`, `/betanet/htxquic/1.1.0`) while still recognizing legacy 1.0.0 paths and will optionally note presence of `/betanet/webrtc/1.0.0`.
 
 Architecture note: All checks are defined declaratively in a central registry (`check-registry.ts`). Adding a new requirement means appending one object with an `evaluate()` function—no orchestration refactor. Severities, names, and version gating live alongside evaluation logic for consistency.
 
@@ -103,11 +103,12 @@ Architecture note: All checks are defined declaratively in a central registry (`
 3. **Inner Frame Encryption** - Encrypts inner frames with ChaCha20-Poly1305, 24-bit length, 96-bit nonce
 4. **SCION Path Management** - Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header
 5. **Transport Endpoints** - Offers `/betanet/htx/1.1.0` & `/betanet/htxquic/1.1.0` (1.0.0 legacy accepted)
-6. **DHT Seed Bootstrap** - (1.0) deterministic bootstrap heuristic (1.1 rendezvous rotation patterns partial)
+6. **DHT Seed Bootstrap** - (1.0) deterministic bootstrap OR (1.1) rotating rendezvous (BeaconSet) heuristic
 7. **Alias Ledger Verification** - Verifies alias ledger with 2-of-3 chain consensus
 8. **Payment System** - Accepts Cashu vouchers from federated mints & supports Lightning settlement
 9. **Build Provenance** - Builds reproducibly and publishes SLSA 3 provenance
 10. **Post-Quantum Cipher Suites** - Presents X25519-Kyber768 suites once the mandatory date is reached (2027-01-01)
+11. **Privacy Hop Enforcement** - Enforces ≥2 (balanced) or ≥3 (strict) mixnet hops with BeaconSet-based diversity (heuristic)
 
 ### Heuristic & Partial Coverage Disclaimer
 Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., TLS fingerprint calibration, path diversity maintenance, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Advanced 1.1 checks (outer TLS calibration, rendezvous beacon rotation, full access ticket protocol validation) are roadmap items.

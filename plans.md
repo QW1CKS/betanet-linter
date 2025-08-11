@@ -36,6 +36,7 @@ Completed:
 - Added centralized check registry (`src/check-registry.ts`) with all metadata & evaluate() functions
 - Added analyzer injection (lazy creation) resolving mocking fragility (ISSUE-022)
 - Division-by-zero guard leveraged by registry (ISSUE-015)
+- Added 11th Privacy Hop Enforcement check (heuristic, 1.1) extending coverage beyond original 10
 
 Pending / Deferred:
 - Migrate basic inline SBOM in `index.ts` to advanced generator (moved to Plan 4)
