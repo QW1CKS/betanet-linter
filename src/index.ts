@@ -30,6 +30,9 @@ export class BetanetComplianceChecker {
     if (!this._analyzer || options.forceRefresh) {
       this._analyzer = new BinaryAnalyzer(binaryPath, options.verbose);
     }
+    if (options.dynamicProbe && typeof (this._analyzer as any).setDynamicProbe === 'function') {
+      (this._analyzer as any).setDynamicProbe(true);
+    }
 
     if (options.verbose) {
       console.log('🔍 Starting Betanet compliance check...');
@@ -129,7 +132,7 @@ export class BetanetComplianceChecker {
       latestKnown: SPEC_VERSION_PARTIAL,
       implementedChecks,
       totalChecks: CHECK_REGISTRY.length,
-      pendingIssues: SPEC_11_PENDING_ISSUES
+  pendingIssues: SPEC_11_PENDING_ISSUES
     };
 
   const result: ComplianceResult = {

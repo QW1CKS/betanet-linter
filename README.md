@@ -4,7 +4,7 @@ A comprehensive CLI tool for checking Betanet specification compliance in binary
 
 ## Features
 
-- ✅ **Complete Compliance Checking**: Validates all 10 Betanet specification requirements
+- ✅ **Complete Compliance Checking**: Validates all 11 Betanet specification requirements (§11)
 - 🔍 **Binary Analysis**: Deep analysis of executable binaries for compliance patterns
 - 📋 **SBOM Generation**: Creates Software Bill of Materials in CycloneDX or SPDX formats
 - � **Multi-License Detection**: Extracts multiple SPDX license identifiers (e.g. Apache-2.0 OR MIT) and surfaces all
@@ -15,6 +15,7 @@ A comprehensive CLI tool for checking Betanet specification compliance in binary
 - 🔄 **Force Refresh**: Use `--force-refresh` to bypass memoized baseline analysis for updated binaries
 - 🛡️ **Degraded Fail Gate**: Set `BETANET_FAIL_ON_DEGRADED=1` to force failure when tooling is degraded
 - ⚡ **Parallel Evaluation**: Runs checks concurrently; tune with `--max-parallel` and per-check `--check-timeout`
+- 🧪 **Dynamic Probe (Optional)**: `--dynamic-probe` lightly invokes the binary with `--help` to enrich heuristic surface (no network / destructive actions)
 
 ## Installation
 
@@ -137,10 +138,10 @@ The tool fully covers Betanet 1.0 checks and partially covers emerging 1.1 eleme
 
 ```
 Spec Coverage: baseline 1.0 fully covered; latest known 1.1 checks implemented 11/11
-Pending 1.1 refinements: ISSUE-051, ISSUE-053, ISSUE-054
+Pending 1.1 refinements: (none – all heuristic refinements integrated)
 ```
 
-Pending 1.1 refinements map to the backlog entries in `issues-inconsistencies.txt` and represent heuristic depth or structural validation improvements (privacy hop refinement, voucher structural format, PoW difficulty context parsing).
+No pending 1.1 refinement issues remain; prior backlog items (privacy hop refinement, voucher structural voucher format, PoW context parsing) have been implemented.
 JSON / YAML outputs include a `specSummary` object with the same fields for programmatic consumption.
 
 ## Output Examples

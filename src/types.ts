@@ -77,6 +77,7 @@ export interface CheckOptions {
   forceRefresh?: boolean; // if true, re-run analysis ignoring cache
   maxParallel?: number; // limit concurrent check evaluations (default: unlimited)
   checkTimeoutMs?: number; // per-check timeout (optional)
+  dynamicProbe?: boolean; // attempt lightweight runtime '--help' probe to augment strings
 }
 
 export interface SBOMOptions {

@@ -9,6 +9,7 @@ import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, dete
 export class BinaryAnalyzer {
   private binaryPath: string;
   private verbose: boolean;
+  private dynamicProbe: boolean = false; // enable lightweight runtime '--help' probe enrichment
   private cachedAnalysis: Promise<{
     strings: string[];
     symbols: string[];
@@ -29,6 +30,10 @@ export class BinaryAnalyzer {
     this.binaryPath = binaryPath;
     this.verbose = verbose;
   this.toolsReady = this.detectTools();
+  }
+
+  setDynamicProbe(flag: boolean) {
+    this.dynamicProbe = !!flag;
   }
 
   getDiagnostics(): AnalyzerDiagnostics {
@@ -91,7 +96,7 @@ export class BinaryAnalyzer {
     this.analysisStartHr = process.hrtime();
     this.cachedAnalysis = (async () => {
       const [strings, symbols, fileFormat, architecture, dependencies, size] = await Promise.all([
-        this.extractStrings(),
+        this.extractStrings(this.dynamicProbe),
         this.extractSymbols(),
         this.detectFileFormat(),
         this.detectArchitecture(),
@@ -107,11 +112,20 @@ export class BinaryAnalyzer {
     return this.cachedAnalysis;
   }
 
-  private async extractStrings(): Promise<string[]> {
+  private async extractStrings(dynamicProbe: boolean): Promise<string[]> {
     try {
       const res = await safeExec('strings', [this.binaryPath]);
       if (!res.failed) {
-        return res.stdout.split('\n').filter((line: string) => line.length > 0);
+        let out = res.stdout.split('\n').filter((line: string) => line.length > 0);
+        if (dynamicProbe) {
+          try {
+            const probe = await safeExec(this.binaryPath, ['--help']);
+            if (!probe.failed && probe.stdout) {
+              out = out.concat(probe.stdout.split('\n').slice(0, 500));
+            }
+          } catch {/* ignore */}
+        }
+        return out;
       }
       if (this.verbose) {
         console.warn('⚠️  strings unavailable (', res.errorMessage, '), using fallback');
@@ -122,7 +136,7 @@ export class BinaryAnalyzer {
         console.warn('⚠️  strings command failed, trying fallback method');
       }
       // Fallback: read file and extract printable strings
-      const buffer = await fs.readFile(this.binaryPath);
+  const buffer = await fs.readFile(this.binaryPath);
       const strings: string[] = [];
       let currentString = '';
       
@@ -138,6 +152,14 @@ export class BinaryAnalyzer {
         }
       }
       
+      if (dynamicProbe) {
+        try {
+          const probe = await safeExec(this.binaryPath, ['--help']);
+          if (!probe.failed && probe.stdout) {
+            strings.push(...probe.stdout.split('\n').slice(0, 500));
+          }
+        } catch {/* ignore */}
+      }
       return strings;
     }
   // If we reach here (should not normally), fallback to empty array

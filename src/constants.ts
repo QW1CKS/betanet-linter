@@ -15,11 +15,7 @@ export const DISCLAIMER_TEXT = `This tool provides heuristic static binary analy
 
 // Pending Betanet 1.1 specific deltas not yet fully implemented as discrete checks.
 // Sourced from issues-inconsistencies.txt (spec delta tracking section).
-export const SPEC_11_PENDING_ISSUES: { id: string; title: string }[] = [
-  { id: 'ISSUE-051', title: 'Privacy hop heuristic refinement (granularity & false-positive reduction)' },
-  { id: 'ISSUE-053', title: 'Voucher structural validation (format/length/signature heuristic)' },
-  { id: 'ISSUE-054', title: 'PoW difficulty context refinement (bounded regex parsing)' }
-];
+export const SPEC_11_PENDING_ISSUES: { id: string; title: string }[] = []; // All previously pending 1.1 heuristic refinements implemented in v1.1.0 finalization
 
 // Helper to parse dotted semantic-ish spec versions (major.minor[.patch]) into numeric tuple
 export function parseSpecVersion(v: string): number[] {

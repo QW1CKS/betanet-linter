@@ -88,9 +88,12 @@ export function detectPayment(src: TextSources) {
   // Avoid lone 'ln'; require explicit lightning tokens
   const hasLightning = /(lightning|lnurl|bolt\d|lnd)/.test(blob);
   const hasFederation = /(federation|federated|federation-mode)/.test(blob);
-  const hasVoucherFormat = /(keysetid32|voucher\s*\(128|aggregatedsig64|bn1=)/.test(blob);
+  // Voucher structural heuristic (128 bytes: keysetID32 + secret32 + aggregatedSig64) textual hints
+  const voucherRegex = /(keysetid32\s+secret32\s+aggregatedsig64)|(voucher\s*128\s*b)|((?:keysetid|secret|aggregatedsig)32)/;
+  const hasVoucherFormat = voucherRegex.test(blob) || /(bn1=)[A-Za-z0-9_-]{10,}/.test(blob);
   const hasFROST = /frost-?ed25519/.test(blob) || /frost group/.test(blob);
-  const hasPoW22 = /(22-?bit|pow.*22)/.test(blob);
+  // PoW difficulty context: match pow=22, pow 22-bit, 22-bit pow, difficulty:22 etc.
+  const hasPoW22 = /(pow\s*[=:]?\s*22\b|22-?bit\s+pow|pow[^a-z0-9]{0,5}22-?bit|difficulty\s*[:=]\s*22)/.test(blob);
   return { hasCashu, hasLightning, hasFederation, hasVoucherFormat, hasFROST, hasPoW22 };
 }
 
@@ -107,12 +110,13 @@ export function evaluatePrivacyTokens(strings: string[]) {
   const blob = toJoinedLower(strings);
   const mixTokens = ['nym','mixnode','hop','hopset','relay'];
   const beaconTokens = ['beaconset','epoch','drand'];
-  const diversityTokens = ['diversity','distinct','as-group','asgroup'];
+  const diversityTokens = ['diversity','distinct','as-group','asgroup','vrf'];
   const scoreCategory = (list: string[]) => list.reduce((acc,t)=> acc + (new RegExp(`(^|[^a-z0-9])${t}([^a-z0-9]|$)`).test(blob)?1:0),0);
   const mixScore = scoreCategory(mixTokens);
   const beaconScore = scoreCategory(beaconTokens);
   const diversityScore = scoreCategory(diversityTokens);
   const totalScore = mixScore*2 + beaconScore*2 + diversityScore*3; // weight diversity highest
-  const passed = mixScore>=2 && beaconScore>=1 && diversityScore>=1;
+  // Require stronger combined signal: either ≥2 mix + ≥1 beacon + ≥1 diversity, OR high diversity (≥2) plus any mix+beacon each
+  const passed = (mixScore>=2 && beaconScore>=1 && diversityScore>=1) || (diversityScore>=2 && mixScore>=1 && beaconScore>=1);
   return { mixScore, beaconScore, diversityScore, totalScore, passed };
 }
