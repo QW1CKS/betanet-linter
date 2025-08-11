@@ -1,4 +1,5 @@
 import { BetanetComplianceChecker } from '../src/index';
+import { BinaryAnalyzer } from '../src/analyzer';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 
@@ -313,6 +314,71 @@ describe('BetanetComplianceChecker', () => {
         // Failure details should list 'port 443' as missing (not falsely detected)
         expect(htxCheck.details).toContain('port 443');
       }
+    });
+
+    it('should not pass DHT bootstrap when only beacon/rendezvous tokens appear without DHT base token', async () => {
+      const checker = new BetanetComplianceChecker();
+      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
+        analyze: () => Promise.resolve({ strings: ['beaconset rotate rendezvous'], symbols: [], dependencies: [] }),
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, rendezvousRotation: true, beaconSetIndicator: true, seedManagement: false }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      });
+      const result = await checker.checkCompliance('/mock/bin');
+      const dhtCheck = result.checks.find(c => c.id === 6);
+      expect(dhtCheck).toBeDefined();
+      if (dhtCheck) {
+        expect(dhtCheck.passed).toBe(false);
+        expect(dhtCheck.details).toContain('DHT support');
+      }
+    });
+
+    it('should not pass Payment System when only voucher/FROST/PoW indicators appear without core payment tokens', async () => {
+      const checker = new BetanetComplianceChecker();
+      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
+        analyze: () => Promise.resolve({ strings: ['voucher frost-ed25519 pow22'], symbols: [], dependencies: [] }),
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false, hasVoucherFormat: true, hasFROST: true, hasPoW22: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      });
+      const result = await checker.checkCompliance('/mock/bin');
+      const paymentCheck = result.checks.find(c => c.id === 8);
+      expect(paymentCheck).toBeDefined();
+      if (paymentCheck) {
+        expect(paymentCheck.passed).toBe(false);
+        expect(paymentCheck.details).toContain('Cashu support');
+        expect(paymentCheck.details).toContain('Lightning support');
+        expect(paymentCheck.details).toContain('federation support');
+      }
+    });
+  });
+
+  describe('performance memoization', () => {
+    it('should only invoke full analysis once across multiple capability checks', async () => {
+      const analyzer = new BinaryAnalyzer('/mock/binary');
+      // Mock private extraction methods to avoid external tool calls
+      jest.spyOn(analyzer as any, 'extractStrings').mockResolvedValue(['kyber768', 'dht', 'cashu', 'lightning', 'federation']);
+      jest.spyOn(analyzer as any, 'extractSymbols').mockResolvedValue([]);
+      jest.spyOn(analyzer as any, 'detectFileFormat').mockResolvedValue('ELF 64-bit');
+      jest.spyOn(analyzer as any, 'detectArchitecture').mockResolvedValue('x86_64');
+      jest.spyOn(analyzer as any, 'detectDependencies').mockResolvedValue([]);
+      jest.spyOn(analyzer as any, 'getFileSize').mockResolvedValue(12345);
+      // Call multiple capability methods sequentially
+      await analyzer.checkNetworkCapabilities();
+      await analyzer.checkCryptographicCapabilities();
+      await analyzer.checkDHTSupport();
+      await analyzer.checkPaymentSupport();
+      const diag = analyzer.getDiagnostics();
+      expect(diag.analyzeInvocations).toBe(1);
+      expect(diag.cached).toBe(true);
     });
   });
 });
