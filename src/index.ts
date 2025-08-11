@@ -240,6 +240,14 @@ export class BetanetComplianceChecker {
       }
       console.log('-'.repeat(60));
     }
+    if (results.diagnostics?.degraded) {
+      const reasons = results.diagnostics.degradationReasons?.join(', ') || 'unknown';
+      console.log(`⚠️  Degraded analysis: ${reasons}`);
+      if (results.diagnostics.missingCoreTools?.length) {
+        console.log(`Missing core tools: ${results.diagnostics.missingCoreTools.join(', ')}`);
+      }
+      console.log('-'.repeat(60));
+    }
 
     if (format === 'json') {
       console.log(JSON.stringify(results, null, 2));

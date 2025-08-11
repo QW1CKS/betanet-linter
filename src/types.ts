@@ -65,6 +65,9 @@ export interface AnalyzerDiagnostics {
   degraded?: boolean; // whether any external tooling missing or timed out
   skippedTools?: string[]; // tools explicitly skipped via config
   timedOutTools?: string[]; // tools that exceeded timeout
+  platform?: string; // process.platform recorded for transparency
+  missingCoreTools?: string[]; // core analysis tools unavailable on this platform
+  degradationReasons?: string[]; // human-readable reasons driving degraded=true
 }
 
 export interface CheckOptions {

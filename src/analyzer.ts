@@ -41,6 +41,9 @@ export class BinaryAnalyzer {
   }
 
   private async detectTools(): Promise<void> {
+    const isWindows = process.platform === 'win32';
+    this.diagnostics.platform = process.platform;
+    const degradationReasons: string[] = [];
     const toolCandidates: { name: string; args: string[] }[] = [
       { name: 'strings', args: ['--version'] },
       { name: 'nm', args: ['--version'] },
@@ -49,7 +52,6 @@ export class BinaryAnalyzer {
       { name: 'file', args: ['--version'] },
       { name: 'uname', args: ['-m'] }
     ];
-
     const checks = toolCandidates.map(async t => {
       const start = Date.now();
       try {
@@ -77,7 +79,11 @@ export class BinaryAnalyzer {
     if (unavailable.length) {
       this.diagnostics.degraded = true;
       this.diagnostics.skippedTools = unavailable.filter(t => t.error === 'skipped-by-config').map(t => t.name);
+      this.diagnostics.missingCoreTools = unavailable.map(t => t.name);
+      if (isWindows) degradationReasons.push('native-windows-missing-unix-tools');
     }
+    if (isWindows) degradationReasons.push('consider-installing-binutils-or-use-WSL');
+    if (this.diagnostics.degraded) this.diagnostics.degradationReasons = degradationReasons;
   }
 
   async analyze(): Promise<{ strings: string[]; symbols: string[]; fileFormat: string; architecture: string; dependencies: string[]; size: number; }> {
@@ -131,6 +137,7 @@ export class BinaryAnalyzer {
         console.warn('⚠️  strings unavailable (', res.errorMessage, '), using fallback');
       }
       this.diagnostics.degraded = true;
+  this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'strings-missing'];
   } catch (error) {
       if (this.verbose) {
         console.warn('⚠️  strings command failed, trying fallback method');
@@ -192,6 +199,8 @@ export class BinaryAnalyzer {
         if (this.verbose) {
           console.warn('⚠️  Symbol extraction failed');
         }
+  this.diagnostics.degraded = true;
+  this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'symbols-missing'];
         return [];
       }
     }
@@ -224,6 +233,7 @@ export class BinaryAnalyzer {
           console.warn('⚠️  ldd unavailable (', res.errorMessage, ')');
         }
         this.diagnostics.degraded = true;
+        this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'ldd-missing'];
         return [];
       }
       return res.stdout.split('\n')
@@ -235,6 +245,7 @@ export class BinaryAnalyzer {
         console.warn('⚠️  ldd command failed');
       }
       this.diagnostics.degraded = true;
+      this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons||[]), 'ldd-failed'];
       return [];
     }
   }

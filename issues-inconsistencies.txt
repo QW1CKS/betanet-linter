@@ -179,10 +179,11 @@ Action: Extract smaller functions.
 
 PLATFORM / PORTABILITY
 ----------------------
-[X] ISSUE-031 | PLATFORM | Reliance on Unix toolchain
+[✓] ISSUE-031 | PLATFORM | Reliance on Unix toolchain
 strings,file,nm,objdump,ldd,uname may not exist on native Windows.
 Impact: Limited portability; degraded analysis.
 Action: Detect OS, use alternative (e.g., dumpbin on Windows) or require WSL; aggregate warnings.
+Resolution: Added platform capture, degradationReasons, missingCoreTools list, concise degraded summary; guidance to use WSL/binutils. (No direct dumpbin integration yet – future enhancement.)
 
 [✓] ISSUE-032 | PLATFORM | No graceful partial capability reporting
 Failures silently return empty arrays.
@@ -202,7 +203,7 @@ Impact: CLI stalls.
 Action: Add timeout & fallback path.
 
 [ ] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
-Status unchanged: still primarily verbose-gated; reconsider concise default warning later.
+Partial: Now prints one-line degraded summary with reasons & missing core tools. Remaining: per-check inline hints could be added later.
 
 [✓] ISSUE-036 | ERROR | Missing try/catch around entire check loop
 RESOLVED: Each check evaluation isolated with error & timeout handling; failures converted to failed check entry.

@@ -801,6 +801,43 @@ describe('BetanetComplianceChecker', () => {
   });
 
   describe('performance memoization', () => {
+    it('should mark degradation reasons on Windows platform when core tools absent', async () => {
+      const checker = new BetanetComplianceChecker();
+      (checker as any)._analyzer = new BinaryAnalyzer('/mock/binary');
+      // Monkey patch detectTools before it runs (simulate Windows missing tools)
+      (checker as any)._analyzer.detectTools = async function() {
+        // @ts-ignore
+        this.diagnostics = { tools: [], analyzeInvocations: 0, cached: false };
+        // @ts-ignore
+        this.diagnostics.platform = 'win32';
+        // @ts-ignore
+        this.diagnostics.tools = [ 'strings','nm','objdump','ldd','file','uname' ].map(n => ({ name: n, available: false, error: 'not-found'}));
+        // @ts-ignore
+        this.diagnostics.degraded = true;
+        // @ts-ignore
+        this.diagnostics.missingCoreTools = ['strings','nm','objdump','ldd','file','uname'];
+        // @ts-ignore
+        this.diagnostics.degradationReasons = ['native-windows-missing-unix-tools','consider-installing-binutils-or-use-WSL'];
+      };
+      // Re-run tool detection with patched method
+      await (checker as any)._analyzer.detectTools();
+      // Mock analysis internals
+      (checker as any)._analyzer.analyze = () => Promise.resolve({ strings: [], symbols: [], fileFormat: 'unknown', architecture: 'x86', dependencies: [], size: 1 });
+      (checker as any)._analyzer.checkNetworkCapabilities = () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false, hasWebRTC: false });
+      (checker as any)._analyzer.checkCryptographicCapabilities = () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false });
+      (checker as any)._analyzer.checkSCIONSupport = () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 });
+      (checker as any)._analyzer.checkDHTSupport = () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false });
+      (checker as any)._analyzer.checkLedgerSupport = () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false });
+      (checker as any)._analyzer.checkPaymentSupport = () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false });
+      (checker as any)._analyzer.checkBuildProvenance = () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false });
+      const tmp = path.join(__dirname, 'temp-windows');
+      await fs.writeFile(tmp, Buffer.from('dummy'));
+      const result = await checker.checkCompliance(tmp);
+      expect(result.diagnostics?.platform).toBe('win32');
+      expect(result.diagnostics?.degraded).toBe(true);
+      expect(result.diagnostics?.degradationReasons).toEqual(expect.arrayContaining(['native-windows-missing-unix-tools']));
+      expect(result.diagnostics?.missingCoreTools?.length).toBeGreaterThan(0);
+    });
     it('should only invoke full analysis once across multiple capability checks', async () => {
       const analyzer = new BinaryAnalyzer('/mock/binary');
       // Mock private extraction methods to avoid external tool calls
