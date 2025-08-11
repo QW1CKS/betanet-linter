@@ -23,41 +23,62 @@ export class BetanetComplianceChecker {
   }
 
   async checkCompliance(binaryPath: string, options: CheckOptions = {}): Promise<ComplianceResult> {
-    // Binary existence pre-check (Plan 5 robustness)
-    if (!(await fs.pathExists(binaryPath))) {
-      throw new Error(`Binary not found at path: ${binaryPath}`);
-    }
-    // Allow tests or callers to pre-inject a mock analyzer; only create if absent
+    // Decomposed path (ISSUE-030)
+    this.ensureAnalyzer(binaryPath, options);
+    const definitions = this.resolveDefinitions(options);
+    const { checks, timings, wallMs } = await this.runChecks(definitions, options);
+    return this.assembleResult(binaryPath, checks, timings, wallMs, options);
+  }
+
+  // === Helper decomposition (ISSUE-030) ===
+  private ensureAnalyzer(binaryPath: string, options: CheckOptions) {
+    if (!fs.existsSync(binaryPath)) throw new Error(`Binary not found at path: ${binaryPath}`);
     if (!this._analyzer || options.forceRefresh) {
       this._analyzer = new BinaryAnalyzer(binaryPath, options.verbose);
     }
-    if (options.dynamicProbe && typeof (this._analyzer as any).setDynamicProbe === 'function') {
+    // Enable dynamic probe if requested or via env toggle
+    if ((options.dynamicProbe || process.env.BETANET_DYNAMIC_PROBE === '1') && typeof (this._analyzer as any).setDynamicProbe === 'function') {
       (this._analyzer as any).setDynamicProbe(true);
     }
-
-    if (options.verbose) {
-      console.log('🔍 Starting Betanet compliance check...');
-    }
-
-    // Resolve registry-based checks with filters
-    const allIds = CHECK_REGISTRY.map(c => c.id);
-    let checkIdsToRun = allIds;
-    if (options.checkFilters?.include) {
-      checkIdsToRun = checkIdsToRun.filter(id => options.checkFilters!.include!.includes(id));
-    }
-    if (options.checkFilters?.exclude) {
-      checkIdsToRun = checkIdsToRun.filter(id => !options.checkFilters!.exclude!.includes(id));
-    }
-    const definitions = getChecksByIds(checkIdsToRun);
-    const checks: ComplianceCheck[] = [];
+  }
+  private resolveDefinitions(options: CheckOptions) {
+    let ids = CHECK_REGISTRY.map(c => c.id);
+    if (options.checkFilters?.include) ids = ids.filter(id => options.checkFilters!.include!.includes(id));
+    if (options.checkFilters?.exclude) ids = ids.filter(id => !options.checkFilters!.exclude!.includes(id));
+    return getChecksByIds(ids);
+  }
+  private async runChecks(definitions: ReturnType<typeof getChecksByIds>, options: CheckOptions) {
     const now = new Date();
-    const checkTimings: { id: number; durationMs: number }[] = [];
+    const checks: ComplianceCheck[] = [];
+    const timings: { id: number; durationMs: number }[] = [];
     const maxParallel = options.maxParallel && options.maxParallel > 0 ? options.maxParallel : definitions.length;
     const timeoutMs = options.checkTimeoutMs && options.checkTimeoutMs > 0 ? options.checkTimeoutMs : undefined;
     const queue = [...definitions];
     const running: Promise<void>[] = [];
     const startWall = performance.now();
-
+    const attachHints = (result: ComplianceCheck, defId: number) => {
+      try {
+        const diag = this._analyzer.getDiagnostics();
+        if (!diag?.degraded) return;
+        const reasons = diag.degradationReasons || [];
+        const hints: string[] = [];
+        const stringReasons = reasons.filter(r => r.startsWith('strings-'));
+        const symbolReasons = reasons.filter(r => r.startsWith('symbols-'));
+        const depReasons = reasons.filter(r => r.startsWith('ldd'));
+        const stringChecks = [1,2,4,5,6,8,10,11];
+        const symbolChecks = [1,3,4,10];
+        if (stringChecks.includes(defId) && stringReasons.length) {
+          if (stringReasons.includes('strings-fallback-truncated')) hints.push('string extraction truncated');
+          if (stringReasons.includes('strings-missing')) hints.push('strings tool missing');
+          if (stringReasons.includes('strings-error')) hints.push('strings invocation error');
+          if (stringReasons.includes('strings-fallback-error')) hints.push('string fallback error');
+        }
+        if (symbolChecks.includes(defId) && symbolReasons.length) hints.push('symbol extraction degraded');
+        if (depReasons.length && false) hints.push('dependency resolution degraded'); // placeholder
+        if (!hints.length && diag.missingCoreTools?.length) hints.push('core analysis tools missing');
+        if (hints.length) result.degradedHints = Array.from(new Set(hints));
+      } catch {/* ignore */}
+    };
     const runOne = async (def: typeof definitions[number]) => {
       const start = performance.now();
       let timer: any;
@@ -71,128 +92,41 @@ export class BetanetComplianceChecker {
         const duration = performance.now() - start;
         if (timer) clearTimeout(timer);
         result.durationMs = duration;
-        // Attach degraded hints mapping (ISSUE-035)
-        try {
-          const diag = this._analyzer.getDiagnostics();
-          if (diag?.degraded) {
-            const reasons = diag.degradationReasons || [];
-            const hints: string[] = [];
-            // Map reasons that influence string-based heuristics
-            const stringReasons = reasons.filter(r => r.startsWith('strings-'));
-            const symbolReasons = reasons.filter(r => r.startsWith('symbols-'));
-            const depReasons = reasons.filter(r => r.startsWith('ldd'));
-            const appliesStringHeuristics = [1,2,4,5,6,8,10,11].includes(def.id); // checks relying heavily on strings
-            const appliesSymbolHeuristics = [1,3,4,10].includes(def.id);
-            const appliesDeps = false; // placeholder for future dependency-specific checks
-            if (appliesStringHeuristics && stringReasons.length) {
-              if (stringReasons.includes('strings-fallback-truncated')) hints.push('string extraction truncated');
-              if (stringReasons.includes('strings-missing')) hints.push('strings tool missing');
-              if (stringReasons.includes('strings-error')) hints.push('strings invocation error');
-              if (stringReasons.includes('strings-fallback-error')) hints.push('string fallback error');
-            }
-            if (appliesSymbolHeuristics && symbolReasons.length) {
-              hints.push('symbol extraction degraded');
-            }
-            if (appliesDeps && depReasons.length) {
-              hints.push('dependency resolution degraded');
-            }
-            if (!hints.length && diag.missingCoreTools?.length) {
-              // Generic platform degradation
-              hints.push('core analysis tools missing');
-            }
-            if (hints.length) {
-              result.degradedHints = Array.from(new Set(hints));
-            }
-          }
-        } catch {/* swallow */}
+        attachHints(result, def.id);
         checks.push(result);
-        checkTimings.push({ id: result.id, durationMs: duration });
+        timings.push({ id: result.id, durationMs: duration });
       } catch (e: any) {
         if (timer) clearTimeout(timer);
         const duration = performance.now() - start;
-        checkTimings.push({ id: def.id, durationMs: duration });
-        checks.push({
-          id: def.id,
-          name: def.name,
-          description: def.description,
-          passed: false,
-          details: e && e.message === 'CHECK_TIMEOUT' ? '❌ Check timed out' : `❌ Check error: ${e?.message || e}`,
-          severity: def.severity,
-          durationMs: duration
-        });
+        timings.push({ id: def.id, durationMs: duration });
+        checks.push({ id: def.id, name: def.name, description: def.description, passed: false, details: e && e.message === 'CHECK_TIMEOUT' ? '❌ Check timed out' : `❌ Check error: ${e?.message || e}`, severity: def.severity, durationMs: duration });
       }
     };
-
     while (queue.length || running.length) {
       while (queue.length && running.length < maxParallel) {
         const def = queue.shift()!;
-        const p = runOne(def).finally(() => {
-          const idx = running.indexOf(p);
-          if (idx >= 0) running.splice(idx, 1);
-        });
+        const p = runOne(def).finally(() => { const idx = running.indexOf(p); if (idx >= 0) running.splice(idx, 1); });
         running.push(p);
       }
-      if (running.length) {
-        await Promise.race(running);
-      }
+      if (running.length) await Promise.race(running);
     }
-    const parallelDurationMs = performance.now() - startWall;
-    // Preserve original ordering by id
-    checks.sort((a, b) => a.id - b.id);
-
-    // Calculate overall results
-    // Apply severity minimum filter for scoring (display still shows all for transparency)
+    const wallMs = performance.now() - startWall;
+    checks.sort((a,b) => a.id - b.id);
+    return { checks, timings, wallMs };
+  }
+  private assembleResult(binaryPath: string, checks: ComplianceCheck[], checkTimings: { id: number; durationMs: number }[], parallelDurationMs: number, options: CheckOptions): ComplianceResult {
     const severityRank = { minor: 1, major: 2, critical: 3 } as const;
     const min = options.severityMin ? severityRank[options.severityMin] : 1;
     const considered = checks.filter(c => severityRank[c.severity] >= min);
     const passedChecks = considered.filter(c => c.passed);
     const criticalChecks = considered.filter(c => c.severity === 'critical' && !c.passed);
-    
-  // Guard against zero considered checks
-  const overallScore = considered.length === 0 ? 0 : Math.round((passedChecks.length / considered.length) * 100);
-  const passed = considered.length > 0 && passedChecks.length === considered.length && criticalChecks.length === 0;
-
-    const diagnostics = ((): any => {
-      const a: any = this.analyzer;
-      if (a && typeof a.getDiagnostics === 'function') {
-        try { return a.getDiagnostics(); } catch { return undefined; }
-      }
-      return undefined;
-    })();
-
-    // Spec coverage summary: counts checks introduced up to partial version
+    const overallScore = considered.length === 0 ? 0 : Math.round((passedChecks.length / considered.length) * 100);
+    const passed = considered.length > 0 && passedChecks.length === considered.length && criticalChecks.length === 0;
+    const diagnostics = (() => { const a: any = this.analyzer; if (a && typeof a.getDiagnostics === 'function') { try { return a.getDiagnostics(); } catch { return undefined; } } return undefined; })();
     const implementedChecks = CHECK_REGISTRY.filter(c => isVersionLE(c.introducedIn, SPEC_VERSION_PARTIAL)).length;
-    const specSummary = {
-      baseline: SPEC_VERSION_SUPPORTED_BASE,
-      latestKnown: SPEC_VERSION_PARTIAL,
-      implementedChecks,
-      totalChecks: CHECK_REGISTRY.length,
-  pendingIssues: SPEC_11_PENDING_ISSUES
-    };
-
-  const result: ComplianceResult = {
-      binaryPath,
-      timestamp: new Date().toISOString(),
-      overallScore,
-      passed,
-      checks,
-      summary: {
-        total: considered.length,
-        passed: passedChecks.length,
-        failed: considered.length - passedChecks.length,
-        critical: criticalChecks.length
-      },
-      specSummary,
-      diagnostics
-    };
-    result.parallelDurationMs = parallelDurationMs;
-    result.checkTimings = checkTimings;
-
-    // If env BETANET_FAIL_ON_DEGRADED set, override pass/fail (but keep original scoring)
-    if (process.env.BETANET_FAIL_ON_DEGRADED === '1' && result.diagnostics?.degraded) {
-      result.passed = false;
-    }
-    return result;
+    const specSummary = { baseline: SPEC_VERSION_SUPPORTED_BASE, latestKnown: SPEC_VERSION_PARTIAL, implementedChecks, totalChecks: CHECK_REGISTRY.length, pendingIssues: SPEC_11_PENDING_ISSUES };
+    const result: ComplianceResult = { binaryPath, timestamp: new Date().toISOString(), overallScore, passed, checks, summary: { total: considered.length, passed: passedChecks.length, failed: considered.length - passedChecks.length, critical: criticalChecks.length }, specSummary, diagnostics };
+    result.parallelDurationMs = parallelDurationMs; result.checkTimings = checkTimings; if (process.env.BETANET_FAIL_ON_DEGRADED === '1' && result.diagnostics?.degraded) result.passed = false; return result;
   }
 
   // Legacy per-check methods removed (Plan 3 consolidation) in favor of registry-based evaluation
@@ -231,32 +165,72 @@ export class BetanetComplianceChecker {
         });
         components = Array.from(seen.values());
       }
-      const xmlObj = {
-        bom: {
-          $: { xmlns: 'http://cyclonedx.org/schema/bom/1.4', version: '1' },
-          metadata: {
-            timestamp: new Date().toISOString(),
-            component: {
-              name: metaComponent.name || path.basename(binaryPath),
-              version: metaComponent.version || '1.0.0',
-              type: metaComponent.type || 'application',
-              purl: metaComponent.purl || `pkg:generic/${path.basename(binaryPath)}@1.0.0`,
-              hashes: metaComponent.hashes ? { hash: metaComponent.hashes.map((h: any) => ({ _: h.content, $: { alg: h.alg } })) } : undefined
-            }
-          },
-          components: components.length ? {
-            component: components.map((c: any) => ({
-              name: c.name || 'unknown',
-              version: c.version || 'unknown',
-              type: c.type || 'library',
-              purl: c.purl,
-              properties: undefined
-            }))
-          } : undefined
+      // Streaming threshold (ISSUE-046)
+      const streamThreshold = (() => {
+        const v = process.env.BETANET_SBOM_STREAM_THRESHOLD;
+        const n = v ? parseInt(v, 10) : NaN;
+        return Number.isFinite(n) ? n : 1000; // default high threshold
+      })();
+      const componentCount = Array.isArray(components) ? components.length : 0;
+      if (componentCount >= streamThreshold) {
+        const ws = fs.createWriteStream(finalOutputPath, { encoding: 'utf8' });
+        ws.write('<bom xmlns="http://cyclonedx.org/schema/bom/1.4" version="1">\n');
+        ws.write('  <metadata>\n');
+        ws.write(`    <timestamp>${new Date().toISOString()}</timestamp>\n`);
+        ws.write('    <component>\n');
+        ws.write(`      <name>${metaComponent.name || path.basename(binaryPath)}</name>\n`);
+        ws.write(`      <version>${metaComponent.version || '1.0.0'}</version>\n`);
+        ws.write(`      <type>${metaComponent.type || 'application'}</type>\n`);
+        ws.write(`      <purl>${metaComponent.purl || `pkg:generic/${path.basename(binaryPath)}@1.0.0`}</purl>\n`);
+        if (metaComponent.hashes && metaComponent.hashes.length) {
+          ws.write('      <hashes>\n');
+          metaComponent.hashes.forEach((h: any) => { ws.write(`        <hash alg="${h.alg}">${h.content}</hash>\n`); });
+          ws.write('      </hashes>\n');
         }
-      };
-      const xml = builder.buildObject(xmlObj);
-      await fs.writeFile(finalOutputPath, xml);
+        ws.write('    </component>\n');
+        ws.write('  </metadata>\n');
+        if (componentCount) {
+          ws.write('  <components>\n');
+          components.forEach((c: any) => {
+            ws.write('    <component>\n');
+            ws.write(`      <name>${c.name || 'unknown'}</name>\n`);
+            ws.write(`      <version>${c.version || 'unknown'}</version>\n`);
+            ws.write(`      <type>${c.type || 'library'}</type>\n`);
+            if (c.purl) ws.write(`      <purl>${c.purl}</purl>\n`);
+            ws.write('    </component>\n');
+          });
+          ws.write('  </components>\n');
+        }
+        ws.write('</bom>');
+        await new Promise<void>(res => ws.end(res));
+      } else {
+        const xmlObj = {
+          bom: {
+            $: { xmlns: 'http://cyclonedx.org/schema/bom/1.4', version: '1' },
+            metadata: {
+              timestamp: new Date().toISOString(),
+              component: {
+                name: metaComponent.name || path.basename(binaryPath),
+                version: metaComponent.version || '1.0.0',
+                type: metaComponent.type || 'application',
+                purl: metaComponent.purl || `pkg:generic/${path.basename(binaryPath)}@1.0.0`,
+                hashes: metaComponent.hashes ? { hash: metaComponent.hashes.map((h: any) => ({ _: h.content, $: { alg: h.alg } })) } : undefined
+              }
+            },
+            components: components.length ? {
+              component: components.map((c: any) => ({
+                name: c.name || 'unknown',
+                version: c.version || 'unknown',
+                type: c.type || 'library',
+                purl: c.purl,
+                properties: undefined
+              }))
+            } : undefined
+          }
+        };
+        const xml = builder.buildObject(xmlObj);
+        await fs.writeFile(finalOutputPath, xml);
+      }
     } else if (format === 'cyclonedx-json') {
       // Write raw JSON structure produced internally (data object)
       await fs.writeFile(finalOutputPath, JSON.stringify((sbom as any).data, null, 2));

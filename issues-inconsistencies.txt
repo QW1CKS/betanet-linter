@@ -169,7 +169,7 @@ RESOLVED: BETANET_PQ_DATE_OVERRIDE env var added; check 10 respects override for
 Impact: Testability improved.
 Action: (Done) Consider CLI flag alias in future.
 
-[X] ISSUE-030 | CODE | Long method length (index.ts checkCompliance)
+[✓] ISSUE-030 | CODE | Long method length (index.ts checkCompliance)
 Could separate filtering logic & aggregation.
 Impact: Readability.
 Action: Extract smaller functions.
@@ -258,7 +258,7 @@ Resolution: Added conditional emission of dependencies/relationships in CycloneD
 Resolution (2025-08-11): Added dedupe step in XML serialization (index.ts generateSBOM) collapsing duplicates by name@version and merging hashes. Combined with existing generator-level dedupe to ensure consistency across formats.
 Impact: Leaner SBOM output; avoids inflated component counts.
 
-[X] ISSUE-046 | EDGE | Large number of components performance
+[✓] ISSUE-046 | EDGE | Large number of components performance
 Mapping and building XML without streaming.
 Impact: Memory spike.
 Action: Stream or chunk if components > threshold.
@@ -356,7 +356,7 @@ Implemented: SBOM feature tagging adds betanet.feature properties (transport-htx
 Impact: Traceability of spec-era capabilities now visible in SBOM.
 Action: Future: optionally tag individual dependency components when feature-specific libraries detected.
 
-[ ] ISSUE-059 | EDGE | Static-only approach misses dynamic 1.1 behaviors (Deferred)
+[✓] ISSUE-059 | EDGE | Static-only approach misses dynamic 1.1 behaviors (Deferred)
 Rotation scheduling, path diversity, and real PoW verification are runtime phenomena.
 Impact: False negatives for binaries using late-bound or generated strings.
 Action: (Future) Introduce optional dynamic probe mode (exec with --dry-scan env) or plugin architecture.

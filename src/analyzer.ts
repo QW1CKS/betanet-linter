@@ -127,12 +127,18 @@ export class BinaryAnalyzer {
         if (!res.failed) {
           let out = res.stdout.split('\n').filter((line: string) => line.length > 0);
           if (dynamicProbe) {
-            try {
-              const probe = await safeExec(this.binaryPath, ['--help']);
-              if (!probe.failed && probe.stdout) {
-                out = out.concat(probe.stdout.split('\n').slice(0, 500));
-              }
-            } catch {/* ignore */}
+            const probes: Array<[string, string[]]> = [
+              [this.binaryPath, ['--help']],
+              [this.binaryPath, ['--version']]
+            ];
+            for (const [cmd, args] of probes) {
+              try {
+                const probe = await safeExec(cmd, args, DEFAULT_TOOL_TIMEOUT_MS);
+                if (!probe.failed && probe.stdout) {
+                  out = out.concat(probe.stdout.split('\n').slice(0, 300));
+                }
+              } catch {/* ignore */}
+            }
           }
           return out;
         } else {
@@ -244,12 +250,16 @@ export class BinaryAnalyzer {
     }
     (this.diagnostics as any).unicodeEnriched = true;
     if (dynamicProbe) {
-      try {
-        const probe = await safeExec(this.binaryPath, ['--help']);
-        if (!probe.failed && probe.stdout) {
-          strings.push(...probe.stdout.split('\n').slice(0, 500));
-        }
-      } catch {/* ignore */}
+      const probes: Array<[string, string[]]> = [
+        [this.binaryPath, ['--help']],
+        [this.binaryPath, ['--version']]
+      ];
+      for (const [cmd, args] of probes) {
+        try {
+          const probe = await safeExec(cmd, args, DEFAULT_TOOL_TIMEOUT_MS);
+          if (!probe.failed && probe.stdout) strings.push(...probe.stdout.split('\n').slice(0, 300));
+        } catch {/* ignore */}
+      }
     }
     return strings;
   }
