@@ -213,10 +213,11 @@ Action: (Done) Add verbose stack logging later.
 
 SECURITY / TRUST
 ----------------
-[X] ISSUE-037 | SEC | Unvalidated dependency path strings in SBOM
+[✓] ISSUE-037 | SEC | Unvalidated dependency path strings in SBOM
 Names derived via path.basename without sanitization.
 Impact: Potential formatting injection in reports.
 Action: Sanitize component names (allow alphanum + -._ ).
+Resolution: Added sanitizeName utility (constants.ts) enforcing allowed charset, collapsing invalid chars, length cap 128, applied to binary root name, components, dependencies, SPDX/CycloneDX outputs. Added tests (sbom-sanitize.test.ts) asserting sanitized names (2025-08-11).
 
 [✓] ISSUE-038 | SEC | Large binary full read for fallback strings
 Reads entire file into memory; potential memory exhaustion.

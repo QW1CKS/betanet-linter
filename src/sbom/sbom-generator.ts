@@ -5,6 +5,7 @@ import { SBOM } from '../types';
 import { BinaryAnalyzer } from '../analyzer';
 import { safeExec } from '../safe-exec';
 import { evaluatePrivacyTokens } from '../heuristics';
+import { sanitizeName } from '../constants';
 
 export class SBOMGenerator {
   async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json' = 'cyclonedx', analyzer?: BinaryAnalyzer): Promise<SBOM> {
@@ -108,7 +109,7 @@ export class SBOMGenerator {
       const fileType = fileInfoRes.failed ? 'Unknown' : fileInfoRes.stdout;
 
       return {
-        name: path.basename(binaryPath),
+        name: sanitizeName(path.basename(binaryPath)),
         path: binaryPath,
         size: stat.size,
         modified: stat.mtime.toISOString(),
@@ -117,7 +118,7 @@ export class SBOMGenerator {
       };
   } catch (error: unknown) {
       return {
-        name: path.basename(binaryPath),
+        name: sanitizeName(path.basename(binaryPath)),
         path: binaryPath,
         size: 0,
         modified: new Date().toISOString(),
@@ -224,7 +225,7 @@ export class SBOMGenerator {
       for (const line of lddLines) {
         const libMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
         if (libMatch) {
-          const libName = libMatch[1];
+          const libName = sanitizeName(libMatch[1]);
           const libPath = libMatch[2];
           components.push({
             type: 'library',
@@ -256,7 +257,7 @@ export class SBOMGenerator {
         for (const line of lddLines) {
           const depMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
           if (depMatch) {
-            const libName = depMatch[1];
+            const libName = sanitizeName(depMatch[1]);
             const libPath = depMatch[2];
             dependencies.push({ ref: libName, path: libPath, type: 'dynamic' });
           }
@@ -359,11 +360,12 @@ export class SBOMGenerator {
           const pkgJson = await fs.readJSON(packagePath);
           if (pkgJson.dependencies) {
             Object.entries(pkgJson.dependencies).forEach(([name, version]) => {
+              const safe = sanitizeName(name);
               dependencies.push({
-                ref: name,
+                ref: safe,
                 version: version,
                 type: 'npm',
-                purl: `pkg:npm/${name}@${version}`
+                purl: `pkg:npm/${safe}@${version}`
               });
             });
           }
@@ -375,11 +377,12 @@ export class SBOMGenerator {
           lines.forEach(line => {
             const match = line.match(/^([a-zA-Z0-9\-_]+)==(.+)$/);
             if (match) {
+              const safe = sanitizeName(match[1]);
               dependencies.push({
-                ref: match[1],
+                ref: safe,
                 version: match[2],
                 type: 'pip',
-                purl: `pkg:pypi/${match[1]}@${match[2]}`
+                purl: `pkg:pypi/${safe}@${match[2]}`
               });
             }
           });
@@ -395,11 +398,12 @@ export class SBOMGenerator {
             depPairs.forEach(pair => {
               const [name, version] = pair.split('=').map(s => s.trim().replace(/"/g, ''));
               if (name && version) {
+                const safe = sanitizeName(name);
                 dependencies.push({
-                  ref: name,
+                  ref: safe,
                   version: version,
                   type: 'cargo',
-                  purl: `pkg:cargo/${name}@${version}`
+                  purl: `pkg:cargo/${safe}@${version}`
                 });
               }
             });
@@ -413,11 +417,12 @@ export class SBOMGenerator {
             requireMatches.forEach(match => {
               const parts = match.split(/\s+/);
               if (parts.length >= 3) {
+                const safe = sanitizeName(parts[1]);
                 dependencies.push({
-                  ref: parts[1],
+                  ref: safe,
                   version: parts[2],
                   type: 'go',
-                  purl: `pkg:golang/${parts[1]}@${parts[2]}`
+                  purl: `pkg:golang/${safe}@${parts[2]}`
                 });
               }
             });
@@ -441,9 +446,9 @@ export class SBOMGenerator {
         timestamp: new Date().toISOString(),
         component: {
           type: 'application',
-          name: binaryInfo.name,
+          name: sanitizeName(binaryInfo.name),
           version: '1.0.0',
-          purl: `pkg:generic/${binaryInfo.name}@1.0.0`,
+          purl: `pkg:generic/${sanitizeName(binaryInfo.name)}@1.0.0`,
           hashes: [
             {
               alg: 'SHA-256',
@@ -460,7 +465,7 @@ export class SBOMGenerator {
       },
       components: components.map(comp => ({
         type: comp.type || 'library',
-        name: comp.name,
+  name: sanitizeName(comp.name),
         version: comp.version || 'unknown',
         purl: comp.purl,
         hashes: comp.hash ? [{ alg: 'SHA-256', content: comp.hash }] : undefined,
@@ -488,14 +493,15 @@ export class SBOMGenerator {
     let spdxText = `SPDXVersion: SPDX-2.3\n`;
     spdxText += `DataLicense: CC0-1.0\n`;
     spdxText += `SPDXID: SPDXRef-DOCUMENT\n`;
-    spdxText += `DocumentName: ${binaryInfo.name}\n`;
-    spdxText += `DocumentNamespace: https://spdx.org/spdxdocs/${binaryInfo.name}-${this.generateUUID()}\n`;
+  const safeDocName = sanitizeName(binaryInfo.name);
+  spdxText += `DocumentName: ${safeDocName}\n`;
+  spdxText += `DocumentNamespace: https://spdx.org/spdxdocs/${safeDocName}-${this.generateUUID()}\n`;
     spdxText += `Created: ${new Date().toISOString()}\n`;
     spdxText += `Creator: Tool: betanet-compliance-linter\n\n`;
 
-    spdxText += `Package: ${binaryInfo.name}\n`;
+  spdxText += `Package: ${safeDocName}\n`;
     spdxText += `SPDXID: SPDXRef-PACKAGE\n`;
-    spdxText += `PackageName: ${binaryInfo.name}\n`;
+  spdxText += `PackageName: ${safeDocName}\n`;
     spdxText += `PackageVersion: 1.0.0\n`;
     spdxText += `PackageDownloadLocation: NOASSERTION\n`;
     spdxText += `FilesAnalyzed: false\n`;
@@ -514,7 +520,7 @@ export class SBOMGenerator {
     // Append detected component licenses if any
     components.forEach((c, idx) => {
       if (c.license) {
-        spdxText += `PackageName: ${c.name}\n`;
+  spdxText += `PackageName: ${sanitizeName(c.name)}\n`;
         spdxText += `SPDXID: SPDXRef-COMP-${idx}\n`;
         spdxText += `PackageVersion: ${c.version || 'unknown'}\n`;
         spdxText += `PackageLicenseDeclared: ${c.license}\n`;
@@ -525,20 +531,21 @@ export class SBOMGenerator {
 
   private generateSPDXJson(binaryInfo: any, components: any[], dependencies: any[]): any {
     const docId = `SPDXRef-DOCUMENT`;
-    const packageId = `SPDXRef-PACKAGE-${binaryInfo.name}`;
+    const safeBin = sanitizeName(binaryInfo.name);
+    const packageId = `SPDXRef-PACKAGE-${safeBin}`;
     return {
       SPDXID: docId,
       spdxVersion: 'SPDX-2.3',
       dataLicense: 'CC0-1.0',
-      name: binaryInfo.name,
-      documentNamespace: `https://spdx.org/spdxdocs/${binaryInfo.name}-${this.generateUUID()}`,
+      name: safeBin,
+      documentNamespace: `https://spdx.org/spdxdocs/${safeBin}-${this.generateUUID()}`,
       creationInfo: {
         created: new Date().toISOString(),
         creators: ['Tool: betanet-compliance-linter']
       },
       packages: [
         {
-          name: binaryInfo.name,
+          name: safeBin,
           SPDXID: packageId,
           versionInfo: '1.0.0',
           filesAnalyzed: false,
@@ -550,7 +557,7 @@ export class SBOMGenerator {
           betanetFeatures: binaryInfo.betanetFeatures && binaryInfo.betanetFeatures.length ? binaryInfo.betanetFeatures : undefined
         },
         ...components.map((c, idx) => ({
-          name: c.name,
+          name: sanitizeName(c.name),
           SPDXID: `SPDXRef-COMP-${idx}`,
           versionInfo: c.version || 'unknown',
           filesAnalyzed: false,

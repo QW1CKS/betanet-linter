@@ -57,3 +57,26 @@ export const FALLBACK_MAX_BYTES = (() => {
   if (!isNaN(parsed) && parsed > 0) return parsed;
   return 32 * 1024 * 1024; // 32 MiB cap by default
 })();
+
+// Component / package name sanitization (ISSUE-037)
+// Allow only a conservative safe subset: alphanumerics, dot, underscore, hyphen.
+// Replace any other character (including path separators, spaces, control chars) with '-'.
+// Collapse consecutive '-' and trim leading/trailing '-'. If result empty, fallback to 'component'.
+// Enforce a max length to avoid pathological extremely long names impacting downstream tools.
+export const COMPONENT_NAME_MAX_LENGTH = 128;
+export function sanitizeName(name: string): string {
+  if (!name) return 'component';
+  // Normalize to NFC to reduce multi-codepoint equivalence issues, ignore errors silently
+  try { name = name.normalize('NFC'); } catch { /* ignore */ }
+  // Replace disallowed chars
+  let cleaned = name.replace(/[^A-Za-z0-9._-]+/g, '-');
+  // Collapse dashes
+  cleaned = cleaned.replace(/-+/g, '-');
+  // Trim leading/trailing dashes/periods (avoid hidden or awkward names)
+  cleaned = cleaned.replace(/^[\-.]+/, '').replace(/[\-.]+$/, '');
+  if (!cleaned.length) cleaned = 'component';
+  if (cleaned.length > COMPONENT_NAME_MAX_LENGTH) {
+    cleaned = cleaned.slice(0, COMPONENT_NAME_MAX_LENGTH);
+  }
+  return cleaned;
+}
