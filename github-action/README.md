@@ -30,7 +30,7 @@ An example showing how to use the reusable workflow in your CI/CD pipeline.
 
 1. Copy `betanet-compliance.yml` to your repository's `.github/workflows/` directory
 2. The workflow will automatically run on pushes, pull requests, and daily schedules
-3. It will find and check all executable binaries in your repository
+3. It will find and check all executable binaries in your repository. Use `--format` to control SBOM format when `--sbom` is enabled (legacy `--sbom-format` is deprecated).
 
 ### Option 2: Using the reusable workflow
 
@@ -171,7 +171,7 @@ Make sure the binary has execute permissions (`chmod +x binary`).
 The workflow automatically installs the Betanet Compliance Linter. If installation fails, check network connectivity and npm registry access.
 
 ### SBOM Generation Fails
-SBOM generation requires additional system tools (`strings`, `ldd`, `file`). These are typically available on Ubuntu runners.
+SBOM generation requires additional system tools (`strings`, `ldd`, `file`). These are typically available on Ubuntu runners. If tools are missing the run is marked degraded; set `BETANET_FAIL_ON_DEGRADED=1` to enforce failure. Prefer `--format cyclonedx-json` for machine ingestion.
 
 ## Support
 

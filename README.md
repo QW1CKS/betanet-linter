@@ -46,6 +46,18 @@ npm link
 
 ## Usage
 
+### Quickstart (Fast Path)
+
+```bash
+npm install -g betanet-compliance-linter
+betanet-lint --version   # verify installation
+betanet-lint check ./your-binary --sbom --format cyclonedx-json --output json > compliance.json
+```
+
+Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
+
+`--format` is now the canonical flag for SBOM format selection. The older `--sbom-format` still works but is deprecated and will emit a warning; it will be removed in a future minor release.
+
 ### Basic Compliance Check
 
 ```bash
@@ -55,7 +67,7 @@ betanet-lint check /path/to/your/binary
 ### With SBOM Generation
 
 ```bash
-betanet-lint check /path/to/binary --sbom
+betanet-lint check /path/to/binary --sbom --format cyclonedx
 ```
 
 ### Different Output Formats
@@ -107,7 +119,12 @@ betanet-lint sbom /path/to/binary --format spdx-json
 betanet-lint sbom /path/to/binary --output /custom/path/sbom.xml
 ```
 
-### Verbose Output
+### Version & Verbose Output
+```bash
+betanet-lint --version
+betanet-lint version    # alternative subcommand
+```
+
 ### Performance & Parallelism
 
 Checks are evaluated in parallel from a cached single baseline analysis of the binary. Control concurrency & resilience:
@@ -234,7 +251,7 @@ Critical Failures: 0
 
 ## GitHub Action Integration
 
-The tool includes a ready-to-use GitHub Action template for automated compliance checking:
+The tool includes a ready-to-use GitHub Action template for automated compliance checking (see `github-action/`).
 
 ```yaml
 name: Betanet Compliance Check
@@ -264,7 +281,7 @@ jobs:
         
     - name: Run Compliance Checks
       run: |
-        betanet-lint check ./target/release/betanet-node --sbom --output json
+  betanet-lint check ./target/release/betanet-node --sbom --format cyclonedx-json --output json
 ```
 
 ## System Requirements
