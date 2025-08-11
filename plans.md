@@ -29,7 +29,7 @@ Implemented:
 
 Deferred (future enhancement ideas): scoring weights, confidence metrics per capability.
 
-## Plan 3 (IN PROGRESS): Architecture Consolidation
+## Plan 3 (DONE): Architecture Consolidation
 Completed:
 - Removed duplicate compliance engine (compliance.ts) (ISSUE-001, 013, 014)
 - Removed legacy sbom.ts (ISSUE-020 duplicate path eliminated)
@@ -39,7 +39,6 @@ Completed:
 - Added 11th Privacy Hop Enforcement check (heuristic, 1.1) extending coverage beyond original 10
 
 Pending / Deferred:
-- Migrate basic inline SBOM in `index.ts` to advanced generator (moved to Plan 4)
 - Extract helper utilities from `index.ts` (ISSUE-030)
 - Externalize magic strings/dates (ISSUE-028, 029)
 
@@ -47,14 +46,13 @@ Outcome: Severities & names normalized via registry; no second engine remains.
 
 ## Plan 4: SBOM Quality & Integrity
 Goals:
-- Consolidate on `sbom/sbom-generator.ts` (retire inline SBOM in index.ts)
+- (Done) Delegate SBOM generation to `sbom/sbom-generator.ts`
 - Produce valid SPDX 2.3 (JSON or tag-value with completeness) & CycloneDX (JSON/XML) (ISSUE-017)
-- Ensure hashing for binary + components (ISSUE-018, 039)
+- Ensure hashing for components (binary hash already present) (ISSUE-018, 039)
 - License detection heuristics (ISSUE-019)
 - Sanitize, dedupe & version quality improvements (ISSUE-037, 045, 021)
 
 Deliverables:
-- Unified SBOM service module & adapter in checker
 - Hash + license utility functions
 - Sanitization & dedupe helpers
 - Schema validation tests (SPDX, CycloneDX)
@@ -99,5 +97,5 @@ Goals:
 
 ---
 ### Recommended Next Step
-Finalize Plan 3 by swapping SBOM path or explicitly delegating to advanced generator; then initiate Plan 4 tasks (valid formats, hashing, licensing).
+Advance Plan 4 tasks: add component hashing & license token scan; introduce schema validation tests.
 
