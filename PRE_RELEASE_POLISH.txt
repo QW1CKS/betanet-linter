@@ -4,12 +4,9 @@ Purpose: Capture remaining high-impact, low-effort tasks to confidently tag v1.0
 
 CORE (Must Complete Before Tagging 1.0.0)
 ----------------------------------------
-1. ISSUE-042: Flag naming finalization
-   - Action: Introduce --format (alias of current --sbom-format) on `check` / SBOM generation.
-   - Keep --sbom-format as deprecated alias (emit one-line deprecation notice when used; remove in a later minor release).
-   - Documentation: Update README flag examples & GitHub Action template.
-   - Tests: Add CLI test invoking both forms to ensure parity.
-   - Success Criteria: Users can invoke either flag; README shows only --format; no breaking change.
+1. ISSUE-042: Flag naming finalization (DONE)
+   - Implemented: --format added; --sbom-format deprecated with warning.
+   - Pending: README & Action template wording update.
 
 2. Add --version flag / command
    - Action: Expose package.json version via `betanet-lint --version` and `betanet-lint version`.

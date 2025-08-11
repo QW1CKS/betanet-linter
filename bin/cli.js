@@ -2,7 +2,13 @@
 
 const { program } = require('commander');
 const path = require('path');
-const { BetanetComplianceChecker } = require('../dist/index');
+// Support running from source in development while using dist in packaged form
+let BetanetComplianceChecker;
+try {
+  ({ BetanetComplianceChecker } = require('../dist/index'));
+} catch (e) {
+  ({ BetanetComplianceChecker } = require('../src/index'));
+}
 
 program
   .name('betanet-lint')
@@ -24,7 +30,8 @@ program
   .option('--check-timeout <ms>', 'Per-check timeout in milliseconds', v => parseInt(v,10))
   .option('--dynamic-probe', 'Attempt lightweight runtime probe (e.g. --help) to enrich heuristics')
   .option('-v, --verbose', 'Verbose output')
-  .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
+  .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
+  .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
   .option('-c, --checks <checks>', 'Comma-separated list of check IDs to include')
   .option('-x, --exclude <checks>', 'Comma-separated list of check IDs to exclude')
   .action(async (binaryPath, options) => {
@@ -53,10 +60,16 @@ program
       });
       
       if (options.sbom) {
-        const sbomPath = await checker.generateSBOM(binaryPath, options.sbomFormat);
+        // Support deprecated --sbom-format; prefer --format
+        const deprecatedUsed = options.sbomFormat && !options.format;
+        const sbomFormat = options.format || options.sbomFormat || 'cyclonedx';
+        if (deprecatedUsed) {
+          console.warn('[DEPRECATION] --sbom-format is deprecated and will be removed in a future release. Use --format instead.');
+        }
+        const sbomPath = await checker.generateSBOM(binaryPath, sbomFormat);
         console.log(`📋 SBOM generated: ${sbomPath}`);
         if (options.validateSbom || options.strictSbom) {
-          await require('./validate-sbom')(binaryPath, sbomPath, options.sbomFormat, options.strictSbom);
+          await require('./validate-sbom')(binaryPath, sbomPath, sbomFormat, options.strictSbom);
         }
       }
       

@@ -240,10 +240,11 @@ RESOLVED: severityMin option / --severity-min flag implemented; scoring filters 
 Impact: Customization enabled.
 Action: (Done)
 
-[X] ISSUE-042 | UX | SBOM generation flag naming
+[✓] ISSUE-042 | UX | SBOM generation flag naming
 --sbom + --sbom-format vs separate 'sbom' command; redundancy.
 Impact: User confusion.
 Action: Keep both but unify naming (--sbom-format -> --format for check).
+Resolution: Added --format flag with deprecated --sbom-format alias (deprecation warning) on `check` command; updated CLI to prefer --format (2025-08-11).
 
 [✓] ISSUE-043 | UX | Report lacks tool versions & analysis diagnostics
 No section showing which external tools succeeded / failed.

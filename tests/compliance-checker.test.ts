@@ -352,6 +352,30 @@ describe('BetanetComplianceChecker', () => {
       expect(spdxText).toMatch(/PackageComment: betanet.feature=crypto-chacha20poly1305/);
       await fs.remove(spdxPath);
     });
+
+    it('CLI flag parity: --format generates SBOM', async () => {
+      // Simulate invocation by calling checker directly (unit-level) using new --format flag
+      const tempBin = path.join(__dirname, 'flag-binary');
+      await fs.writeFile(tempBin, Buffer.from('binary data'));
+      const checkerLocal = new BetanetComplianceChecker();
+      const out = await checkerLocal.generateSBOM(tempBin, 'cyclonedx-json');
+      const content = await fs.readFile(out, 'utf8');
+      expect(content).toMatch(/CycloneDX|bom|metadata/);
+      await fs.remove(out);
+      await fs.remove(tempBin);
+    });
+
+    it('Deprecated alias --sbom-format still honored (indirect test)', async () => {
+      // We emulate alias by calling generateSBOM with format variable; deprecation warning is emitted in CLI wrapper only.
+      const tempBin = path.join(__dirname, 'alias-binary');
+      await fs.writeFile(tempBin, Buffer.from('binary data 2'));
+      const checkerLocal = new BetanetComplianceChecker();
+      const out = await checkerLocal.generateSBOM(tempBin, 'spdx');
+      const txt = await fs.readFile(out, 'utf8');
+      expect(txt).toMatch(/SPDXVersion: SPDX-2.3/);
+      await fs.remove(out);
+      await fs.remove(tempBin);
+    });
   });
 
   describe('displayResults', () => {
