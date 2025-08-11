@@ -213,6 +213,8 @@ export class BinaryAnalyzer {
   async checkDHTSupport(): Promise<{
     hasDHT: boolean;
     deterministicBootstrap: boolean;
+  rendezvousRotation?: boolean;
+  beaconSetIndicator?: boolean;
     seedManagement: boolean;
   }> {
   const analysis = await this.analyze();
@@ -232,6 +234,9 @@ export class BinaryAnalyzer {
     hasCashu: boolean;
     hasLightning: boolean;
     hasFederation: boolean;
+  hasVoucherFormat?: boolean;
+  hasFROST?: boolean;
+  hasPoW22?: boolean;
   }> {
   const analysis = await this.analyze();
   return detectPayment({ strings: analysis.strings, symbols: analysis.symbols });

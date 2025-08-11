@@ -1,6 +1,6 @@
 # Betanet Compliance Linter
 
-A comprehensive CLI tool for checking Betanet specification compliance in binary implementations. This tool automatically validates all 10 mandatory requirements from the Betanet 1.0 specification (§11) and generates detailed compliance reports.
+A comprehensive CLI tool for checking Betanet specification compliance in binary implementations. It fully targets the Betanet 1.0 specification (§11) and provides partial heuristic coverage of newly published Betanet 1.1 changes (transport version bump, rendezvous DHT, optional WebRTC transport). It generates detailed compliance reports.
 
 ## Features
 
@@ -94,18 +94,21 @@ betanet-lint check /path/to/binary --verbose
 
 ## Compliance Checks
 
-The tool validates all 10 mandatory requirements from Betanet specification §11:
+The tool validates 10 core requirements from Betanet specification §11 (1.0 baseline). For Betanet 1.1 it additionally accepts updated transport endpoint versions (`/betanet/htx/1.1.0`, `/betanet/htxquic/1.1.0`) while still recognizing legacy 1.0.0 paths and will optionally note presence of `/betanet/webrtc/1.0.0`.
 
 1. **HTX over TCP-443 & QUIC-443** - Implements HTX over TCP-443 and QUIC-443 with TLS 1.3 mimic + ECH
 2. **Rotating Access Tickets** - Uses rotating access tickets (§5.2)
 3. **Inner Frame Encryption** - Encrypts inner frames with ChaCha20-Poly1305, 24-bit length, 96-bit nonce
 4. **SCION Path Management** - Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header
-5. **Transport Endpoints** - Offers `/betanet/htx/1.0.0` and `/betanet/htxquic/1.0.0` transports
-6. **DHT Seed Bootstrap** - Implements deterministic DHT seed bootstrap
+5. **Transport Endpoints** - Offers `/betanet/htx/1.1.0` & `/betanet/htxquic/1.1.0` (1.0.0 legacy accepted)
+6. **DHT Seed Bootstrap** - (1.0) deterministic bootstrap heuristic (1.1 rendezvous rotation patterns partial)
 7. **Alias Ledger Verification** - Verifies alias ledger with 2-of-3 chain consensus
 8. **Payment System** - Accepts Cashu vouchers from federated mints & supports Lightning settlement
 9. **Build Provenance** - Builds reproducibly and publishes SLSA 3 provenance
 10. **Post-Quantum Cipher Suites** - Presents X25519-Kyber768 suites once the mandatory date is reached (2027-01-01)
+
+### Heuristic & Partial Coverage Disclaimer
+Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., TLS fingerprint calibration, path diversity maintenance, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Advanced 1.1 checks (outer TLS calibration, rendezvous beacon rotation, full access ticket protocol validation) are roadmap items.
 
 ## Output Examples
 
@@ -263,6 +266,7 @@ For issues, questions, or contributions, please open an issue on the GitHub repo
 
 ## Betanet Specification
 
-This tool implements compliance checking based on the [Betanet 1.0 Specification](https://ravendevteam.org/betanet/betanet_1.0_spec.txt).
+- Primary baseline: [Betanet 1.0 Specification](https://ravendevteam.org/betanet/betanet_1.0_spec.txt)
+- Partial awareness: Betanet 1.1 transport & rendezvous updates (document updated 2025-08)
 
-For the most up-to-date specification and requirements, please refer to the official Betanet documentation.
+For the most up-to-date specification and requirements, please refer to the official Betanet documentation. Contributions to extend 1.1 coverage are welcome (see DISCLAIMER above).

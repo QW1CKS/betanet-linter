@@ -46,6 +46,8 @@ export declare class BinaryAnalyzer {
     checkDHTSupport(): Promise<{
         hasDHT: boolean;
         deterministicBootstrap: boolean;
+        rendezvousRotation?: boolean;
+        beaconSetIndicator?: boolean;
         seedManagement: boolean;
     }>;
     checkLedgerSupport(): Promise<{
@@ -57,6 +59,9 @@ export declare class BinaryAnalyzer {
         hasCashu: boolean;
         hasLightning: boolean;
         hasFederation: boolean;
+        hasVoucherFormat?: boolean;
+        hasFROST?: boolean;
+        hasPoW22?: boolean;
     }>;
     checkBuildProvenance(): Promise<{
         hasSLSA: boolean;

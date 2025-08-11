@@ -1,4 +1,5 @@
 import { BinaryAnalyzer } from './analyzer';
+import { TRANSPORT_ENDPOINT_VERSIONS, OPTIONAL_TRANSPORTS } from './constants';
 import { ComplianceCheck, ComplianceResult, CheckOptions, SBOMComponent } from './types';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -198,24 +199,26 @@ export class BetanetComplianceChecker {
   }
 
   private async checkTransportEndpoints(): Promise<ComplianceCheck> {
-    const analysis = await this.analyzer.analyze();
-    const strings = analysis.strings.join(' ');
+  const analysis = await this.analyzer.analyze();
+  const strings = analysis.strings.join(' ');
 
-    const hasHTXEndpoint = strings.includes('/betanet/htx/1.0.0');
-    const hasQUICEndpoint = strings.includes('/betanet/htxquic/1.0.0');
+  // Accept either 1.1.0 (preferred) or legacy 1.0.0 endpoints
+  const hasHTXEndpoint = TRANSPORT_ENDPOINT_VERSIONS.some(v => strings.includes(`/betanet/htx/${v}`));
+  const hasQUICEndpoint = TRANSPORT_ENDPOINT_VERSIONS.some(v => strings.includes(`/betanet/htxquic/${v}`));
+  const optionalPresent = OPTIONAL_TRANSPORTS.filter(t => strings.includes(t.path));
 
     const passed = hasHTXEndpoint && hasQUICEndpoint;
 
     return {
       id: 5,
       name: 'Transport Endpoints',
-      description: 'Offers /betanet/htx/1.0.0 and /betanet/htxquic/1.0.0 transports',
+      description: 'Offers Betanet HTX & HTX-QUIC transports (v1.1.0 preferred, 1.0.0 legacy supported)',
       passed,
       details: passed
-        ? '✅ Found both HTX and QUIC transport endpoints'
+        ? `✅ Found HTX & QUIC transport endpoints${optionalPresent.length ? ' + optional: ' + optionalPresent.map(o => o.kind).join(', ') : ''}`
         : `❌ Missing: ${[
-            !hasHTXEndpoint && '/betanet/htx/1.0.0',
-            !hasQUICEndpoint && '/betanet/htxquic/1.0.0'
+            !hasHTXEndpoint && 'HTX endpoint (v1.1.0 or 1.0.0)',
+            !hasQUICEndpoint && 'HTX-QUIC endpoint (v1.1.0 or 1.0.0)'
           ].filter(Boolean).join(', ')}`,
       severity: 'major'
     };
@@ -224,18 +227,19 @@ export class BetanetComplianceChecker {
   private async checkDHTBootstrap(): Promise<ComplianceCheck> {
     const dhtSupport = await this.analyzer.checkDHTSupport();
     
-    const passed = dhtSupport.hasDHT && dhtSupport.deterministicBootstrap;
+  const passed = !!(dhtSupport.hasDHT && (dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation));
 
     return {
       id: 6,
       name: 'DHT Seed Bootstrap',
-      description: 'Implements deterministic DHT seed bootstrap',
+      description: 'Implements deterministic (1.0) or rotating rendezvous (1.1) DHT seed bootstrap',
       passed,
       details: passed
-        ? '✅ Found DHT with deterministic bootstrap'
+        ? `✅ Found DHT with ${dhtSupport.rendezvousRotation ? 'rotating rendezvous' : 'deterministic'} bootstrap` +
+          (dhtSupport.beaconSetIndicator ? ' (BeaconSet evidence)' : '')
         : `❌ Missing: ${[
             !dhtSupport.hasDHT && 'DHT support',
-            !dhtSupport.deterministicBootstrap && 'deterministic bootstrap'
+            !(dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation) && 'deterministic or rendezvous bootstrap'
           ].filter(Boolean).join(', ')}`,
       severity: 'major'
     };
@@ -270,10 +274,13 @@ export class BetanetComplianceChecker {
     return {
       id: 8,
       name: 'Payment System',
-      description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement',
+      description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)',
       passed,
       details: passed
-        ? '✅ Found Cashu, Lightning, and federation support'
+        ? '✅ Found Cashu, Lightning, and federation support' +
+          (paymentSupport.hasVoucherFormat ? ' + voucher format' : '') +
+          (paymentSupport.hasFROST ? ' + FROST group' : '') +
+          (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '')
         : `❌ Missing: ${[
             !paymentSupport.hasCashu && 'Cashu support',
             !paymentSupport.hasLightning && 'Lightning support',

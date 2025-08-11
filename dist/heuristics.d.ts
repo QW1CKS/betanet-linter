@@ -26,6 +26,8 @@ export declare function detectSCION(src: TextSources): {
 export declare function detectDHT(src: TextSources): {
     hasDHT: boolean;
     deterministicBootstrap: boolean;
+    rendezvousRotation: boolean;
+    beaconSetIndicator: boolean;
     seedManagement: boolean;
 };
 export declare function detectLedger(src: TextSources): {
@@ -37,6 +39,9 @@ export declare function detectPayment(src: TextSources): {
     hasCashu: boolean;
     hasLightning: boolean;
     hasFederation: boolean;
+    hasVoucherFormat: boolean;
+    hasFROST: boolean;
+    hasPoW22: boolean;
 };
 export declare function detectBuildProvenance(src: TextSources): {
     hasSLSA: boolean;

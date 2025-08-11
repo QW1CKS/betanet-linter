@@ -50,10 +50,12 @@ function detectSCION(src) {
 }
 function detectDHT(src) {
     const blob = toJoinedLower(src.strings).concat(' ', toJoinedLower(src.symbols));
-    const hasDHT = /\bdht\b/.test(blob) || /(kademlia|kad table)/.test(blob);
-    const deterministicBootstrap = hasDHT && /(deterministic.*bootstrap|stable.*seed)/.test(blob);
+    const hasDHT = /\bdht\b/.test(blob) || /(kademlia|kad table|rendezvous dht)/.test(blob);
+    const deterministicBootstrap = hasDHT && /(deterministic.*bootstrap|stable.*seed)/.test(blob); // legacy 1.0 heuristic
+    const rendezvousRotation = /(rendezvous|bn-seed|beaconset|rotating rendezvous)/.test(blob);
+    const beaconSetIndicator = /beaconset\(/.test(blob) || /bn-seed/.test(blob);
     const seedManagement = /(seed.*(rotate|management)|bootstrap.*seed)/.test(blob);
-    return { hasDHT, deterministicBootstrap, seedManagement };
+    return { hasDHT, deterministicBootstrap, rendezvousRotation, beaconSetIndicator, seedManagement };
 }
 function detectLedger(src) {
     const blob = toJoinedLower(src.strings).concat(' ', toJoinedLower(src.symbols));
@@ -68,7 +70,10 @@ function detectPayment(src) {
     // Avoid lone 'ln'; require explicit lightning tokens
     const hasLightning = /(lightning|lnurl|bolt\d|lnd)/.test(blob);
     const hasFederation = /(federation|federated|federation-mode)/.test(blob);
-    return { hasCashu, hasLightning, hasFederation };
+    const hasVoucherFormat = /(keysetid32|voucher\s*\(128|aggregatedsig64|bn1=)/.test(blob);
+    const hasFROST = /frost-?ed25519/.test(blob) || /frost group/.test(blob);
+    const hasPoW22 = /(22-?bit|pow.*22)/.test(blob);
+    return { hasCashu, hasLightning, hasFederation, hasVoucherFormat, hasFROST, hasPoW22 };
 }
 function detectBuildProvenance(src) {
     const blob = toJoinedLower(src.strings).concat(' ', toJoinedLower(src.symbols));

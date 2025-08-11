@@ -5,6 +5,8 @@ betanet-linter/
 ├── src/
 │   ├── index.ts              # Main compliance checker class
 │   ├── analyzer.ts           # Binary analysis functionality
+│   ├── heuristics.ts         # Heuristic pattern detection (Plan 2)
+│   ├── constants.ts          # Central spec/version constants (Betanet 1.0 + partial 1.1)
 │   └── types.ts              # TypeScript type definitions
 ├── bin/
 │   └── cli.js                # Command-line interface
@@ -24,10 +26,10 @@ betanet-linter/
 ### 1. Core Classes
 
 - **BetanetComplianceChecker** (`src/index.ts`)
-  - Main class that orchestrates compliance checking
-  - Implements all 10 compliance checks from Betanet spec §11
-  - Handles result generation and display
-  - Manages SBOM generation
+   - Main class orchestrating compliance checking (1.0 baseline; partial 1.1 support for updated transport versions & optional WebRTC)
+   - Implements all 10 compliance checks from Betanet spec §11
+   - Handles result generation and display
+   - Manages SBOM generation
 
 - **BinaryAnalyzer** (`src/analyzer.ts`)
   - Performs deep binary analysis
@@ -51,8 +53,8 @@ Each of the 10 checks is implemented as a separate method in `BetanetComplianceC
 2. **Access Tickets** - Detects ticket rotation mechanisms
 3. **Frame Encryption** - Validates ChaCha20-Poly1305 support
 4. **SCION Paths** - Checks for SCION support or IP-transition headers
-5. **Transport Endpoints** - Looks for specific Betanet endpoint paths
-6. **DHT Bootstrap** - Validates deterministic DHT implementation
+5. **Transport Endpoints** - Detects `/betanet/htx/{1.1.0|1.0.0}`, `/betanet/htxquic/{1.1.0|1.0.0}`, optional `/betanet/webrtc/1.0.0`
+6. **DHT Bootstrap** - (1.0 heuristic) deterministic bootstrap; rendezvous rotation (1.1) partial
 7. **Alias Ledger** - Checks for consensus-based ledger verification
 8. **Payment System** - Detects Cashu and Lightning support
 9. **Build Provenance** - Validates SLSA and reproducible build support
@@ -136,9 +138,10 @@ The architecture is designed to be easily extensible:
 - **New Output Formats** - Add display methods
 - **New SBOM Formats** - Extend SBOM generation methods
 
-## Performance Considerations
+## Performance & Diagnostics
 
-- **Parallel Analysis** - Multiple analysis operations run concurrently
-- **Caching** - Results cached where appropriate
-- **Efficient String Processing** - Optimized pattern matching
-- **Memory Management** - Proper cleanup of temporary files and resources
+- **Memoized Analysis** - Single extraction pass cached to avoid redundant external tool invocations
+- **Parallel Extraction** - Core extraction tasks (strings, symbols, deps, file metadata) run concurrently
+- **Tool Diagnostics** - Availability & timing of key external tools captured once
+- **Efficient String Processing** - Regex-based heuristics with boundary checks to reduce false positives
+- **Memory Management** - Fallback string extraction avoids excessive allocations
