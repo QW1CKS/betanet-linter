@@ -4,6 +4,7 @@
 
 import { BinaryAnalyzer } from './analyzer';
 import { TRANSPORT_ENDPOINT_VERSIONS, OPTIONAL_TRANSPORTS, POST_QUANTUM_MANDATORY_DATE } from './constants';
+import { evaluatePrivacyTokens } from './heuristics';
 import { ComplianceCheck } from './types';
 
 export interface CheckDefinitionMeta {
@@ -108,16 +109,17 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     introducedIn: '1.0',
     evaluate: async (analyzer) => {
       const scionSupport = await analyzer.checkSCIONSupport();
-      const passed = scionSupport.hasSCION && (scionSupport.pathManagement || scionSupport.hasIPTransition);
+      const passed = scionSupport.hasSCION && (scionSupport.pathManagement || scionSupport.hasIPTransition) && scionSupport.pathDiversityCount >= 2;
       return {
         id: 4,
         name: 'SCION Path Management',
         description: 'Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header',
         passed,
-        details: passed ? '✅ Found SCION support with path management or IP-transition' : `❌ Missing: ${missingList([
+        details: passed ? `✅ SCION support with path management/IP-transition & path diversity=${scionSupport.pathDiversityCount}` : `❌ Missing: ${missingList([
           !scionSupport.hasSCION && 'SCION support',
           !scionSupport.pathManagement && 'path management',
-          !scionSupport.hasIPTransition && 'IP-transition header'
+          !scionSupport.hasIPTransition && 'IP-transition header',
+          scionSupport.pathDiversityCount < 2 && '≥2 path diversity markers'
         ])}`,
         severity: 'critical'
       };
@@ -166,8 +168,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         name: 'DHT Seed Bootstrap',
         description: 'Implements deterministic (1.0) or rotating rendezvous (1.1) DHT seed bootstrap',
         passed,
-        details: passed ? `✅ Found DHT with ${dhtSupport.rendezvousRotation ? 'rotating rendezvous' : 'deterministic'} bootstrap` +
-          (dhtSupport.beaconSetIndicator ? ' (BeaconSet evidence)' : '') :
+        details: passed ? `✅ DHT ${dhtSupport.rendezvousRotation ? `rotating rendezvous (hits=${dhtSupport.rotationHits})` : 'deterministic'} bootstrap` +
+          (dhtSupport.beaconSetIndicator ? ' + BeaconSet' : '') :
           `❌ Missing: ${missingList([
             !dhtSupport.hasDHT && 'DHT support',
             !(dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation) && 'deterministic or rendezvous bootstrap'
@@ -262,10 +264,12 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     mandatoryIn: POST_QUANTUM_MANDATORY_DATE,
     evaluate: async (analyzer, now) => {
       const cryptoCaps = await analyzer.checkCryptographicCapabilities();
-      const mandatoryDate = new Date(POST_QUANTUM_MANDATORY_DATE);
+      // Allow override via env var for testing future enforcement earlier
+      const override = process.env.BETANET_PQ_DATE_OVERRIDE;
+      const mandatoryDate = new Date(override || POST_QUANTUM_MANDATORY_DATE);
       const isPastMandatoryDate = now >= mandatoryDate;
       let passed = true;
-      let details = '✅ Post-quantum requirements not yet mandatory';
+      let details = `✅ Post-quantum requirements not yet mandatory (enforce after ${mandatoryDate.toISOString().slice(0,10)})`;
       let severity: 'minor' | 'critical' = 'minor';
       if (isPastMandatoryDate) {
         severity = 'critical';
@@ -273,7 +277,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         details = passed ? '✅ Found X25519-Kyber768 hybrid cipher suite' : `❌ Missing: ${missingList([
           !cryptoCaps.hasX25519 && 'X25519',
           !cryptoCaps.hasKyber768 && 'Kyber768'
-        ])} (mandatory after ${POST_QUANTUM_MANDATORY_DATE})`;
+        ])} (mandatory after ${mandatoryDate.toISOString().slice(0,10)})`;
       }
       return {
         id: 10,
@@ -294,30 +298,15 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
       const analysis = await analyzer.analyze();
-      const lower = analysis.strings.map((s: string) => s.toLowerCase());
-      const joined = lower.join(' ');
-      // Token groups
-      const mixTokens = ['nym', 'mix', 'mixnode', 'hop', 'hopset'];
-      const beaconTokens = ['beaconset', 'epoch', 'drand'];
-      const diversityTokens = ['diversity', 'distinct', 'as-group', 'asgroup'];
-
-      const mixHits = mixTokens.filter(t => joined.includes(t));
-      const beaconHits = beaconTokens.filter(t => joined.includes(t));
-      const diversityHits = diversityTokens.filter(t => joined.includes(t));
-
-      // Heuristic pass rule: at least 2 mix-related + 1 beacon/epoch + 1 diversity indicator
-      const passed = mixHits.length >= 2 && beaconHits.length >= 1 && diversityHits.length >= 1;
+      const evaluation = evaluatePrivacyTokens(analysis.strings);
+      const passed = evaluation.passed;
       return {
         id: 11,
         name: 'Privacy Hop Enforcement',
         description: 'Enforces ≥2 (balanced) or ≥3 (strict) mixnet hops with BeaconSet-based diversity',
         passed,
-        details: passed ? `✅ Found mixnet indicators: mix(${mixHits.join('/')}) beacon(${beaconHits.join('/')}) diversity(${diversityHits.join('/')})` :
-          `❌ Missing: ${missingList([
-            mixHits.length < 2 && '≥2 mix-related tokens',
-            beaconHits.length < 1 && 'BeaconSet/epoch token',
-            diversityHits.length < 1 && 'diversity indicator'
-          ])}`,
+        details: passed ? `✅ Privacy weighting ok (mix=${evaluation.mixScore} beacon=${evaluation.beaconScore} diversity=${evaluation.diversityScore} total=${evaluation.totalScore})` :
+          `❌ Privacy indicators insufficient (mix=${evaluation.mixScore} beacon=${evaluation.beaconScore} diversity=${evaluation.diversityScore})`,
         severity: 'major'
       };
     }

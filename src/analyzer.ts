@@ -228,6 +228,7 @@ export class BinaryAnalyzer {
     hasHTX: boolean;
     hasECH: boolean;
     port443: boolean;
+  hasWebRTC: boolean;
   }> {
   const analysis = await this.analyze();
   return detectNetwork({ strings: analysis.strings, symbols: analysis.symbols });
@@ -250,6 +251,7 @@ export class BinaryAnalyzer {
     hasSCION: boolean;
     pathManagement: boolean;
     hasIPTransition: boolean;
+  pathDiversityCount: number;
   }> {
   const analysis = await this.analyze();
   return detectSCION({ strings: analysis.strings, symbols: analysis.symbols });
@@ -261,6 +263,7 @@ export class BinaryAnalyzer {
   rendezvousRotation?: boolean;
   beaconSetIndicator?: boolean;
     seedManagement: boolean;
+  rotationHits?: number;
   }> {
   const analysis = await this.analyze();
   return detectDHT({ strings: analysis.strings, symbols: analysis.symbols });

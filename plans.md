@@ -107,7 +107,7 @@ Goals:
 - Structured JSON log output option
 
 ---
-## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (NEXT)
+## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (IN PROGRESS)
 Goals:
 - Optional WebRTC transport signal surfaced (informational) (ISSUE-051)
 - Stronger Rendezvous / BeaconSet rotation heuristic (epoch diversity + rotation verbs) (ISSUE-052)
@@ -116,15 +116,20 @@ Goals:
 - PQ date override flag/env for pre-mandatory testing (ISSUE-055)
 
 Deliverables:
-- Updated check 5 & 6 details including WebRTC & rotation evidence
-- Adjusted check 11 algorithm with improved token weighting
-- New optional config: BETANET_PQ_DATE_OVERRIDE
-- Additional negative tests preventing false positives from generic words
+- (DONE) Updated check 5 details to surface optional WebRTC (transport list)
+- (DONE) Updated check 6 with rotationHits & BeaconSet evidence in details
+- (DONE) Adjusted check 11 algorithm with weighted token scoring
+- (DONE) New optional config: BETANET_PQ_DATE_OVERRIDE
+- (PARTIAL) Additional negative tests (existing suite covers core; may add more generic-word suppression later)
 
 Success Criteria:
-- All new heuristic tests pass (extended suite > current 24)
-- No regression in existing tests (backward compatibility)
-- Diagnostics still stable (degradation unaffected)
+- All new heuristic tests pass (current suite: 24 tests passing including new heuristics)
+- No regression in existing tests (verified)
+- Diagnostics stable (unchanged logic)
+
+Next Increment:
+- Add explicit tests for path diversity threshold & WebRTC optional endpoint surfacing.
+- Add negative test for incidental 'rotate' without DHT context (already partially covered).
 
 ### Recommended Next Step
 Implement Plan 10 heuristics (WebRTC, rotation, path diversity, privacy refinement, PQ override) with accompanying tests.

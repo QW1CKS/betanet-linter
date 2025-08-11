@@ -1,6 +1,6 @@
 # Betanet Compliance Linter
 
-A comprehensive CLI tool for checking Betanet specification compliance in binary implementations. It fully targets the Betanet 1.0 specification (§11) and provides partial heuristic coverage of newly published Betanet 1.1 changes (transport version bump, rendezvous DHT, optional WebRTC transport). It generates detailed compliance reports.
+A comprehensive CLI tool for checking Betanet specification compliance in binary implementations. It fully targets the Betanet 1.0 specification (§11) and provides enhanced heuristic coverage of emerging Betanet 1.1 changes (transport version bump, rendezvous rotation scoring, path diversity, optional WebRTC transport, privacy hop weighting). It generates detailed compliance reports.
 
 ## Features
 
@@ -108,16 +108,16 @@ Architecture note: All checks are defined declaratively in a central registry (`
 2. **Rotating Access Tickets** - Uses rotating access tickets (§5.2)
 3. **Inner Frame Encryption** - Encrypts inner frames with ChaCha20-Poly1305, 24-bit length, 96-bit nonce
 4. **SCION Path Management** - Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header
-5. **Transport Endpoints** - Offers `/betanet/htx/1.1.0` & `/betanet/htxquic/1.1.0` (1.0.0 legacy accepted)
-6. **DHT Seed Bootstrap** - (1.0) deterministic bootstrap OR (1.1) rotating rendezvous (BeaconSet) heuristic
+5. **Transport Endpoints** - Offers `/betanet/htx/1.1.0` & `/betanet/htxquic/1.1.0` (1.0.0 legacy accepted) (+ optional `/betanet/webrtc/1.0.0`)
+6. **DHT Seed Bootstrap** - (1.0) deterministic bootstrap OR (1.1) rotating rendezvous (BeaconSet) heuristic (now reports rotation hit count)
 7. **Alias Ledger Verification** - Verifies alias ledger with 2-of-3 chain consensus
 8. **Payment System** - Accepts Cashu vouchers from federated mints & supports Lightning settlement
 9. **Build Provenance** - Builds reproducibly and publishes SLSA 3 provenance
 10. **Post-Quantum Cipher Suites** - Presents X25519-Kyber768 suites once the mandatory date is reached (2027-01-01)
-11. **Privacy Hop Enforcement** - Enforces ≥2 (balanced) or ≥3 (strict) mixnet hops with BeaconSet-based diversity (heuristic)
+11. **Privacy Hop Enforcement** - Weighted mixnet heuristic (mix + beacon/epoch + diversity tokens) requiring ≥2 mix, ≥1 beacon, ≥1 diversity indicator (scores now surfaced)
 
 ### Heuristic & Partial Coverage Disclaimer
-Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., TLS fingerprint calibration, path diversity maintenance, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Advanced 1.1 checks (outer TLS calibration, rendezvous beacon rotation, full access ticket protocol validation) are roadmap items.
+Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., live TLS fingerprint calibration, sustained path diversity rotation, runtime hop enforcement, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Rotation confidence (rotationHits) and path diversity counts are informational only.
 
 ## Output Examples
 
@@ -257,6 +257,7 @@ On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhan
 - `BETANET_TOOL_TIMEOUT_MS=5000` - Override per external tool invocation timeout (ms)
 - `BETANET_SKIP_TOOLS=strings,nm` - Comma-separated list of external tools to skip (graceful degradation)
  - `BETANET_FAIL_ON_DEGRADED=1` - (Future) Treat degraded analysis as failure (currently use --fail-on-degraded CLI flag)
+ - `BETANET_PQ_DATE_OVERRIDE=YYYY-MM-DD` - Override post-quantum mandatory enforcement date (for early testing)
 
 ### Diagnostics & Degradation
 

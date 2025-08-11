@@ -43,7 +43,8 @@ export function detectNetwork(src: TextSources) {
   // Port 443: require separator before & non-digit after
   const port443 = /[:\[\s]443([^0-9]|$)/.test(blob);
 
-  return { hasTLS, hasQUIC, hasHTX, hasECH, port443 };
+  const hasWebRTC = /\/betanet\/webrtc\//.test(blob) || /webrtc/.test(blob);
+  return { hasTLS, hasQUIC, hasHTX, hasECH, port443, hasWebRTC };
 }
 
 export function detectSCION(src: TextSources) {
@@ -51,17 +52,26 @@ export function detectSCION(src: TextSources) {
   const hasSCION = /\bscion\b/.test(blob);
   const pathManagement = hasSCION && /(path.*maintenance|path.*resolver|segcache)/.test(blob);
   const hasIPTransition = /(ip-?transition|ipv4.*ipv6|legacy.*ip.*bridge)/.test(blob);
-  return { hasSCION, pathManagement, hasIPTransition };
+  // Path diversity heuristic: detect multiple AS/path markers (as123, as-1234, pathid:, scion://)
+  const diversityMatches = blob.match(/\bas[-]?[0-9]{2,5}\b|pathid[:=][a-f0-9]+|scion:\/\//g) || [];
+  const uniqueDiversity = new Set(diversityMatches.map(m => m.toLowerCase()));
+  return { hasSCION, pathManagement, hasIPTransition, pathDiversityCount: uniqueDiversity.size };
 }
 
 export function detectDHT(src: TextSources) {
   const blob = toJoinedLower(src.strings).concat(' ', toJoinedLower(src.symbols));
   const hasDHT = /\bdht\b/.test(blob) || /(kademlia|kad table|rendezvous dht)/.test(blob);
   const deterministicBootstrap = hasDHT && /(deterministic.*bootstrap|stable.*seed)/.test(blob); // legacy 1.0 heuristic
-  const rendezvousRotation = /(rendezvous|bn-seed|beaconset|rotating rendezvous)/.test(blob);
-  const beaconSetIndicator = /beaconset\(/.test(blob) || /bn-seed/.test(blob);
+  const rotationTokens = /(rendezvous|beaconset|epoch|rotate|rotation|bn-seed|schedule)/g;
+  let match; let rotationHits = 0; const seen = new Set<string>();
+  while ((match = rotationTokens.exec(blob)) !== null) {
+    const token = match[0];
+    if (!seen.has(token + match.index)) { rotationHits++; seen.add(token + match.index); }
+  }
+  const rendezvousRotation = rotationHits >= 2; // require at least two distinct rotation-related indicators
+  const beaconSetIndicator = /beaconset\(/.test(blob) || /bn-seed/.test(blob) || /epoch/.test(blob);
   const seedManagement = /(seed.*(rotate|management)|bootstrap.*seed)/.test(blob);
-  return { hasDHT, deterministicBootstrap, rendezvousRotation, beaconSetIndicator, seedManagement };
+  return { hasDHT, deterministicBootstrap, rendezvousRotation, beaconSetIndicator, seedManagement, rotationHits };
 }
 
 export function detectLedger(src: TextSources) {
@@ -90,4 +100,19 @@ export function detectBuildProvenance(src: TextSources) {
   const reproducible = /(reproducible build|deterministic build|bit-for-bit)/.test(blob);
   const provenance = /(build.*provenance|attestation|slsa\.json)/.test(blob);
   return { hasSLSA, reproducible, provenance };
+}
+
+// Privacy hop weighting utility for check 11 refinement
+export function evaluatePrivacyTokens(strings: string[]) {
+  const blob = toJoinedLower(strings);
+  const mixTokens = ['nym','mixnode','hop','hopset','relay'];
+  const beaconTokens = ['beaconset','epoch','drand'];
+  const diversityTokens = ['diversity','distinct','as-group','asgroup'];
+  const scoreCategory = (list: string[]) => list.reduce((acc,t)=> acc + (new RegExp(`(^|[^a-z0-9])${t}([^a-z0-9]|$)`).test(blob)?1:0),0);
+  const mixScore = scoreCategory(mixTokens);
+  const beaconScore = scoreCategory(beaconTokens);
+  const diversityScore = scoreCategory(diversityTokens);
+  const totalScore = mixScore*2 + beaconScore*2 + diversityScore*3; // weight diversity highest
+  const passed = mixScore>=2 && beaconScore>=1 && diversityScore>=1;
+  return { mixScore, beaconScore, diversityScore, totalScore, passed };
 }
