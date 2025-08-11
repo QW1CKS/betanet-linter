@@ -246,6 +246,7 @@ On Linux/macOS (or Windows via WSL), installing `binutils`/`llvm` packages enhan
 - `0` - All compliance checks passed
 - `1` - One or more compliance checks failed
 - `2` - Error in execution (invalid arguments, file not found, etc.)
+- `3` - SBOM shape validation failed (non-strict); use `--strict-sbom` to escalate to 2
 
 ## Development
 

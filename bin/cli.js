@@ -15,13 +15,13 @@ program
   .argument('<binary>', 'Path to the binary to check')
   .option('-o, --output <format>', 'Output format (json|table|yaml)', 'table')
   .option('-s, --sbom', 'Generate Software Bill of Materials')
+    .option('--validate-sbom', 'Validate generated SBOM structure (shape)')
+    .option('--strict-sbom', 'Fail if SBOM fails strict schema shape validation (implies --validate-sbom)')
   .option('-v, --verbose', 'Verbose output')
   .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx)', 'cyclonedx')
   .action(async (binaryPath, options) => {
     try {
       const checker = new BetanetComplianceChecker();
-      
-      console.log(`🔍 Checking Betanet compliance for: ${binaryPath}`);
       console.log('='.repeat(50));
       
       const results = await checker.checkCompliance(binaryPath, options);
@@ -29,6 +29,9 @@ program
       if (options.sbom) {
         const sbomPath = await checker.generateSBOM(binaryPath, options.sbomFormat);
         console.log(`📋 SBOM generated: ${sbomPath}`);
+        if (options.validateSbom || options.strictSbom) {
+          await require('./validate-sbom')(binaryPath, sbomPath, options.sbomFormat, options.strictSbom);
+        }
       }
       
       checker.displayResults(results, options.output);
@@ -46,6 +49,8 @@ program
   .description('Generate Software Bill of Materials for a binary')
   .argument('<binary>', 'Path to the binary')
   .option('-f, --format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx)', 'cyclonedx')
+    .option('--validate-sbom', 'Validate SBOM structure (shape)')
+    .option('--strict-sbom', 'Fail on strict validation errors (implies --validate-sbom)')
   .option('-o, --output <path>', 'Output file path')
   .action(async (binaryPath, options) => {
     try {
@@ -53,6 +58,9 @@ program
       const sbomPath = await checker.generateSBOM(binaryPath, options.format, options.output);
       
       console.log(`✅ SBOM generated successfully: ${sbomPath}`);
+      if (options.validateSbom || options.strictSbom) {
+        await require('./validate-sbom')(binaryPath, sbomPath, options.format, options.strictSbom);
+      }
     } catch (error) {
       console.error('❌ Error generating SBOM:', error.message);
       process.exit(1);
