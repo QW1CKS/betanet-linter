@@ -30,7 +30,7 @@ An example showing how to use the reusable workflow in your CI/CD pipeline.
 
 1. Copy `betanet-compliance.yml` to your repository's `.github/workflows/` directory
 2. The workflow will automatically run on pushes, pull requests, and daily schedules
-3. It will find and check all executable binaries in your repository. Use `--format` to control SBOM format when `--sbom` is enabled (legacy `--sbom-format` is deprecated).
+3. It will find and check all executable binaries in your repository. Use `--format` to control SBOM format when `--sbom` is enabled. The legacy `--sbom-format` flag is deprecated and will emit a warning; migrate all workflows to use `--format`.
 
 ### Option 2: Using the reusable workflow
 

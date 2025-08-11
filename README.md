@@ -1,6 +1,26 @@
+
 # Betanet Compliance Linter
 
+> **Quickstart:**
+> ```bash
+> npm install -g betanet-compliance-linter
+> betanet-lint --version   # verify installation
+> betanet-lint check ./your-binary --sbom --format cyclonedx-json --output json > compliance.json
+> ```
+> Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
+
 A comprehensive CLI tool for checking Betanet specification compliance in binary implementations. It fully targets the Betanet 1.0 specification (§11) and provides enhanced heuristic coverage of emerging Betanet 1.1 changes (transport version bump, rendezvous rotation scoring, path diversity, optional WebRTC transport, privacy hop weighting). It generates detailed compliance reports.
+
+> **Flag Naming:**
+> `--format` is now the canonical flag for SBOM format selection. The older `--sbom-format` still works but is deprecated and will emit a warning; it will be removed in a future minor release. All CLI and GitHub Action usage should migrate to `--format`.
+
+## Limitations
+
+This tool uses static heuristic analysis. It cannot guarantee runtime compliance or detect dynamic behaviors (e.g., live rotation, runtime-generated keys, or negotiated ciphers). See [plans.md](./plans.md) for roadmap and deferred features (e.g., dynamic probe plugins, confidence metrics).
+
+## License
+
+MIT License. See [LICENSE](./LICENSE) for details.
 
 > DISCLAIMER (Heuristic Analysis – ISSUE-049): This linter performs static, best‑effort heuristic inspection of binaries. A PASS does not cryptographically prove runtime adherence; a FAIL may reflect missing static indicators rather than true absence. Dynamic phenomena (live rotation cadence, negotiated cipher activation, runtime path diversification, active voucher redemption) are not executed. Treat results as advisory signals requiring corroboration in integration / runtime QA.
 
