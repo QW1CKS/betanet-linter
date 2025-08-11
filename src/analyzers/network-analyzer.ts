@@ -1,5 +1,5 @@
 import * as fs from 'fs-extra';
-import { execa } from 'execa';
+import execa from 'execa';
 
 export interface NetworkAnalysis {
   protocols: string[];
@@ -240,7 +240,7 @@ export class NetworkAnalyzer {
         extensions: [],
         hasECH: false,
         hasTLS13: false,
-        error: error.message
+  error: (error as any)?.message
       };
     }
   }

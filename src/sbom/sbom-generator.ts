@@ -1,6 +1,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { execa } from 'execa';
+import execa from 'execa';
 import { SBOM } from '../types';
 
 export class SBOMGenerator {
@@ -39,7 +39,7 @@ export class SBOMGenerator {
         type: fileInfo.stdout,
         hash: await this.calculateHash(binaryPath)
       };
-    } catch (error) {
+  } catch (error: unknown) {
       return {
         name: path.basename(binaryPath),
         path: binaryPath,
@@ -47,7 +47,7 @@ export class SBOMGenerator {
         modified: new Date().toISOString(),
         type: 'Unknown',
         hash: '',
-        error: error.message
+    error: (error as any)?.message
       };
     }
   }
@@ -133,8 +133,8 @@ export class SBOMGenerator {
         // ldd failed, continue without library info
       }
 
-    } catch (error) {
-      console.warn('Error extracting components:', error.message);
+    } catch (error: unknown) {
+      console.warn('Error extracting components:', (error as any)?.message);
     }
 
     return components;
@@ -174,8 +174,8 @@ export class SBOMGenerator {
         }
       }
 
-    } catch (error) {
-      console.warn('Error extracting dependencies:', error.message);
+    } catch (error: unknown) {
+      console.warn('Error extracting dependencies:', (error as any)?.message);
     }
 
     return dependencies;
@@ -256,8 +256,8 @@ export class SBOMGenerator {
           }
           break;
       }
-    } catch (error) {
-      console.warn(`Error parsing package file ${packagePath}:`, error.message);
+    } catch (error: unknown) {
+      console.warn(`Error parsing package file ${packagePath}:`, (error as any)?.message);
     }
 
     return dependencies;

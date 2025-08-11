@@ -6,15 +6,20 @@ import * as yaml from 'js-yaml';
 import * as xml2js from 'xml2js';
 
 export class BetanetComplianceChecker {
-  private analyzer: BinaryAnalyzer;
+  private _analyzer: BinaryAnalyzer;
 
   constructor() {
     // Will be initialized when checking compliance
-    this.analyzer = null as any;
+    this._analyzer = null as any;
+  }
+
+  // Expose analyzer via getter so tests can spy/mock it safely
+  get analyzer(): BinaryAnalyzer {
+    return this._analyzer;
   }
 
   async checkCompliance(binaryPath: string, options: CheckOptions = {}): Promise<ComplianceResult> {
-    this.analyzer = new BinaryAnalyzer(binaryPath, options.verbose);
+  this._analyzer = new BinaryAnalyzer(binaryPath, options.verbose);
 
     if (options.verbose) {
       console.log('🔍 Starting Betanet compliance check...');
@@ -322,7 +327,7 @@ export class BetanetComplianceChecker {
 
   async generateSBOM(binaryPath: string, format: 'cyclonedx' | 'spdx' = 'cyclonedx', outputPath?: string): Promise<string> {
     if (!this.analyzer) {
-      this.analyzer = new BinaryAnalyzer(binaryPath);
+  this._analyzer = new BinaryAnalyzer(binaryPath);
     }
 
     const analysis = await this.analyzer.analyze();

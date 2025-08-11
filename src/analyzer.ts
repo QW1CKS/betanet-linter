@@ -1,8 +1,7 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { execa } from 'execa';
-import { which } from 'which';
-import { ComplianceCheck, ComplianceResult, CheckOptions, SBOMComponent } from './types';
+import execa from 'execa';
+// Removed unused imports (which, types)
 
 export class BinaryAnalyzer {
   private binaryPath: string;
@@ -47,7 +46,7 @@ export class BinaryAnalyzer {
   private async extractStrings(): Promise<string[]> {
     try {
       const { stdout } = await execa('strings', [this.binaryPath]);
-      return stdout.split('\n').filter(line => line.length > 0);
+  return stdout.split('\n').filter((line: string) => line.length > 0);
     } catch (error) {
       if (this.verbose) {
         console.warn('⚠️  strings command failed, trying fallback method');
@@ -77,9 +76,9 @@ export class BinaryAnalyzer {
     try {
       const { stdout } = await execa('nm', ['-D', this.binaryPath]);
       return stdout.split('\n')
-        .filter(line => line.trim())
-        .map(line => line.split(' ').pop() || '')
-        .filter(symbol => symbol);
+        .filter((line: string) => line.trim())
+        .map((line: string) => line.split(' ').pop() || '')
+        .filter((symbol: string) => symbol);
     } catch (error) {
       if (this.verbose) {
         console.warn('⚠️  nm command failed, trying objdump');
@@ -88,9 +87,9 @@ export class BinaryAnalyzer {
       try {
         const { stdout } = await execa('objdump', ['-t', this.binaryPath]);
         return stdout.split('\n')
-          .filter(line => line.includes('.text'))
-          .map(line => line.split(' ').pop() || '')
-          .filter(symbol => symbol);
+          .filter((line: string) => line.includes('.text'))
+          .map((line: string) => line.split(' ').pop() || '')
+          .filter((symbol: string) => symbol);
       } catch (error2) {
         if (this.verbose) {
           console.warn('⚠️  Symbol extraction failed');
@@ -122,9 +121,9 @@ export class BinaryAnalyzer {
     try {
       const { stdout } = await execa('ldd', [this.binaryPath]);
       return stdout.split('\n')
-        .filter(line => line.includes('=>'))
-        .map(line => line.split('=>')[1]?.split('(')[0]?.trim() || '')
-        .filter(dep => dep && !dep.includes('not found'));
+        .filter((line: string) => line.includes('=>'))
+        .map((line: string) => line.split('=>')[1]?.split('(')[0]?.trim() || '')
+        .filter((dep: string) => dep && !dep.includes('not found'));
     } catch (error) {
       if (this.verbose) {
         console.warn('⚠️  ldd command failed');

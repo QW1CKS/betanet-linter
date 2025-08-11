@@ -2,7 +2,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as xml2js from 'xml2js';
 import * as yaml from 'js-yaml';
-import { execa } from 'execa';
+import execa from 'execa';
 import { SBOMComponent, SBOMOptions } from './types';
 import { BinaryAnalyzer } from './analyzer';
 

@@ -30,6 +30,13 @@ export interface SBOMComponent {
   hashes?: string[];
 }
 
+// Generic SBOM structure used by sbom-generator.ts
+export interface SBOM {
+  format: 'cyclonedx' | 'spdx';
+  data: any; // Underlying JSON / XML / text representation
+  generated: string; // ISO timestamp
+}
+
 export interface CheckOptions {
   verbose?: boolean;
   checkFilters?: {

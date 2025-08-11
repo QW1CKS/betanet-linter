@@ -1,6 +1,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import { execa } from 'execa';
+import execa from 'execa';
 
 export interface BinaryAnalysis {
   strings: string[];
@@ -30,7 +30,7 @@ export class BinaryAnalyzer {
     try {
       // Try using 'strings' command first
       const { stdout } = await execa('strings', [binaryPath]);
-      return stdout.split('\n').filter(s => s.length > 0);
+  return stdout.split('\n').filter((s: string) => s.length > 0);
     } catch (error) {
       // Fallback to manual string extraction
       console.warn('strings command not available, using fallback method');
@@ -71,12 +71,12 @@ export class BinaryAnalyzer {
       // Try using 'nm' command for symbols
       const { stdout } = await execa('nm', [binaryPath]);
       return stdout.split('\n')
-        .filter(line => line.trim())
-        .map(line => {
+        .filter((line: string) => line.trim())
+        .map((line: string) => {
           const parts = line.split(/\s+/);
           return parts[parts.length - 1]; // Symbol name is usually the last part
         })
-        .filter(symbol => symbol && symbol.length > 0);
+        .filter((symbol: string) => symbol && symbol.length > 0);
     } catch (error) {
       // Fallback: return empty array
       return [];

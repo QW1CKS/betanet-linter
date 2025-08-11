@@ -46,24 +46,24 @@ export class ComplianceChecker {
   private async checkHTXImplementation(analysis: any): Promise<ComplianceCheck> {
     const { strings, symbols, networkFunctions } = analysis;
     
-    const hasTCP443 = networkFunctions.some(f => 
+    const hasTCP443 = networkFunctions.some((f: string) => 
       f.toLowerCase().includes('tcp') || 
-      strings.some(s => s.includes('443'))
+      strings.some((s: string) => s.includes('443'))
     );
     
-    const hasQUIC443 = networkFunctions.some(f => 
+    const hasQUIC443 = networkFunctions.some((f: string) => 
       f.toLowerCase().includes('quic') ||
-      strings.some(s => s.toLowerCase().includes('quic'))
+      strings.some((s: string) => s.toLowerCase().includes('quic'))
     );
     
-    const hasTLS13 = networkFunctions.some(f => 
+    const hasTLS13 = networkFunctions.some((f: string) => 
       f.toLowerCase().includes('tls') ||
-      strings.some(s => s.includes('1.3') || s.toLowerCase().includes('tls'))
+      strings.some((s: string) => s.includes('1.3') || s.toLowerCase().includes('tls'))
     );
     
-    const hasECH = networkFunctions.some(f => 
+    const hasECH = networkFunctions.some((f: string) => 
       f.toLowerCase().includes('ech') ||
-      strings.some(s => s.toLowerCase().includes('ech'))
+      strings.some((s: string) => s.toLowerCase().includes('ech'))
     );
 
     const passed = hasTCP443 && hasQUIC443 && hasTLS13 && hasECH;
@@ -89,9 +89,9 @@ export class ComplianceChecker {
     const { strings, symbols } = analysis;
     
     const ticketKeywords = ['ticket', 'access', 'rotate', 'refresh', 'session'];
-    const found = ticketKeywords.filter(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword)) ||
-      symbols.some(s => s.toLowerCase().includes(keyword))
+    const found = ticketKeywords.filter((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword)) ||
+      symbols.some((s: string) => s.toLowerCase().includes(keyword))
     );
 
     const passed = found.length >= 2; // At least ticket-related and rotation-related
@@ -111,15 +111,15 @@ export class ComplianceChecker {
   private async checkInnerFrameEncryption(analysis: any): Promise<ComplianceCheck> {
     const { strings, symbols, cryptoFunctions } = analysis;
     
-    const hasChaCha20 = cryptoFunctions.some(f => 
+  const hasChaCha20 = cryptoFunctions.some((f: string) => 
       f.toLowerCase().includes('chacha20')
     );
     
-    const hasPoly1305 = cryptoFunctions.some(f => 
+  const hasPoly1305 = cryptoFunctions.some((f: string) => 
       f.toLowerCase().includes('poly1305')
     );
     
-    const hasFrameEncryption = strings.some(s => 
+  const hasFrameEncryption = strings.some((s: string) => 
       s.toLowerCase().includes('frame') && 
       (s.toLowerCase().includes('encrypt') || s.toLowerCase().includes('cipher'))
     );
@@ -148,14 +148,14 @@ export class ComplianceChecker {
     const scionKeywords = ['scion', 'path', 'segment', 'as', 'router', 'gateway'];
     const pathKeywords = ['path', 'route', 'forward', 'hop'];
     
-    const hasSCION = scionKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword)) ||
-      symbols.some(s => s.toLowerCase().includes(keyword))
+    const hasSCION = scionKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword)) ||
+      symbols.some((s: string) => s.toLowerCase().includes(keyword))
     );
     
-    const hasPathManagement = pathKeywords.filter(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword)) ||
-      symbols.some(s => s.toLowerCase().includes(keyword))
+    const hasPathManagement = pathKeywords.filter((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword)) ||
+      symbols.some((s: string) => s.toLowerCase().includes(keyword))
     ).length >= 2;
 
     const passed = hasSCION || hasPathManagement;
@@ -177,11 +177,11 @@ export class ComplianceChecker {
   private async checkTransportEndpoints(analysis: any): Promise<ComplianceCheck> {
     const { strings } = analysis;
     
-    const hasHTXEndpoint = strings.some(s => 
+  const hasHTXEndpoint = strings.some((s: string) => 
       s.includes('/betanet/htx/1.0.0')
     );
     
-    const hasHTXQUICEndpoint = strings.some(s => 
+  const hasHTXQUICEndpoint = strings.some((s: string) => 
       s.includes('/betanet/htxquic/1.0.0')
     );
 
@@ -208,13 +208,13 @@ export class ComplianceChecker {
     const dhtKeywords = ['dht', 'bootstrap', 'seed', 'node', 'peer', 'discovery'];
     const deterministicKeywords = ['deterministic', 'seed', 'fixed', 'static'];
     
-    const hasDHT = dhtKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword)) ||
-      symbols.some(s => s.toLowerCase().includes(keyword))
+    const hasDHT = dhtKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword)) ||
+      symbols.some((s: string) => s.toLowerCase().includes(keyword))
     );
     
-    const hasDeterministic = deterministicKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword))
+    const hasDeterministic = deterministicKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword))
     );
 
     const passed = hasDHT && hasDeterministic;
@@ -240,13 +240,13 @@ export class ComplianceChecker {
     const aliasKeywords = ['alias', 'ledger', 'identity', 'name', 'trust'];
     const consensusKeywords = ['consensus', '2of3', 'chain', 'verify', 'validate'];
     
-    const hasAlias = aliasKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword)) ||
-      symbols.some(s => s.toLowerCase().includes(keyword))
+    const hasAlias = aliasKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword)) ||
+      symbols.some((s: string) => s.toLowerCase().includes(keyword))
     );
     
-    const hasConsensus = consensusKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword))
+    const hasConsensus = consensusKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword))
     );
 
     const passed = hasAlias && hasConsensus;
@@ -272,13 +272,13 @@ export class ComplianceChecker {
     const cashuKeywords = ['cashu', 'mint', 'token', 'voucher', 'ecash'];
     const lightningKeywords = ['lightning', 'ln', 'payment', 'channel', 'settlement'];
     
-    const hasCashu = cashuKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword)) ||
-      symbols.some(s => s.toLowerCase().includes(keyword))
+    const hasCashu = cashuKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword)) ||
+      symbols.some((s: string) => s.toLowerCase().includes(keyword))
     );
     
-    const hasLightning = lightningKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword))
+    const hasLightning = lightningKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword))
     );
 
     const passed = hasCashu && hasLightning;
@@ -304,13 +304,13 @@ export class ComplianceChecker {
     const buildKeywords = ['reproducible', 'slsa', 'provenance', 'build', 'verify'];
     const versionKeywords = ['version', 'commit', 'hash', 'tag'];
     
-    const hasReproducible = buildKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword)) ||
-      symbols.some(s => s.toLowerCase().includes(keyword))
+    const hasReproducible = buildKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword)) ||
+      symbols.some((s: string) => s.toLowerCase().includes(keyword))
     );
     
-    const hasVersioning = versionKeywords.some(keyword => 
-      strings.some(s => s.toLowerCase().includes(keyword))
+    const hasVersioning = versionKeywords.some((keyword: string) => 
+      strings.some((s: string) => s.toLowerCase().includes(keyword))
     );
 
     const passed = hasReproducible && hasVersioning;
@@ -333,11 +333,11 @@ export class ComplianceChecker {
   private async checkPostQuantumSuites(analysis: any): Promise<ComplianceCheck> {
     const { strings, symbols, cryptoFunctions } = analysis;
     
-    const hasX25519 = cryptoFunctions.some(f => 
+  const hasX25519 = cryptoFunctions.some((f: string) => 
       f.toLowerCase().includes('x25519')
     );
     
-    const hasKyber = cryptoFunctions.some(f => 
+  const hasKyber = cryptoFunctions.some((f: string) => 
       f.toLowerCase().includes('kyber')
     );
     
