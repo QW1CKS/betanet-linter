@@ -7,8 +7,8 @@ A comprehensive CLI tool for checking Betanet specification compliance in binary
 - ✅ **Complete Compliance Checking**: Validates all 11 Betanet specification requirements (§11)
 - 🔍 **Binary Analysis**: Deep analysis of executable binaries for compliance patterns
 - 📋 **SBOM Generation**: Creates Software Bill of Materials in CycloneDX or SPDX formats
-- � **Multi-License Detection**: Extracts multiple SPDX license identifiers (e.g. Apache-2.0 OR MIT) and surfaces all
-- �📊 **Multiple Output Formats**: JSON, YAML, and table-based reports
+- 🔢 **Multi-License Detection**: Extracts multiple SPDX license identifiers (e.g. Apache-2.0 OR MIT) and surfaces all
+- 📊 **Multiple Output Formats**: JSON, YAML, and table-based reports
 - 🎯 **Selective Checking**: Run specific checks or exclude certain requirements
 - 🤖 **GitHub Action Ready**: Automated compliance checking in CI/CD pipelines
 - 📈 **Detailed Reporting**: Pass/fail status with detailed explanations
