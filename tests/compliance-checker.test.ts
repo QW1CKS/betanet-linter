@@ -1,5 +1,5 @@
 import { BetanetComplianceChecker } from '../src/index';
-import { validateCycloneDXShape, validateSPDXTagValue } from '../src/sbom/sbom-validators';
+import { validateCycloneDXShape, validateSPDXTagValue, validateCycloneDXStrict, validateSPDXTagValueStrict } from '../src/sbom/sbom-validators';
 import { BinaryAnalyzer } from '../src/analyzer';
 import * as fs from 'fs-extra';
 import * as path from 'path';
@@ -242,7 +242,7 @@ describe('BetanetComplianceChecker', () => {
       await fs.remove(tempBin);
     });
 
-    it('should pass CycloneDX JSON and SPDX shape validators', async () => {
+  it('should pass CycloneDX JSON and SPDX shape validators (strict)', async () => {
       const tempBin = path.join(__dirname, 'shape-binary');
       await fs.writeFile(tempBin, Buffer.from('Test SPDXVersion: SPDX-2.3 MIT DocumentNamespace placeholder'));
       const checker3 = new BetanetComplianceChecker();
@@ -256,24 +256,33 @@ describe('BetanetComplianceChecker', () => {
       const cdxJsonPath = path.join(__dirname, 'shape-sbom.cdx.json');
       await checker3.generateSBOM(tempBin, 'cyclonedx-json', cdxJsonPath);
       const cdxJson = JSON.parse(await fs.readFile(cdxJsonPath, 'utf8'));
-      const cdxValidation = validateCycloneDXShape(cdxJson);
-      expect(cdxValidation.valid).toBe(true);
-      if (!cdxValidation.valid) {
-        throw new Error('CycloneDX validation errors: ' + cdxValidation.errors.join(', '));
-      }
+  const cdxValidation = validateCycloneDXShape(cdxJson);
+  expect(cdxValidation.valid).toBe(true);
+  const cdxStrict = validateCycloneDXStrict(cdxJson);
+  expect(cdxStrict.valid).toBe(true);
+  if (!cdxStrict.valid) throw new Error('CycloneDX strict errors: ' + cdxStrict.errors.join(', '));
 
       const spdxPath = path.join(__dirname, 'shape-sbom.spdx');
       await checker3.generateSBOM(tempBin, 'spdx', spdxPath);
       const spdxText = await fs.readFile(spdxPath, 'utf8');
-      const spdxValidation = validateSPDXTagValue(spdxText);
-      expect(spdxValidation.valid).toBe(true);
-      if (!spdxValidation.valid) {
-        throw new Error('SPDX validation errors: ' + spdxValidation.errors.join(', '));
-      }
+  const spdxValidation = validateSPDXTagValue(spdxText);
+  expect(spdxValidation.valid).toBe(true);
+  const spdxStrict = validateSPDXTagValueStrict(spdxText);
+  expect(spdxStrict.valid).toBe(true);
+  if (!spdxStrict.valid) throw new Error('SPDX strict errors: ' + spdxStrict.errors.join(', '));
 
       await fs.remove(cdxJsonPath);
       await fs.remove(spdxPath);
       await fs.remove(tempBin);
+    });
+
+    it('should fail strict SPDX validation on malformed document', () => {
+      const bad = 'SPDXVersion: SPDX-2.3\nDocumentName: MissingNamespace\nPackageName: testpkg\nPackageLicenseDeclared: NOASSERTION';
+      const base = validateSPDXTagValue(bad);
+      // Base should fail because DocumentNamespace missing
+      expect(base.valid).toBe(false);
+      const strict = validateSPDXTagValueStrict(bad);
+      expect(strict.valid).toBe(false);
     });
   });
 
