@@ -9,12 +9,12 @@ Legend Categories: ARCH (Architecture), PERF (Performance), HEUR (Heuristics), A
 
 ARCHITECTURE / DESIGN
 ---------------------
-[X] ISSUE-001 | ARCH | Duplicate compliance engines
+[✓] ISSUE-001 | ARCH | Duplicate compliance engines
 Two separate implementations: BetanetComplianceChecker (src/index.ts) and ComplianceChecker (src/compliance.ts) with diverging logic, severities, wording.
 Impact: Confusion, inconsistent results, maintenance burden.
 Action: Choose one canonical implementation; remove or deprecate the other. Prefer a single analyzer pass model.
 
-[X] ISSUE-002 | ARCH | Duplicate SBOM logic
+[✓] ISSUE-002 | ARCH | Duplicate SBOM logic
 SBOM generation exists in both BetanetComplianceChecker (index.ts) and SBOMGenerator (sbom.ts) with differing formats and field richness.
 Impact: Divergent output, duplicated maintenance.
 Action: Centralize SBOM logic into one module (e.g., src/sbom/) and expose consistent API.
@@ -75,12 +75,12 @@ Action: Prefer 'lnpay', 'lightning', 'lnnode', 'lnurl', 'bolt' patterns.
 
 API / LOGIC INCONSISTENCIES
 ---------------------------
-[X] ISSUE-013 | API | Severity differences between implementations
+[✓] ISSUE-013 | API | Severity differences between implementations
 Same checks have different severities across index.ts vs compliance.ts.
 Impact: Inconsistent pass/fail weighting.
 Action: Normalize severity map centrally.
 
-[X] ISSUE-014 | API | Check naming differences
+[✓] ISSUE-014 | API | Check naming differences
 "DHT Seed Bootstrap" vs "DHT Bootstrap"; etc.
 Impact: User confusion.
 Action: Standardize names list constant.

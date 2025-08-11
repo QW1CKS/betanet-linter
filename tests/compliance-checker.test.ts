@@ -14,8 +14,8 @@ describe('BetanetComplianceChecker', () => {
 
   describe('checkCompliance', () => {
     it('should return a compliance result with all checks', async () => {
-      // Mock the analyzer methods
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
+  // Inject mock analyzer directly (private field access via casting)
+  (checker as any)._analyzer = {
         checkNetworkCapabilities: () => Promise.resolve({
           hasTLS: true,
           hasQUIC: true,
@@ -26,7 +26,10 @@ describe('BetanetComplianceChecker', () => {
         analyze: () => Promise.resolve({
           strings: ['ticket', 'rotation', '/betanet/htx/1.0.0', '/betanet/htxquic/1.0.0'],
           symbols: ['chacha20', 'poly1305'],
-          dependencies: []
+          dependencies: [],
+          fileFormat: 'ELF',
+          architecture: 'x86_64',
+          size: 1000
         }),
         checkCryptographicCapabilities: () => Promise.resolve({
           hasChaCha20: true,
@@ -62,7 +65,7 @@ describe('BetanetComplianceChecker', () => {
           reproducible: true,
           provenance: true
         })
-      });
+  };
 
       const result = await checker.checkCompliance(mockBinaryPath);
 
@@ -75,11 +78,11 @@ describe('BetanetComplianceChecker', () => {
     });
 
     it('should filter checks when include option is provided', async () => {
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
+  (checker as any)._analyzer = {
         checkNetworkCapabilities: () => Promise.resolve({
           hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true
         }),
-        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [] }),
+  analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkCryptographicCapabilities: () => Promise.resolve({
           hasChaCha20: true, hasPoly1305: true, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false
         }),
@@ -88,7 +91,7 @@ describe('BetanetComplianceChecker', () => {
         checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-      });
+  };
 
       const result = await checker.checkCompliance(mockBinaryPath, {
         checkFilters: { include: [1, 3] }
@@ -99,11 +102,11 @@ describe('BetanetComplianceChecker', () => {
     });
 
     it('should filter checks when exclude option is provided', async () => {
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
+  (checker as any)._analyzer = {
         checkNetworkCapabilities: () => Promise.resolve({
           hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true
         }),
-        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [] }),
+  analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkCryptographicCapabilities: () => Promise.resolve({
           hasChaCha20: true, hasPoly1305: true, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false
         }),
@@ -112,7 +115,7 @@ describe('BetanetComplianceChecker', () => {
         checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-      });
+  };
 
       const result = await checker.checkCompliance(mockBinaryPath, {
         checkFilters: { exclude: [10] }
@@ -142,7 +145,7 @@ describe('BetanetComplianceChecker', () => {
         })
       };
 
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue(mockAnalyzer);
+  (checker as any)._analyzer = mockAnalyzer;
 
       const outputPath = path.join(__dirname, 'test-sbom.xml');
       
@@ -173,7 +176,7 @@ describe('BetanetComplianceChecker', () => {
         })
       };
 
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue(mockAnalyzer);
+  (checker as any)._analyzer = mockAnalyzer;
 
       const outputPath = path.join(__dirname, 'test-sbom.spdx');
       
@@ -275,8 +278,8 @@ describe('BetanetComplianceChecker', () => {
   describe('heuristics false-positive protection', () => {
     it('should not flag Kyber768 when only number 768 appears without kyber token', async () => {
       const checker = new BetanetComplianceChecker();
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
-        analyze: () => Promise.resolve({ strings: ['version768 build'], symbols: [], dependencies: [] }),
+  (checker as any)._analyzer = {
+  analyze: () => Promise.resolve({ strings: ['version768 build'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
         checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
         checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
@@ -284,7 +287,7 @@ describe('BetanetComplianceChecker', () => {
         checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-      });
+  };
       const result = await checker.checkCompliance('/mock/bin');
       // Post-quantum check is ID 10
       const postQuantum = result.checks.find(c => c.id === 10);
@@ -296,8 +299,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should not treat random 443 in version string as port indicator (should remain missing)', async () => {
       const checker = new BetanetComplianceChecker();
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
-        analyze: () => Promise.resolve({ strings: ['v1.443.0 build'], symbols: [], dependencies: [] }),
+  (checker as any)._analyzer = {
+  analyze: () => Promise.resolve({ strings: ['v1.443.0 build'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
         checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
         checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
@@ -305,7 +308,7 @@ describe('BetanetComplianceChecker', () => {
         checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-      });
+  };
       const result = await checker.checkCompliance('/mock/bin');
       const htxCheck = result.checks.find(c => c.id === 1);
       expect(htxCheck).toBeDefined();
@@ -318,8 +321,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should not pass DHT bootstrap when only beacon/rendezvous tokens appear without DHT base token', async () => {
       const checker = new BetanetComplianceChecker();
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
-        analyze: () => Promise.resolve({ strings: ['beaconset rotate rendezvous'], symbols: [], dependencies: [] }),
+  (checker as any)._analyzer = {
+  analyze: () => Promise.resolve({ strings: ['beaconset rotate rendezvous'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
         checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
         checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
@@ -327,7 +330,7 @@ describe('BetanetComplianceChecker', () => {
         checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-      });
+  };
       const result = await checker.checkCompliance('/mock/bin');
       const dhtCheck = result.checks.find(c => c.id === 6);
       expect(dhtCheck).toBeDefined();
@@ -339,8 +342,8 @@ describe('BetanetComplianceChecker', () => {
 
     it('should not pass Payment System when only voucher/FROST/PoW indicators appear without core payment tokens', async () => {
       const checker = new BetanetComplianceChecker();
-      jest.spyOn(checker as any, 'analyzer', 'get').mockReturnValue({
-        analyze: () => Promise.resolve({ strings: ['voucher frost-ed25519 pow22'], symbols: [], dependencies: [] }),
+  (checker as any)._analyzer = {
+  analyze: () => Promise.resolve({ strings: ['voucher frost-ed25519 pow22'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: false, hasQUIC: false, hasHTX: false, hasECH: false, port443: false }),
         checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
         checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false }),
@@ -348,7 +351,7 @@ describe('BetanetComplianceChecker', () => {
         checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
         checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false, hasVoucherFormat: true, hasFROST: true, hasPoW22: true }),
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-      });
+  };
       const result = await checker.checkCompliance('/mock/bin');
       const paymentCheck = result.checks.find(c => c.id === 8);
       expect(paymentCheck).toBeDefined();
