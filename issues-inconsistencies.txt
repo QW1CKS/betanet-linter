@@ -95,10 +95,11 @@ If include filter selects zero checks, overallScore = (0/0) => NaN.
 Impact: Output invalid / crash risk downstream.
 Action: Guard: if total == 0 set score=0 and passed=false with message.
 
-[X] ISSUE-016 | API | Post-quantum date logic timezone ambiguity
+[✓] ISSUE-016 | API | Post-quantum date logic timezone ambiguity
 Using Date('2027-01-01') without timezone normalization.
 Impact: Boundary off-by-one in some locales.
 Action: Compare in UTC; use Date.UTC.
+Resolution: Replaced local Date construction with UTC epoch constant (POST_QUANTUM_MANDATORY_EPOCH_MS) and override parser. Added boundary tests (pre-midnight, midnight, override ISO). Commit d551fbe.
 
 SBOM ISSUES
 -----------
