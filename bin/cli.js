@@ -16,7 +16,7 @@ program
   .option('-o, --output <format>', 'Output format (json|table|yaml)', 'table')
   .option('-s, --sbom', 'Generate Software Bill of Materials')
   .option('-v, --verbose', 'Verbose output')
-  .option('--sbom-format <format>', 'SBOM format (cyclonedx|spdx)', 'cyclonedx')
+  .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx)', 'cyclonedx')
   .action(async (binaryPath, options) => {
     try {
       const checker = new BetanetComplianceChecker();
@@ -45,7 +45,7 @@ program
   .command('sbom')
   .description('Generate Software Bill of Materials for a binary')
   .argument('<binary>', 'Path to the binary')
-  .option('-f, --format <format>', 'SBOM format (cyclonedx|spdx)', 'cyclonedx')
+  .option('-f, --format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx)', 'cyclonedx')
   .option('-o, --output <path>', 'Output file path')
   .action(async (binaryPath, options) => {
     try {

@@ -79,6 +79,9 @@ betanet-lint validate /path/to/binary --exclude 10
 # CycloneDX format (default)
 betanet-lint sbom /path/to/binary --format cyclonedx
 
+# CycloneDX JSON format
+betanet-lint sbom /path/to/binary --format cyclonedx-json
+
 # SPDX format
 betanet-lint sbom /path/to/binary --format spdx
 

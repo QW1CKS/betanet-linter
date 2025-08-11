@@ -4,7 +4,7 @@ import execa from 'execa';
 import { SBOM } from '../types';
 
 export class SBOMGenerator {
-  async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' = 'cyclonedx'): Promise<SBOM> {
+  async generate(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' = 'cyclonedx'): Promise<SBOM> {
     const binaryInfo = await this.getBinaryInfo(binaryPath);
     const components = await this.extractComponents(binaryPath);
     const dependencies = await this.extractDependencies(binaryPath);
@@ -19,9 +19,9 @@ export class SBOMGenerator {
       (binaryInfo as any).license = rootLicense;
     }
 
-    if (format === 'cyclonedx') {
+  if (format === 'cyclonedx' || format === 'cyclonedx-json') {
       return {
-        format: 'cyclonedx',
+    format: format === 'cyclonedx-json' ? 'cyclonedx-json' : 'cyclonedx',
         data: this.generateCycloneDX(binaryInfo, finalComponents, dependencies),
         generated: new Date().toISOString()
       };

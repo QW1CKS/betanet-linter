@@ -33,7 +33,7 @@ export interface SBOMComponent {
 
 // Generic SBOM structure used by sbom-generator.ts
 export interface SBOM {
-  format: 'cyclonedx' | 'spdx';
+  format: 'cyclonedx' | 'spdx' | 'cyclonedx-json';
   data: any; // Underlying JSON / XML / text representation
   generated: string; // ISO timestamp
 }
@@ -62,6 +62,6 @@ export interface CheckOptions {
 }
 
 export interface SBOMOptions {
-  format: 'cyclonedx' | 'spdx';
+  format: 'cyclonedx' | 'spdx' | 'cyclonedx-json';
   outputPath?: string;
 }

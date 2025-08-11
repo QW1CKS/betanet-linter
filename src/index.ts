@@ -83,7 +83,7 @@ export class BetanetComplianceChecker {
 
   // Legacy per-check methods removed (Plan 3 consolidation) in favor of registry-based evaluation
 
-  async generateSBOM(binaryPath: string, format: 'cyclonedx' | 'spdx' = 'cyclonedx', outputPath?: string): Promise<string> {
+  async generateSBOM(binaryPath: string, format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' = 'cyclonedx', outputPath?: string): Promise<string> {
     // Ensure analyzer exists for consistency (even though SBOMGenerator operates independently)
     if (!this.analyzer) {
       this._analyzer = new BinaryAnalyzer(binaryPath);
@@ -92,13 +92,14 @@ export class BetanetComplianceChecker {
     const generator = new SBOMGenerator();
     const sbom = await generator.generate(binaryPath, format);
 
-    const defaultOutputPath = path.join(
-      path.dirname(binaryPath),
-      `${path.basename(binaryPath)}-sbom.${format === 'cyclonedx' ? 'xml' : 'spdx'}`
-    );
+    const defaultOutputPath = (() => {
+      if (format === 'cyclonedx') return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.xml`);
+      if (format === 'cyclonedx-json') return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.cdx.json`);
+      return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.spdx`);
+    })();
     const finalOutputPath = outputPath || defaultOutputPath;
 
-    if (format === 'cyclonedx') {
+  if (format === 'cyclonedx') {
       // Serialize a CycloneDX-style XML (backwards compatible with previous output path & extension)
       const builder = new xml2js.Builder();
       const metaComponent = (sbom as any).data?.metadata?.component || {};
@@ -129,6 +130,9 @@ export class BetanetComplianceChecker {
       };
       const xml = builder.buildObject(xmlObj);
       await fs.writeFile(finalOutputPath, xml);
+    } else if (format === 'cyclonedx-json') {
+      // Write raw JSON structure produced internally (data object)
+      await fs.writeFile(finalOutputPath, JSON.stringify((sbom as any).data, null, 2));
     } else {
       // SPDX already text from generator
       await fs.writeFile(finalOutputPath, (sbom as any).data);
