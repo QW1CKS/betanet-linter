@@ -298,3 +298,67 @@ NEXT ACTION STARTER SET
 5) Select & deprecate duplicate compliance engine (ISSUE-001, 013, 014).
 
 End of backlog.
+
+BETANET 1.1 SPEC DELTA TRACKING (Added 2025-08-11)
+--------------------------------------------------
+Context: The linter originated against Betanet 1.0 assumptions. Partial 1.1 heuristics have been integrated (transport endpoint versioning, optional WebRTC transport, enhanced DHT rendezvous / BeaconSet indicators, extended payment voucher/FROST/PoW signals). This section enumerates what 1.1 deltas are already reflected vs still pending so contributors can focus Plan 3+ work.
+
+Implemented 1.1-Relevant Deltas (status captured in code & docs; no new issue IDs created to avoid retroactive noise):
+[✓] Transport endpoint multi-version heuristic (1.0.0 / 1.1.0) + optional WebRTC flag
+[✓] DHT rendezvous rotation & BeaconSet token indicators
+[✓] Payment heuristics: voucher token, FROST mention, PoW ≥22-bit textual indicator
+[✓] Extended diagnostics & constants module allowing future version gating
+
+New / Pending 1.1-Specific Issues
+---------------------------------
+[ ] ISSUE-051 | HEUR | Missing negative tests for new 1.1 heuristics
+Rendezvous rotation, BeaconSet, voucher/FROST/PoW indicators lack dedicated false-positive regression tests.
+Impact: Future heuristic broadening could silently inflate compliance.
+Action: Add fixtures with unrelated use of 'voucher', 'rotation', 'beacon' to assert non-matches; add positive minimal fixtures.
+
+[ ] ISSUE-052 | ARCH | Central feature flag matrix for spec versions
+Currently constants list versions, but no structured matrix mapping each check to (introduced_in, mandatory_in).
+Impact: Harder to evolve when 1.2 introduces new mandatory items.
+Action: Introduce CHECK_REGISTRY with version metadata; drive compliance evaluation through it.
+
+[ ] ISSUE-053 | HEUR | Voucher structural validation absent
+Only detects presence of 'voucher' token; no format, length, signature, or prefix pattern verification.
+Impact: Overstates payment readiness.
+Action: Define expected voucher regex (e.g., base58/hex length), optional checksum heuristic.
+
+[ ] ISSUE-054 | HEUR | PoW difficulty heuristic shallow
+Currently any string with 'pow' and '22' may pass threshold intent.
+Impact: Could misclassify generic log text.
+Action: Parse nearby context (e.g., 'pow=22', 'difficulty:22', 'work(22)') with bounded regex capturing.
+
+[ ] ISSUE-055 | UX | Spec version summary not surfaced
+CLI output does not clearly state evaluated spec version(s) and coverage delta.
+Impact: Users may misinterpret partial 1.1 support as full.
+Action: Add header/footer summarizing: Implemented 1.1 checks: X / Planned Y (list pending IDs).
+
+[ ] ISSUE-056 | TEST | Stripped / packed binary degradation tests
+No tests simulating stripped symbols (nm/objdump absence) to ensure graceful heuristic fallback.
+Impact: 1.1 heuristics may rely too heavily on symbol names.
+Action: Provide synthetic minimal binary or mock analyzer output to simulate missing symbols.
+
+[ ] ISSUE-057 | PERF | Parallel capability aggregation still pending (1.1 scale)
+As additional 1.1 checks are added, sequential model will further slow runtime.
+Impact: Latency grows superlinearly with spec expansion.
+Action: Implement parallel derivation from cached analysis (See ISSUE-005 linkage) and document expected speedup.
+
+[ ] ISSUE-058 | SBOM | Versioned component mapping for new transports / payment modules
+SBOM does not classify 1.1-specific modules (e.g., WebRTC transport, payment adapter) distinctly.
+Impact: Limited traceability of which spec-era features binary includes.
+Action: Extend component classifier to tag modules by spec feature set.
+
+[ ] ISSUE-059 | EDGE | Static-only approach misses dynamic 1.1 behaviors
+Rotation scheduling, path diversity, and real PoW verification are runtime phenomena.
+Impact: False negatives for binaries using late-bound or generated strings.
+Action: (Future) Introduce optional dynamic probe mode (exec with --dry-scan env) or plugin architecture.
+
+[ ] ISSUE-060 | DOC | README lacks 1.1 delta coverage table
+Documentation lists partial support but not a matrix of implemented vs pending 1.1 features.
+Impact: Contributors lack at-a-glance roadmap.
+Action: Add table referencing ISSUE-051..060 statuses; auto-update suggestion script.
+
+Note: Issues 051–060 focus exclusively on Betanet 1.1 evolution; they should be reassessed once Plan 3 consolidation is underway to avoid duplication with architectural refactors.
