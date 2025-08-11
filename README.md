@@ -307,6 +307,15 @@ npm run lint
 5. Run the test suite
 6. Submit a pull request
 
+## Additional Documentation
+
+For deeper insight into project direction and open/refined issues:
+
+- Roadmap & plan status: see [plans.md](./plans.md)
+- Issues, inconsistencies & improvement backlog: see [issues-inconsistencies.txt](./issues-inconsistencies.txt)
+
+These documents complement the README by outlining historical decisions, completed milestones, and pending enhancement tracks.
+
 ## License
 
 MIT License - see LICENSE file for details.
