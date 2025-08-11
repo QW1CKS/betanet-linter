@@ -48,14 +48,59 @@ export class BetanetComplianceChecker {
     const checks: ComplianceCheck[] = [];
     const now = new Date();
     const checkTimings: { id: number; durationMs: number }[] = [];
-    for (const def of definitions) {
+    const maxParallel = options.maxParallel && options.maxParallel > 0 ? options.maxParallel : definitions.length;
+    const timeoutMs = options.checkTimeoutMs && options.checkTimeoutMs > 0 ? options.checkTimeoutMs : undefined;
+    const queue = [...definitions];
+    const running: Promise<void>[] = [];
+    const startWall = performance.now();
+
+    const runOne = async (def: typeof definitions[number]) => {
       const start = performance.now();
-      const result = await def.evaluate(this._analyzer, now);
-      const duration = performance.now() - start;
-      result.durationMs = duration;
-      checkTimings.push({ id: result.id, durationMs: duration });
-      checks.push(result);
+      let timer: any;
+      const evalPromise = def.evaluate(this._analyzer, now);
+      const wrapped = timeoutMs ? Promise.race([
+        evalPromise,
+        new Promise<ComplianceCheck>((_, reject) => { timer = setTimeout(() => reject(new Error('CHECK_TIMEOUT')), timeoutMs); })
+      ]) : evalPromise;
+      try {
+        const result = await wrapped;
+        const duration = performance.now() - start;
+        if (timer) clearTimeout(timer);
+        result.durationMs = duration;
+        checks.push(result);
+        checkTimings.push({ id: result.id, durationMs: duration });
+      } catch (e: any) {
+        if (timer) clearTimeout(timer);
+        const duration = performance.now() - start;
+        checkTimings.push({ id: def.id, durationMs: duration });
+        checks.push({
+          id: def.id,
+          name: def.name,
+          description: def.description,
+          passed: false,
+          details: e && e.message === 'CHECK_TIMEOUT' ? '❌ Check timed out' : `❌ Check error: ${e?.message || e}`,
+          severity: def.severity,
+          durationMs: duration
+        });
+      }
+    };
+
+    while (queue.length || running.length) {
+      while (queue.length && running.length < maxParallel) {
+        const def = queue.shift()!;
+        const p = runOne(def).finally(() => {
+          const idx = running.indexOf(p);
+          if (idx >= 0) running.splice(idx, 1);
+        });
+        running.push(p);
+      }
+      if (running.length) {
+        await Promise.race(running);
+      }
     }
+    const parallelDurationMs = performance.now() - startWall;
+    // Preserve original ordering by id
+    checks.sort((a, b) => a.id - b.id);
 
     // Calculate overall results
     // Apply severity minimum filter for scoring (display still shows all for transparency)
@@ -102,6 +147,7 @@ export class BetanetComplianceChecker {
       specSummary,
       diagnostics
     };
+    result.parallelDurationMs = parallelDurationMs;
     result.checkTimings = checkTimings;
 
     // If env BETANET_FAIL_ON_DEGRADED set, override pass/fail (but keep original scoring)

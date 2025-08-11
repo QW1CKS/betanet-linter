@@ -20,6 +20,8 @@ program
   .option('--severity-min <level>', 'Minimum severity to include in scoring (minor|major|critical)', 'minor')
   .option('--force-refresh', 'Ignore cached analysis and re-run extraction')
   .option('--fail-on-degraded', 'Exit non-zero if analysis degraded (missing/timeout tools)')
+  .option('--max-parallel <n>', 'Maximum concurrent check evaluations', v => parseInt(v,10))
+  .option('--check-timeout <ms>', 'Per-check timeout in milliseconds', v => parseInt(v,10))
   .option('-v, --verbose', 'Verbose output')
   .option('--sbom-format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .action(async (binaryPath, options) => {
@@ -27,7 +29,14 @@ program
       const checker = new BetanetComplianceChecker();
       console.log('='.repeat(50));
       
-  const results = await checker.checkCompliance(binaryPath, { checkFilters: options.checkFilters, verbose: options.verbose, severityMin: options.severityMin, forceRefresh: options.forceRefresh });
+  const results = await checker.checkCompliance(binaryPath, {
+        checkFilters: options.checkFilters,
+        verbose: options.verbose,
+        severityMin: options.severityMin,
+        forceRefresh: options.forceRefresh,
+        maxParallel: options.maxParallel,
+        checkTimeoutMs: options.checkTimeout
+      });
       
       if (options.sbom) {
         const sbomPath = await checker.generateSBOM(binaryPath, options.sbomFormat);

@@ -14,6 +14,7 @@ A comprehensive CLI tool for checking Betanet specification compliance in binary
 - 📈 **Detailed Reporting**: Pass/fail status with detailed explanations
 - 🔄 **Force Refresh**: Use `--force-refresh` to bypass memoized baseline analysis for updated binaries
 - 🛡️ **Degraded Fail Gate**: Set `BETANET_FAIL_ON_DEGRADED=1` to force failure when tooling is degraded
+- ⚡ **Parallel Evaluation**: Runs checks concurrently; tune with `--max-parallel` and per-check `--check-timeout`
 
 ## Installation
 
@@ -96,6 +97,15 @@ betanet-lint sbom /path/to/binary --output /custom/path/sbom.xml
 ```
 
 ### Verbose Output
+### Performance & Parallelism
+
+Checks are evaluated in parallel from a cached single baseline analysis of the binary. Control concurrency & resilience:
+
+```
+betanet-lint check ./bin --max-parallel 6 --check-timeout 3000
+```
+
+Fields `parallelDurationMs` and per-check `durationMs` appear in JSON/YAML for profiling. A fallback timeout marks a check failed (non-fatal) instead of aborting the run.
 
 ```bash
 betanet-lint check /path/to/binary --verbose
@@ -269,6 +279,8 @@ Multi-license detection: Composite SPDX expressions (e.g. `Apache-2.0 OR MIT`) a
 
 ## Environment Variables
 
+- `BETANET_CHECK_TIMEOUT_MS=ms` - (Optional) Global default per-check timeout if not supplied via CLI
+
 - `BETANET_DEBUG_SBOM=1` - Enable verbose SBOM generator logging
 - `BETANET_TOOL_TIMEOUT_MS=5000` - Override per external tool invocation timeout (ms)
 - `BETANET_SKIP_TOOLS=strings,nm` - Comma-separated list of external tools to skip (graceful degradation)
@@ -283,6 +295,8 @@ Compliance results include a `diagnostics` object with tooling and performance m
 - `skippedTools`: tools skipped via configuration
 - `timedOutTools`: tools that exceeded the timeout
 - `tools[]`: per-tool availability + durations
+- `parallelDurationMs`: total elapsed time for parallel evaluation phase
+- Each check includes `durationMs`
 
 Degraded mode lowers confidence and normally does not trigger failure; set `BETANET_FAIL_ON_DEGRADED=1` (or `--fail-on-degraded`) to enforce failure.
 

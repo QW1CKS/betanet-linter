@@ -29,6 +29,7 @@ export interface ComplianceResult {
   };
   diagnostics?: AnalyzerDiagnostics;
   checkTimings?: { id: number; durationMs: number }[];
+  parallelDurationMs?: number; // total wall-clock duration of parallel evaluation phase
 }
 
 export interface SBOMComponent {
@@ -74,6 +75,8 @@ export interface CheckOptions {
   };
   severityMin?: 'minor' | 'major' | 'critical';
   forceRefresh?: boolean; // if true, re-run analysis ignoring cache
+  maxParallel?: number; // limit concurrent check evaluations (default: unlimited)
+  checkTimeoutMs?: number; // per-check timeout (optional)
 }
 
 export interface SBOMOptions {

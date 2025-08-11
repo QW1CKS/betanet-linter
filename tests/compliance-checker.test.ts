@@ -737,6 +737,29 @@ describe('BetanetComplianceChecker', () => {
     });
   });
 
+  describe('parallel evaluation', () => {
+    it('should reduce wall time vs sequential simulation', async () => {
+      const checker = new BetanetComplianceChecker();
+      // Craft analyzer returning predictable data
+      (checker as any)._analyzer = {
+        checkNetworkCapabilities: () => new Promise(r => setTimeout(()=> r({ hasTLS:true, hasQUIC:true, hasHTX:true, hasECH:true, port443:true }),50)),
+        analyze: () => Promise.resolve({ strings: ['/betanet/htx/1.1.0','/betanet/htxquic/1.1.0','ticket','rotation','chacha20','poly1305','cashu','lightning','federation','slsa','reproducible','provenance','nym mixnode beaconset diversity'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
+        checkCryptographicCapabilities: () => new Promise(r => setTimeout(()=> r({ hasChaCha20:true, hasPoly1305:true, hasEd25519:true, hasX25519:true, hasKyber768:true, hasSHA256:true, hasHKDF:true }),50)),
+        checkSCIONSupport: () => new Promise(r => setTimeout(()=> r({ hasSCION:true, pathManagement:true, hasIPTransition:false, pathDiversityCount:2 }),50)),
+        checkDHTSupport: () => new Promise(r => setTimeout(()=> r({ hasDHT:true, deterministicBootstrap:true, seedManagement:true, rotationHits:0 }),50)),
+        checkLedgerSupport: () => new Promise(r => setTimeout(()=> r({ hasAliasLedger:true, hasConsensus:true, chainSupport:true }),50)),
+        checkPaymentSupport: () => new Promise(r => setTimeout(()=> r({ hasCashu:true, hasLightning:true, hasFederation:true }),50)),
+        checkBuildProvenance: () => new Promise(r => setTimeout(()=> r({ hasSLSA:true, reproducible:true, provenance:true }),50))
+      };
+      const start = Date.now();
+      const result = await checker.checkCompliance(__filename, { maxParallel: 6 });
+      const elapsed = Date.now() - start;
+      // Sequential would have been roughly 11 * 50ms ≈ 550ms plus overhead; allow generous margin
+      expect(elapsed).toBeLessThan(450); // demonstrates some parallelism benefit
+      expect(result.parallelDurationMs).toBeDefined();
+    });
+  });
+
   describe('severity filtering', () => {
     it('should adjust scoring based on severityMin', async () => {
       const checker = new BetanetComplianceChecker();

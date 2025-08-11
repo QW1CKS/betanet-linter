@@ -31,10 +31,10 @@ Each capability helper calls analyze(), re-running expensive external commands f
 Impact: O(N_checks * extraction cost) slowdown.
 Action: Memoize analyze() result inside BinaryAnalyzer; reuse.
 
-[X] ISSUE-005 | PERF | Sequential capability checks
-Checks run serially though many depend only on static analysis.
-Impact: Increased runtime latency.
-Action: After memoization, compute capability helpers in parallel (Promise.all) or derive from cached analysis.
+[✓] ISSUE-005 | PERF | Sequential capability checks
+RESOLVED: Checks now evaluated in parallel with configurable --max-parallel; derive from single cached analysis.
+Impact: Reduced wall time as checks scale.
+Action: (Done) Consider adaptive pool sizing.
 
 HEURISTICS / ACCURACY
 ---------------------
@@ -144,10 +144,10 @@ All tests check presence counts only.
 Impact: Heuristic regressions undetected.
 Action: Add fixtures with misleading strings to ensure not matched.
 
-[X] ISSUE-025 | TEST | Lacks performance regression tests
-No measurement of extraction count.
-Impact: Silent slowdown risk.
-Action: Add test counting analyze() invocations after memoization.
+[✓] ISSUE-025 | TEST | Lacks performance regression tests
+RESOLVED: Tests assert single analyze() invocation and measure parallel speed improvement.
+Impact: Guards regression.
+Action: (Done) Optional future micro-benchmark harness.
 
 CODE QUALITY / CLEANUP
 ----------------------
@@ -203,10 +203,10 @@ Action: Add timeout & fallback path.
 [ ] ISSUE-035 | ERROR | Silent fallback warnings gated by verbose only
 Status unchanged: still primarily verbose-gated; reconsider concise default warning later.
 
-[X] ISSUE-036 | ERROR | Missing try/catch around entire check loop
-Individual check exceptions would abort entire run.
-Impact: Partial results lost.
-Action: Wrap per-check with error capture; mark check failed with diagnostic.
+[✓] ISSUE-036 | ERROR | Missing try/catch around entire check loop
+RESOLVED: Each check evaluation isolated with error & timeout handling; failures converted to failed check entry.
+Impact: Increases resilience.
+Action: (Done) Add verbose stack logging later.
 
 SECURITY / TRUST
 ----------------
@@ -344,10 +344,10 @@ No tests simulating stripped symbols (nm/objdump absence) to ensure graceful heu
 Impact: 1.1 heuristics may rely too heavily on symbol names.
 Action: Provide synthetic minimal binary or mock analyzer output to simulate missing symbols.
 
-[ ] ISSUE-057 | PERF | Parallel capability aggregation still pending (1.1 scale)
-As additional 1.1 checks are added, sequential model will further slow runtime.
-Impact: Latency grows superlinearly with spec expansion.
-Action: Implement parallel derivation from cached analysis (See ISSUE-005 linkage) and document expected speedup.
+[✓] ISSUE-057 | PERF | Parallel capability aggregation still pending (1.1 scale)
+RESOLVED: Parallel aggregation implemented (see ISSUE-005). Wall time test added.
+Impact: Scaling latency controlled.
+Action: (Done) Add runtime timing histogram later.
 
 [ ] ISSUE-058 | SBOM | Versioned component mapping for new transports / payment modules
 SBOM does not classify 1.1-specific modules (e.g., WebRTC transport, payment adapter) distinctly.

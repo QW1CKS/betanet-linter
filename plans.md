@@ -103,6 +103,7 @@ Goals:
 - forceRefresh / invalidate cache API (DONE in Plan 10)
 - Performance regression test (ISSUE-025) if not added earlier
 - Structured JSON log output option
+ - Parallel check evaluation (moved earlier into implementation; DONE, ISSUE-005/057)
 
 ---
 ## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (MOSTLY COMPLETE)
@@ -124,6 +125,7 @@ Deliverables:
 - (DONE) Fail-on-degraded env (BETANET_FAIL_ON_DEGRADED) overriding pass
 - (DONE) Multi-license parsing in SBOM (previously deferred in Plan 4)
 - (DONE) Spec version matrix (introducedIn/mandatoryIn) & CLI spec coverage summary (ISSUE-052, ISSUE-055)
+- (DONE) Parallelized check evaluation + per-check timeout & error isolation (ISSUE-005, 036, 057)
 
 Success Criteria:
 - All new heuristic & control flag tests pass (current suite updated to 31 tests) ✅
