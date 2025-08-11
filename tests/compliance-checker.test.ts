@@ -760,6 +760,24 @@ describe('BetanetComplianceChecker', () => {
     });
   });
 
+  describe('degradation (stripped binaries)', () => {
+    it('should degrade gracefully with skipped symbol tools (ISSUE-056)', async () => {
+      process.env.BETANET_SKIP_TOOLS = 'nm,objdump';
+      const checker = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-stripped');
+      await fs.writeFile(tmp, Buffer.from('/betanet/htx/1.1.0 ticket chacha20 poly1305 cashu lightning federation slsa reproducible provenance nym beaconset diversity'));
+      const result = await checker.checkCompliance(tmp, { maxParallel: 4 });
+      expect(result.diagnostics).toBeDefined();
+      expect(result.diagnostics?.degraded).toBe(true);
+      expect(result.diagnostics?.skippedTools).toEqual(expect.arrayContaining(['nm','objdump']));
+      // Ensure all checks still evaluated
+      expect(result.checks.length).toBeGreaterThanOrEqual(11);
+      const privacy = result.checks.find(c => c.id === 11);
+      expect(privacy).toBeDefined();
+      delete process.env.BETANET_SKIP_TOOLS;
+    });
+  });
+
   describe('severity filtering', () => {
     it('should adjust scoring based on severityMin', async () => {
       const checker = new BetanetComplianceChecker();

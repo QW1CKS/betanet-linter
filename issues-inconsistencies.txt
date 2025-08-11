@@ -73,7 +73,7 @@ Action: Require combination and maybe structured metadata file detection.
 Impact: False positives.
 Action: Prefer 'lnpay', 'lightning', 'lnnode', 'lnurl', 'bolt' patterns.
 
-[ ] ISSUE-051 | HEUR | Privacy hop enforcement heuristic coarse (Deferred)
+[✓] ISSUE-051 | HEUR | Privacy hop enforcement heuristic coarse (refined weighting & diversity logic implemented)
 Current detection relies on simple token presence (nym/mix/beaconset/diversity) which may appear in unrelated contexts.
 Impact: Potential false positives/negatives for new check 11.
 Action: Consider structured pattern grouping (BeaconSet+epoch parsing, VRF/seed terms, hop count tokens) & minimum entropy indicators.
@@ -324,12 +324,12 @@ IMPLEMENTED: Registry entries now include introducedIn & mandatoryIn fields. Spe
 Impact: Future spec (1.2+) evolution now data-driven.
 Action: (Done) Extend when new checks added; consider adding enforcement gating later.
 
-[ ] ISSUE-053 | HEUR | Voucher structural validation absent (Deferred)
+[✓] ISSUE-053 | HEUR | Voucher structural validation absent (structural regex & format tokens implemented)
 Only detects presence of 'voucher' token; no format, length, signature, or prefix pattern verification.
 Impact: Overstates payment readiness.
 Action: Define expected voucher regex (e.g., base58/hex length), optional checksum heuristic.
 
-[ ] ISSUE-054 | HEUR | PoW difficulty heuristic shallow (Deferred)
+[✓] ISSUE-054 | HEUR | PoW difficulty heuristic shallow (contextual regex parsing implemented)
 Currently any string with 'pow' and '22' may pass threshold intent.
 Impact: Could misclassify generic log text.
 Action: Parse nearby context (e.g., 'pow=22', 'difficulty:22', 'work(22)') with bounded regex capturing.
@@ -339,7 +339,7 @@ IMPLEMENTED: CLI/table output prints spec coverage line + pending 1.1 refinement
 Impact: Transparency improved; users see partial 1.1 coverage.
 Action: (Done) Keep pending issue list synchronized.
 
-[ ] ISSUE-056 | TEST | Stripped / packed binary degradation tests (Deferred)
+[✓] ISSUE-056 | TEST | Stripped / packed binary degradation tests (added nm/objdump skip degradation test)
 No tests simulating stripped symbols (nm/objdump absence) to ensure graceful heuristic fallback.
 Impact: 1.1 heuristics may rely too heavily on symbol names.
 Action: Provide synthetic minimal binary or mock analyzer output to simulate missing symbols.
