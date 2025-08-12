@@ -1,0 +1,145 @@
+name: Build, Provenance & Reproducibility
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write  # needed for provenance OIDC token (future full SLSA attestation)
+  actions: none
+  checks: none
+  deployments: none
+  issues: none
+  packages: read
+  pull-requests: read
+  security-events: none
+  statuses: read
+
+concurrency:
+  group: provenance-repro-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  SOURCE_DATE_EPOCH: 1700000000
+  NODE_VERSION: '18.19.0'
+
+jobs:
+  build:
+    name: Build & Hash
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      - name: Install (clean)
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Hash manifest (dist/)
+        id: hash
+        run: |
+          set -e
+          if [ -d dist ]; then
+            find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist.sha256sum || true
+          fi
+          if [ -s dist.sha256sum ]; then
+            overall=$(sha256sum dist.sha256sum | cut -d' ' -f1)
+            echo "overall_sha256=$overall" >> $GITHUB_OUTPUT
+            echo "Computed overall dist digest: $overall"
+          else
+            echo 'No dist files found; skipping digest.'
+          fi
+      - name: Create provenance reference JSON
+        if: steps.hash.outputs.overall_sha256
+        run: |
+          cat > provenance-reference.json <<EOF
+          {
+            "binaryDistDigest": "sha256:${{ steps.hash.outputs.overall_sha256 }}",
+            "sourceDateEpoch": "${SOURCE_DATE_EPOCH}",
+            "schema": 1
+          }
+          EOF
+          mkdir -p evidence
+          cp provenance-reference.json evidence/provenance.json
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-dist-${{ github.run_number }}
+          path: |
+            dist/
+            dist.sha256sum
+            evidence/provenance.json
+          retention-days: 7
+      - name: (Placeholder) Generate SLSA Provenance
+        if: steps.hash.outputs.overall_sha256
+        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+        with:
+          base64-subjects: |
+            betanet-linter:sha256:${{ steps.hash.outputs.overall_sha256 }}
+        secrets: inherit
+
+  rebuild:
+    name: Rebuild & Verify
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Install (clean)
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Compute new manifest
+        run: |
+          if [ -d dist ]; then
+            find dist -type f -print0 | sort -z | xargs -0 sha256sum > dist.sha256sum || true
+            sha256sum dist.sha256sum | cut -d' ' -f1 > overall.sha || true
+          fi
+      - name: Download original artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-dist-${{ github.run_number }}
+          path: original
+      - name: Diff manifests
+        run: |
+          if [ -f original/dist.sha256sum ] && [ -f dist.sha256sum ]; then
+            echo 'Comparing manifests...'
+            if diff -u original/dist.sha256sum dist.sha256sum; then
+              echo '✅ Rebuild manifests match.'
+            else
+              echo '❌ Rebuild manifests differ.'
+              exit 1
+            fi
+          else
+            echo 'Skipping diff (missing manifest).'
+          fi
+      - name: Run linter with provenance evidence
+        run: |
+          npm install -g .
+          if [ -f original/evidence/provenance.json ]; then
+            betanet-lint check bin/cli.js --output json --evidence-file original/evidence/provenance.json > compliance-with-provenance.json || true
+            jq '.checks[] | select(.id==9) | {id,evidenceType,details}' compliance-with-provenance.json || true
+          else
+            echo 'No provenance evidence available.'
+          fi
+      - name: Upload verification outputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: reproducibility-verification-${{ github.run_number }}
+          path: |
+            dist.sha256sum
+            overall.sha
+            compliance-with-provenance.json
+          retention-days: 7

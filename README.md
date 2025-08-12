@@ -1,4 +1,3 @@
-
 # Betanet Compliance Linter
 
 > **IMPORTANT – Transitional Compliance Notice (v1.0.0)**  
@@ -63,6 +62,16 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |13 Reproducible builds + SLSA3 provenance | 9 | heuristic | Partial | Keyword presence only |
 
 All “Partial” / “Shallow” rows will migrate to structural, dynamic, or artifact evidence per [remedation.md](./remedation.md) roadmap.
+
+### Provenance & Reproducible Build (Experimental)
+An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
+1. Deterministic build with fixed `SOURCE_DATE_EPOCH`.
+2. Per-file SHA256 manifest + aggregate digest.
+3. (Placeholder) SLSA provenance generation referencing the aggregate digest.
+4. Clean rebuild diff to assert reproducibility.
+5. Evidence ingestion via `--evidence-file` to begin upgrading Build Provenance (check 9) toward `artifact` status.
+
+Limitations: Action refs currently pinned by major version tag (will move to commit SHAs); provenance predicate not yet parsed/validated—treated as advisory evidence. See roadmap step 3 in `remedation.md`.
 
 ## License
 

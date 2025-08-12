@@ -160,7 +160,7 @@ Initial Implementation Order (Action Queue)
 ------------------------------------------
 1. [x] README matrix + strict/heuristic mode + check metadata.
 2. [x] Add evidence ingestion (JSON path via --evidence-file) wiring; adapt existing checks to accept external evidence.
-3. [ ] Harden GitHub Action + provenance generation & reproducibility verify step.
+3. [~] Harden GitHub Action + provenance generation & reproducibility verify step. (Workflow scaffold added: provenance-repro.yml placeholder; pending full commit SHA pins, predicate parsing, signature validation.)
 4. [ ] Static parsers (ClientHello template, Noise pattern, voucher struct).
 5. [ ] Dynamic harness skeleton (TLS capture + fallback simulation minimal prototype).
 6. [ ] Governance & ledger evidence validation logic.
