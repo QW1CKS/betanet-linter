@@ -254,4 +254,54 @@ Change Control
 This document should be updated as phases complete. Track completion status inline or in CHANGELOG under a "Roadmap" heading.
 
 ---
+Evidence Schema Version History
+-------------------------------
+- v1 (implicit): Heuristic-only fields (provenance (basic), governance, ledger, mix (early), noiseExtended (sim), h2Adaptive (sim)).
+- v2 (Step 10): Added `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative` plus explicit `schemaVersion=2` marker.
+- Planned v3 (Step 11+): `dynamicClientHelloCapture` (raw bytes + JA3/JA4), `quicInitial`, `statisticalJitter`, `signedEvidence`, potential `governanceHistoricalDiversity` dataset schema, and calibration baseline persistence (`calibrationBaseline`).
+
+Multi-Signal Scoring Weights & Policy
+-------------------------------------
+Weights: artifact=3, dynamic=2, static=1, heuristic=0.
+Policy Rules:
+1. A normative §11 item requires ≥2 independent non-heuristic categories (any combination of static/dynamic/artifact) for a "strong pass" label.
+2. Heuristic-only evidence cannot clear strict mode (exit code 2) unless `--allow-heuristic` is provided; even then it is annotated as advisory.
+3. Check 18 (anti-evasion) fails if excessive spec token density exists without the category diversity above (keyword stuffing heuristic guard).
+4. Roadmap graduation criteria for each pending dynamic feature include demonstrating uplift from heuristic→static or static→dynamic/artifact, reflected in a weight delta.
+5. Future: introduce a minimum composite score threshold per item once ≥2 categories routinely available (target after real dynamic capture lands).
+
+Provenance & Reproducibility (Current State)
+-------------------------------------------
+Implemented (Step 3 initial slice):
+- Deterministic build (fixed SOURCE_DATE_EPOCH) + per-file SHA256 manifest and aggregate digest.
+- (Placeholder) SLSA provenance ingestion and parsing (predicateType, builderId, subjects, materials subset) upgrading Build Provenance (Check 9) to artifact when matching binary digest.
+- Rebuild verification comparing manifests; mismatch escalates details.
+Pending Enhancements:
+- Full action pinning to commit SHAs (partial today), signature/attestation verification, complete materials graph policy, detached evidence signing.
+- Reproducible environment pin list & toolchain material hashing for tightened artifact trust.
+
+Architecture Snapshot (Current)
+-------------------------------
+Core Modules: `index.ts` (orchestrator), `check-registry.ts` (23 declarative checks), `analyzer.ts` (single-pass extraction + schema v2 population + simulated dynamic evidence), `static-parsers.ts` & `binary-introspect.ts` (structural extraction), `heuristics.ts` (legacy/token heuristics), `sbom/` (CycloneDX & SPDX generation, feature tagging), `safe-exec.ts` (tooling wrapper), `governance-parser.ts` & ledger parsers (artifact ingestion), `sbom-validators.ts` (shape checks), `types.ts` (shared types).
+Execution Model: single analyzer pass cached; parallel check evaluation with per-check timeout; multi-signal aggregation after evaluation.
+Degradation Surface: tool availability (strings, nm, objdump, ldd, file, sha256sum), fallback streaming ASCII extraction (32MiB cap), platform diagnostics for Windows missing Unix toolchain.
+
+Contribution & Escalation Path
+------------------------------
+Lifecycle of a Capability:
+1. Heuristic token detection (initial coverage) → 2. Structural parser (static-structural) → 3. Dynamic harness capture (dynamic-protocol) → 4. External artifact / cryptographic validation (artifact).
+Checklist for New Check (see CONTRIBUTING.md): registry entry (id/key/metadata), extraction added to analyzer or parser, tests (happy, negative, edge, version gate), documentation (README matrix + roadmap update), evidence type escalation plan recorded here.
+Escalation Targets (Step 11 focus): Transport calibration (1→12/22 dynamic), Noise rekey (19 sim → real), HTTP/2/3 adaptive jitter (20 sim → real + statistical), Governance diversity (15 artifact depth), Fallback timing (new dynamic), Signed evidence (artifact authenticity layer).
+
+Security Reporting & Hardening Summary
+-------------------------------------
+Report Vulnerabilities: see SECURITY.md (issue tracker or direct maintainer contact – avoid public disclosure pre-fix for critical issues).
+Hardening Implemented: command timeouts (`safe-exec`), deterministic date override gating (UTC), sanitized SBOM names, degraded diagnostics, multi-signal anti-evasion, provenance & reproducibility scaffolding.
+Planned Security Enhancements: evidence signature verification, action pin audit automation, sandboxed dynamic probe execution with resource quotas, artifact materials completeness policy, optional offline mode enforcement (--fail-on-network + allowlist).
+
+Cross-Doc Pointers
+------------------
+For detailed schemas see `docs/evidence-schema.md`. For CI provenance workflow details see `docs/provenance-repro.md`. For architectural deep dive see `ARCHITECTURE.md`. Contribution guidance: `CONTRIBUTING.md`.
+
+---
 Legacy End (see ROADMAP.md for current status).

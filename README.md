@@ -2,7 +2,7 @@
 
 > **IMPORTANT – Transitional Compliance Notice (post Step 10)**  
 > The linter now contains **23 registered checks** (IDs 1–23) spanning heuristic, static-structural, dynamic-protocol and artifact evidence classes. Steps 8–10 introduced multi‑signal scoring & anti‑evasion, simulated dynamic harness evidence (Noise rekey policy & HTTP/2 adaptive jitter), structural binary introspection, static ClientHello template extraction, enhanced Noise pattern detail, negative assertions, and evidence schema **v2**.  
-> Many behaviors (real transcript capture, HTTP/3, calibration baselines, statistical variance tests, governance depth) remain pending; by default **strict mode** still excludes purely heuristic passes unless `--allow-heuristic` is provided. See the living roadmap in [ROADMAP.md](./ROADMAP.md).  
+> Many behaviors (real transcript capture, HTTP/3, calibration baselines, statistical variance tests, governance depth) remain pending; by default **strict mode** still excludes purely heuristic passes unless `--allow-heuristic` is provided. See the living roadmap in [ROADMAP.md](./ROADMAP.md) (sections: Progress Summary, Evidence Schema Version History, Multi-Signal Scoring, Provenance & Reproducibility).  
 > Treat PASS states as advisory unless supported by ≥2 non‑heuristic categories (see Multi‑Signal section).
 
 
@@ -472,7 +472,7 @@ npm run lint
 
 For deeper insight into project direction and open/refined issues:
 
-- Roadmap status: see [ROADMAP.md](./ROADMAP.md)
+- Roadmap status & advanced context (schema history, scoring weights, provenance state, escalation path): see [ROADMAP.md](./ROADMAP.md)
 - Issues, inconsistencies & improvement backlog: see [issues-inconsistencies.txt](./issues-inconsistencies.txt)
 
 These documents complement the README by outlining historical decisions, completed milestones, and pending enhancement tracks.
