@@ -47,6 +47,7 @@ program
   .option('--strict', 'Enable strict mode (heuristic passes do not count unless --allow-heuristic)', true)
   .option('--allow-heuristic', 'In strict mode, allow heuristic passes to count toward compliance', false)
   .option('--evidence-file <path>', 'Path to external evidence JSON for normative checks (Phase 1)')
+  .option('--sbom-file <path>', 'Path to SBOM file (CycloneDX XML/JSON or SPDX tag/json) for materials cross-check')
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -78,6 +79,7 @@ program
         strictMode: options.strict !== undefined ? options.strict : true,
         allowHeuristic: options.allowHeuristic,
         evidenceFile: options.evidenceFile
+  , sbomFile: options.sbomFile
       });
       
       if (options.sbom) {

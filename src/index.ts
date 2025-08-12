@@ -102,6 +102,67 @@ export class BetanetComplianceChecker {
         console.warn(`⚠️  Failed to load evidence file ${options.evidenceFile}: ${e.message}`);
       }
     }
+    // Optional SBOM ingestion for materials cross-check (Phase 3 partial)
+    if (options.sbomFile && fs.existsSync(options.sbomFile)) {
+      try {
+        const sbomRaw = fs.readFileSync(options.sbomFile, 'utf8');
+        let sbomObj: any = null;
+        if (options.sbomFile.endsWith('.json')) {
+          try { sbomObj = JSON.parse(sbomRaw); } catch {/* ignore */}
+        } else if (options.sbomFile.endsWith('.xml')) {
+          try { sbomObj = xml2js.parseStringPromise(sbomRaw); } catch {/* ignore */}
+        } else { // attempt tag-value SPDX simplistic parse into map array
+          const lines = sbomRaw.split(/\r?\n/);
+          const pkgs: { name: string; version?: string; checksum?: string }[] = [];
+          let current: any = {};
+          for (const l of lines) {
+            if (/^PackageName:\s+/.test(l)) {
+              if (current.name) pkgs.push(current); current = { name: l.replace(/^PackageName:\s+/,'').trim() };
+            } else if (/^PackageVersion:\s+/.test(l)) {
+              current.version = l.replace(/^PackageVersion:\s+/,'').trim();
+            } else if (/^PackageChecksum:\s+SHA256:\s+/.test(l)) {
+              current.checksum = l.replace(/^PackageChecksum:\s+SHA256:\s+/,'').trim();
+            }
+          }
+          if (current.name) pkgs.push(current);
+          sbomObj = { _tagValuePackages: pkgs };
+        }
+        if (sbomObj) {
+          (this._analyzer as any).ingestedSBOM = sbomObj;
+          // Attempt immediate materials validation if both provenance & SBOM present
+          const evidence: IngestedEvidence | undefined = (this._analyzer as any).evidence;
+          if (evidence?.provenance?.materials && evidence.provenance.materials.length) {
+            try {
+              const sbomDigests = new Set<string>();
+              // CycloneDX JSON format
+              const cdxComponents = (sbomObj.components && Array.isArray(sbomObj.components)) ? sbomObj.components : (sbomObj.bom?.components?.component || []);
+              if (Array.isArray(cdxComponents)) {
+                cdxComponents.forEach((c: any) => {
+                  const hashes = c.hashes || c.hashes?.hash || [];
+                  if (Array.isArray(hashes)) hashes.forEach((h: any) => { if (h.content) sbomDigests.add('sha256:' + (h.content || '').toLowerCase()); });
+                });
+              }
+              // SPDX JSON
+              if (Array.isArray(sbomObj.packages)) {
+                sbomObj.packages.forEach((p: any) => {
+                  if (Array.isArray(p.checksums)) p.checksums.forEach((cs: any) => { if (cs.algorithm === 'SHA256' && cs.checksumValue) sbomDigests.add('sha256:' + cs.checksumValue.toLowerCase()); });
+                });
+              }
+              // SPDX tag-value fallback
+              if (Array.isArray(sbomObj._tagValuePackages)) {
+                sbomObj._tagValuePackages.forEach((p: any) => { if (p.checksum) sbomDigests.add('sha256:' + p.checksum.toLowerCase()); });
+              }
+              const materials = evidence.provenance.materials;
+              const unmatched = materials.filter(m => m.digest && !sbomDigests.has(m.digest.toLowerCase()));
+              evidence.provenance.materialsMismatchCount = unmatched.length;
+              evidence.provenance.materialsValidated = unmatched.length === 0;
+            } catch {/* ignore validation errors */}
+          }
+        }
+      } catch (e: any) {
+        console.warn(`⚠️  Failed to ingest SBOM file ${options.sbomFile}: ${e.message}`);
+      }
+    }
     // Enable dynamic probe if requested or via env toggle
     if ((options.dynamicProbe || process.env.BETANET_DYNAMIC_PROBE === '1') && typeof (this._analyzer as any).setDynamicProbe === 'function') {
       (this._analyzer as any).setDynamicProbe(true);

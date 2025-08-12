@@ -142,6 +142,69 @@ describe('BetanetComplianceChecker', () => {
       await fs.remove(evidencePath);
     });
 
+    it('passes build provenance when materials match SBOM digests', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmpBin = path.join(__dirname, 'temp-existing-bin2');
+      await fs.writeFile(tmpBin, Buffer.from('binary data slsa reproducible provenance'));
+      const fileBuf = await fs.readFile(tmpBin);
+      const actualDigest = require('crypto').createHash('sha256').update(fileBuf).digest('hex');
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['slsa','reproducible','provenance'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false }),
+        getBinarySha256: () => Promise.resolve(actualDigest)
+      };
+      const evidencePath = path.join(__dirname, 'temp-evidence-materials.json');
+      const materials = [ { uri: 'git+https://example.com/repo@abc', digest: 'sha256:' + actualDigest } ];
+      const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest, materials } };
+      await fs.writeFile(evidencePath, JSON.stringify(evidence));
+      // Create minimal SPDX JSON SBOM containing the digest
+      const sbomPath = path.join(__dirname, 'temp-sbom.spdx.json');
+      const sbom = { spdxVersion: 'SPDX-2.3', packages: [{ name: 'root', SPDXID: 'SPDXRef-Package-Root', versionInfo: '1.0.0', filesAnalyzed: false, downloadLocation: 'NOASSERTION', licenseDeclared: 'NOASSERTION', licenseConcluded: 'NOASSERTION', copyrightText: 'NOASSERTION', checksums: [{ algorithm: 'SHA256', checksumValue: actualDigest }] }] };
+      await fs.writeFile(sbomPath, JSON.stringify(sbom));
+      const result = await checkerLocal.checkCompliance(tmpBin, { evidenceFile: evidencePath, sbomFile: sbomPath, allowHeuristic: true });
+      const buildProv = result.checks.find(c => c.id === 9);
+      expect(buildProv?.passed).toBe(true);
+      expect(buildProv?.details).toMatch(/materials cross-checked/);
+      await fs.remove(evidencePath); await fs.remove(sbomPath); await fs.remove(tmpBin);
+    });
+
+    it('fails build provenance when materials do not match SBOM digests', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmpBin = path.join(__dirname, 'temp-existing-bin3');
+      await fs.writeFile(tmpBin, Buffer.from('binary data slsa reproducible provenance mismatch'));
+      const fileBuf = await fs.readFile(tmpBin);
+      const actualDigest = require('crypto').createHash('sha256').update(fileBuf).digest('hex');
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['slsa','reproducible','provenance'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false }),
+        getBinarySha256: () => Promise.resolve(actualDigest)
+      };
+      const evidencePath = path.join(__dirname, 'temp-evidence-materials-mismatch.json');
+      const materials = [ { uri: 'git+https://example.com/repo@abc', digest: 'sha256:' + actualDigest.slice(0, 60) + 'dead' } ];
+      const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest, materials } };
+      await fs.writeFile(evidencePath, JSON.stringify(evidence));
+      const sbomPath = path.join(__dirname, 'temp-sbom2.spdx.json');
+      const sbom = { spdxVersion: 'SPDX-2.3', packages: [{ name: 'root', SPDXID: 'SPDXRef-Package-Root', versionInfo: '1.0.0', filesAnalyzed: false, downloadLocation: 'NOASSERTION', licenseDeclared: 'NOASSERTION', licenseConcluded: 'NOASSERTION', copyrightText: 'NOASSERTION', checksums: [{ algorithm: 'SHA256', checksumValue: actualDigest }] }] };
+      await fs.writeFile(sbomPath, JSON.stringify(sbom));
+      const result = await checkerLocal.checkCompliance(tmpBin, { evidenceFile: evidencePath, sbomFile: sbomPath, allowHeuristic: true });
+      const buildProv = result.checks.find(c => c.id === 9);
+      expect(buildProv?.passed).toBe(false);
+      expect(buildProv?.details).toMatch(/Materials\/SBOM mismatch/);
+      await fs.remove(evidencePath); await fs.remove(sbomPath); await fs.remove(tmpBin);
+    });
+
     it('should throw if binary does not exist', async () => {
       const localChecker = new BetanetComplianceChecker();
       await expect(localChecker.checkCompliance('/non/existent/path/binary')).rejects.toThrow(/Binary not found/);

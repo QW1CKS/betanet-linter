@@ -257,6 +257,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   const buildInfo = rawBuildInfo || { hasSLSA: false, reproducible: false, provenance: false };
       const evidence = (analyzer as any).evidence || {};
       const prov = evidence.provenance || {};
+  const materialsValidated = prov.materialsValidated === true;
+  const materialsMismatchCount = prov.materialsMismatchCount || 0;
       // Validate normative provenance
       let normativeDetails: string[] = [];
       let hasNormative = false;
@@ -311,7 +313,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         rebuildMismatch = true;
         normativeDetails.push('rebuild digest mismatch flagged');
       }
-      const passed = !rebuildMismatch && ((buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative);
+      const passed = !rebuildMismatch && ((buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative) && (!materialsMismatchCount);
       const missing = missingList([
         !(buildInfo.hasSLSA || prov.predicateType) && 'SLSA support/predicate',
         !(buildInfo.reproducible || hasNormative) && 'reproducible builds',
@@ -322,7 +324,9 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         name: 'Build Provenance',
         description: 'Builds reproducibly and publishes SLSA 3 provenance',
         passed,
-        details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (rebuildMismatch ? '❌ Rebuild digest mismatch (non-reproducible)' : `❌ Missing: ${missing}`),
+        details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (
+          rebuildMismatch ? '❌ Rebuild digest mismatch (non-reproducible)' : (materialsMismatchCount ? `❌ Materials/SBOM mismatch (${materialsMismatchCount} unmatched)` : `❌ Missing: ${missing}`)
+        ),
         severity: 'minor',
         evidenceType: hasNormative ? 'artifact' : 'heuristic'
       };

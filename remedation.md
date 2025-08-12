@@ -3,7 +3,7 @@ Betanet Linter Remediation Strategy (Reference)
 
 Progress Summary
 ----------------
-Completed so far: 5 tasks (Phase 0 transparency set + Implementation Order steps 1 & 2 + partial step 3 provenance validation)  
+Completed so far: 5 tasks (Phase 0 transparency set + Implementation Order steps 1 & 2 + partial step 3: provenance parsing, action pinning, rebuild mismatch enforcement)  
 Pending: Remaining tasks across Phases 1–7 and supporting sections.  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
@@ -160,7 +160,7 @@ Initial Implementation Order (Action Queue)
 ------------------------------------------
 1. [x] README matrix + strict/heuristic mode + check metadata.
 2. [x] Add evidence ingestion (JSON path via --evidence-file) wiring; adapt existing checks to accept external evidence.
-3. [~] Harden GitHub Action + provenance generation & reproducibility verify step. (Workflow scaffold + provenance parsing + binary digest verification implemented: external SLSA or DSSE/JSON evidence upgrades check 9 to artifact. Pending: pin all action SHAs, signature & materials validation, reproducibility rebuild enforcement, SBOM/materials cross-check.)
+3. [~] Harden GitHub Action + provenance generation & reproducibility verify step. (Implemented: workflow scaffold, action SHAs pinned, provenance parsing, binary digest validation, rebuild mismatch enforcement (fails check 9 on non-reproducible rebuild), artifact evidence upgrade, SBOM ingestion + materials/SBOM cross-check gating pass. Pending: signature verification of provenance, stricter materials completeness/allowlists, attestation (cosign) verification.)
 4. [ ] Static parsers (ClientHello template, Noise pattern, voucher struct).
 5. [ ] Dynamic harness skeleton (TLS capture + fallback simulation minimal prototype).
 6. [ ] Governance & ledger evidence validation logic.

@@ -86,6 +86,7 @@ export interface CheckOptions {
   strictMode?: boolean; // if true, only non-heuristic evidence counts toward pass unless allowHeuristic
   allowHeuristic?: boolean; // if true in strict mode, heuristic passes are included
   evidenceFile?: string; // path to external evidence JSON (Phase 1 ingestion)
+  sbomFile?: string; // optional SBOM file path to cross-check provenance materials (Phase 3 extension)
 }
 
 export interface SBOMOptions {
@@ -104,6 +105,8 @@ export interface IngestedEvidence {
   verified?: boolean; // internal flag after validation
   sourceDateEpoch?: number; // captured SOURCE_DATE_EPOCH if present
   rebuildDigestMismatch?: boolean; // flag set when CI detects non-reproducible rebuild
+  materialsValidated?: boolean; // set true when all provenance.materials digests accounted for in SBOM
+  materialsMismatchCount?: number; // count of material digests not matched in SBOM (if sbom provided)
   };
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder
