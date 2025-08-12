@@ -185,10 +185,13 @@ program
   .option('--mix-samples <n>', 'Simulate mix path sampling (number of samples)', v => parseInt(v,10))
   .option('--mix-hops-range <a,b>', 'Range of hops per path (e.g. 2,4)', v => v.split(',').map(x=>parseInt(x,10)).slice(0,2))
   .option('--mix-deterministic', 'Deterministic pseudo-random mix sampling for reproducible CI')
+  .option('--rekey-simulate', 'Simulate observing a Noise rekey event (Step 9 placeholder)')
+  .option('--h2-adaptive-simulate', 'Simulate HTTP/2 adaptive padding/jitter evidence (Step 9 placeholder)')
+  .option('--jitter-samples <n>', 'Number of simulated jitter samples (default 20)', v => parseInt(v,10))
   .action(async (binaryPath, options) => {
     try {
       const { runHarness } = require('../src/harness');
-  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections, mixSamples: options.mixSamples, mixHopsRange: options.mixHopsRange, mixDeterministic: options.mixDeterministic });
+  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections, mixSamples: options.mixSamples, mixHopsRange: options.mixHopsRange, mixDeterministic: options.mixDeterministic, rekeySimulate: options.rekeySimulate, h2AdaptiveSimulate: options.h2AdaptiveSimulate, jitterSamples: options.jitterSamples });
       console.log(`✅ Harness evidence written to ${out}`);
     } catch (e) {
       console.error('❌ Harness error:', e.message);

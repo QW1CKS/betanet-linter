@@ -124,6 +124,7 @@ export interface IngestedEvidence {
   };
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder
+  noiseExtended?: { pattern?: string; rekeysObserved?: number; rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number } };
   governance?: any; // Phase 6 governance snapshot evidence
   ledger?: any; // Phase 6 ledger observation evidence
   mix?: {
@@ -133,5 +134,6 @@ export interface IngestedEvidence {
     minHopsBalanced?: number; // balanced mode min hops (e.g., 2)
     minHopsStrict?: number; // strict mode min hops (e.g., 3)
   }; // Phase 7 mix diversity sampling evidence
+  h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
   [k: string]: any; // allow forward-compatible keys
 }

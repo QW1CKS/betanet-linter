@@ -3,8 +3,8 @@ Betanet Linter Remediation Strategy (Reference)
 
 Progress Summary
 ----------------
-Completed so far: 5 tasks (Phase 0 transparency set + Implementation Order steps 1 & 2 + partial step 3: provenance parsing, action pinning, rebuild mismatch enforcement)  
-Pending: Remaining tasks across Phases 1–7 and supporting sections.  
+Completed so far: 9 tasks (Implementation Order steps 1–9; Step 3 advanced with provenance parsing, action pinning, rebuild mismatch enforcement; cryptographic signature & some extended materials policy still pending; Step 9 initial simulation scope complete)  
+Pending: Remaining tasks across Phases 1–7 beyond Step 9 (real transcript capture, HTTP/3 adaptive, calibration baselines, statistical variance tests, signature verification, negative assertions, governance depth, etc.).  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
 Purpose
@@ -166,7 +166,7 @@ Initial Implementation Order (Action Queue)
 6. [x] Governance & ledger evidence validation logic (ingestion via --governance-file; artifact checks 15 & 16; derives AS/org caps from raw weights; parses CBOR quorum certificates, validates aggregate threshold; flags partitions & emergency advance; future enhancement: signature cryptographic validation & historical diversity dataset integration).
 7. [x] Mix diversity sampling + privacy refinement. (Implemented: mix evidence schema, harness simulation w/ deterministic option, CLI flags --mix-samples/--mix-hops-range/--mix-deterministic, Check 17 with hop depth + uniqueness + diversity index thresholds, Privacy Hop Enforcement upgraded to dynamic when mix evidence present.)
 8. [x] Multi-signal scoring & anti-evasion heuristics. (Implemented: Check 18 requiring ≥2 category evidences, weighted multi-signal scoring summary, keyword stuffing density heuristic that flags/fails suspected token padding when evidence diversity insufficient, warnings surfaced in result for suspicious cases.)
-9. [ ] Full dynamic harness expansion (rekey observation, HTTP/2/3 adaptive tolerances, timing jitter stats).
+9. [x] Full dynamic harness expansion (initial simulation implemented: rekey event, HTTP/2 adaptive jitter metrics, Checks 19 & 20, CLI flags --rekey-simulate/--h2-adaptive-simulate/--jitter-samples; future: real capture, HTTP/3, calibration baselines, statistical variance tests).
 
 Potential Risks & Mitigations
 -----------------------------
