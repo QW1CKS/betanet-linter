@@ -396,6 +396,73 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       };
     }
   }
+  ,
+  {
+    id: 12,
+    key: 'clienthello-static-template',
+    name: 'TLS ClientHello Static Template',
+    description: 'Extracts ALPN set/order & extension ordering hash (static approximation)',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const patterns = await (analyzer as any).getStaticPatterns?.();
+      const ch = patterns?.clientHello;
+      const passed = !!(ch && ch.alpn && ch.alpn.length >= 2);
+      return {
+        id: 12,
+        name: 'TLS ClientHello Static Template',
+        description: 'Extracts ALPN set/order & extension ordering hash (static approximation)',
+        passed,
+        details: passed ? `✅ ALPN: ${ch!.alpn.join(', ')} hash=${ch!.extOrderSha256?.slice(0,12)}` : '❌ Insufficient ALPN evidence',
+        severity: 'minor',
+        evidenceType: 'static-structural'
+      };
+    }
+  },
+  {
+    id: 13,
+    key: 'noise-xk-pattern',
+    name: 'Noise XK Pattern',
+    description: 'Detects Noise_XK handshake pattern tokens',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const patterns = await (analyzer as any).getStaticPatterns?.();
+      const noise = patterns?.noise;
+      const passed = !!(noise && noise.pattern === 'XK');
+      return {
+        id: 13,
+        name: 'Noise XK Pattern',
+        description: 'Detects Noise_XK handshake pattern tokens',
+        passed,
+        details: passed ? '✅ Noise_XK pattern detected' : '❌ Noise_XK pattern not found',
+        severity: 'minor',
+        evidenceType: 'static-structural'
+      };
+    }
+  },
+  {
+    id: 14,
+    key: 'voucher-struct-heuristic',
+    name: 'Voucher Struct Heuristic',
+    description: 'Detects presence of 128B voucher struct token triad',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const patterns = await (analyzer as any).getStaticPatterns?.();
+      const voucher = patterns?.voucher;
+      const passed = !!(voucher && voucher.structLikely);
+      return {
+        id: 14,
+        name: 'Voucher Struct Heuristic',
+        description: 'Detects presence of 128B voucher struct token triad',
+        passed,
+        details: voucher ? (voucher.structLikely ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')}` : `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')}`) : '❌ No voucher struct tokens',
+        severity: 'minor',
+        evidenceType: 'static-structural'
+      };
+    }
+  }
 ];
 
 export function getChecksByIds(ids: number[]): CheckDefinitionMeta[] {

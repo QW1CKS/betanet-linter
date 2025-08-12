@@ -5,6 +5,7 @@ import { safeExec, isToolSkipped } from './safe-exec';
 import { FALLBACK_MAX_BYTES, DEFAULT_FALLBACK_STRING_MIN_LEN, DEFAULT_TOOL_TIMEOUT_MS } from './constants';
 import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
 import * as crypto from 'crypto';
+import { extractStaticPatterns, StaticPatterns } from './static-parsers';
 // Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 
 export class BinaryAnalyzer {
@@ -27,6 +28,7 @@ export class BinaryAnalyzer {
   private analysisStartHr: [number, number] | null = null;
   private toolsReady: Promise<void>;
   private binarySha256: string | null = null;
+  private staticPatterns: StaticPatterns | null = null;
 
   constructor(binaryPath: string, verbose: boolean = false) {
     this.binaryPath = binaryPath;
@@ -50,6 +52,17 @@ export class BinaryAnalyzer {
       stream.on('error', reject);
     });
     return this.binarySha256;
+  }
+
+  async getStaticPatterns(): Promise<StaticPatterns> {
+    if (this.staticPatterns) return this.staticPatterns;
+    const analysis = await this.analyze();
+    try {
+      this.staticPatterns = extractStaticPatterns(analysis.strings);
+    } catch {
+      this.staticPatterns = {} as StaticPatterns;
+    }
+    return this.staticPatterns as StaticPatterns;
   }
 
   setDynamicProbe(flag: boolean) {

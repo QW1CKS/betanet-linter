@@ -74,8 +74,9 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-  expect(result.checks).toHaveLength(11);
-  expect(result.summary.total).toBe(11);
+  // Total checks increased to 14 after adding static structural parsers (IDs 12-14)
+  expect(result.checks).toHaveLength(14);
+  expect(result.summary.total).toBe(14);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
   // Spec summary should be present
@@ -254,7 +255,8 @@ describe('BetanetComplianceChecker', () => {
         checkFilters: { exclude: [10] }
       });
 
-      expect(result.checks).toHaveLength(10); // 11 total minus excluded 10
+  // With 14 total, excluding id 10 should yield 13
+  expect(result.checks).toHaveLength(13); // 14 total minus excluded 10
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 
@@ -517,6 +519,41 @@ describe('BetanetComplianceChecker', () => {
       expect(cdx.dependencies === undefined || cdx.dependencies.length === 0).toBe(true);
       await fs.remove(cdxJsonPath);
       await fs.remove(tempBin);
+    });
+  });
+
+  describe('static parser checks', () => {
+    it('detects ClientHello ALPN order, Noise_XK, and voucher struct tokens', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmpBin = path.join(__dirname, 'temp-static-bin');
+      await fs.writeFile(tmpBin, Buffer.from('Noise_XK h2 http/1.1 keysetid32 secret32 aggregatedsig64'));
+      (checkerLocal as any)._analyzer = {
+        analyze: () => Promise.resolve({ strings: ['Noise_XK','h2','http/1.1','keysetid32','secret32','aggregatedsig64'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        getStaticPatterns: async () => ({
+          clientHello: { alpn: ['h2','http/1.1'], extOrderSha256: 'deadbeef', detected: true },
+          noise: { pattern: 'XK', detected: true },
+          voucher: { structLikely: true, tokenHits: ['keysetid32','secret32','aggregatedsig64'] }
+        })
+      };
+      const result = await checkerLocal.checkCompliance(tmpBin, { allowHeuristic: true });
+      const ids = result.checks.map(c => c.id);
+      expect(ids).toContain(12);
+      expect(ids).toContain(13);
+      expect(ids).toContain(14);
+      const ch = result.checks.find(c => c.id === 12);
+      const noise = result.checks.find(c => c.id === 13);
+      const voucher = result.checks.find(c => c.id === 14);
+      expect(ch?.passed).toBe(true);
+      expect(noise?.passed).toBe(true);
+      expect(voucher?.passed).toBe(true);
+      await fs.remove(tmpBin);
     });
   });
 
