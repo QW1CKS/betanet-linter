@@ -118,14 +118,28 @@ export class BetanetComplianceChecker {
     const severityRank = { minor: 1, major: 2, critical: 3 } as const;
     const min = options.severityMin ? severityRank[options.severityMin] : 1;
     const considered = checks.filter(c => severityRank[c.severity] >= min);
-    const passedChecks = considered.filter(c => c.passed);
+    // Strict mode logic: by default treat heuristic passes as informational unless allowHeuristic OR not in strictMode
+    const strictMode = options.strictMode !== false; // default true if not specified
+    const allowHeuristic = !!options.allowHeuristic;
+    const normativePasses = considered.filter(c => c.passed && c.evidenceType && c.evidenceType !== 'heuristic');
+    const heuristicPasses = considered.filter(c => c.passed && (c.evidenceType === 'heuristic' || !c.evidenceType));
+    const passedChecks = (!strictMode || allowHeuristic) ? considered.filter(c => c.passed) : normativePasses;
     const criticalChecks = considered.filter(c => c.severity === 'critical' && !c.passed);
     const overallScore = considered.length === 0 ? 0 : Math.round((passedChecks.length / considered.length) * 100);
-    const passed = considered.length > 0 && passedChecks.length === considered.length && criticalChecks.length === 0;
+    let passed = considered.length > 0 && passedChecks.length === considered.length && criticalChecks.length === 0;
+    // In strict mode if there are any heuristic-only passes counting toward compliance, force non-pass unless allowed
+    let heuristicContributionCount = 0;
+    if (strictMode && !allowHeuristic) {
+      heuristicContributionCount = heuristicPasses.length;
+      if (heuristicContributionCount > 0) passed = false;
+    }
     const diagnostics = (() => { const a: any = this.analyzer; if (a && typeof a.getDiagnostics === 'function') { try { return a.getDiagnostics(); } catch { return undefined; } } return undefined; })();
     const implementedChecks = CHECK_REGISTRY.filter(c => isVersionLE(c.introducedIn, SPEC_VERSION_PARTIAL)).length;
     const specSummary = { baseline: SPEC_VERSION_SUPPORTED_BASE, latestKnown: SPEC_VERSION_PARTIAL, implementedChecks, totalChecks: CHECK_REGISTRY.length, pendingIssues: SPEC_11_PENDING_ISSUES };
     const result: ComplianceResult = { binaryPath, timestamp: new Date().toISOString(), overallScore, passed, checks, summary: { total: considered.length, passed: passedChecks.length, failed: considered.length - passedChecks.length, critical: criticalChecks.length }, specSummary, diagnostics };
+    (result as any).strictMode = strictMode;
+    (result as any).allowHeuristic = allowHeuristic;
+    (result as any).heuristicContributionCount = heuristicContributionCount;
     result.parallelDurationMs = parallelDurationMs; result.checkTimings = checkTimings; if (process.env.BETANET_FAIL_ON_DEGRADED === '1' && result.diagnostics?.degraded) result.passed = false; return result;
   }
 

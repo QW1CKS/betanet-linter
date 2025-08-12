@@ -5,6 +5,7 @@ export interface ComplianceCheck {
   passed: boolean;
   details: string;
   severity: 'critical' | 'major' | 'minor';
+  evidenceType?: 'heuristic' | 'static-structural' | 'dynamic-protocol' | 'artifact'; // classification for strict mode
   durationMs?: number; // execution time for the check
   degradedHints?: string[]; // per-check degradation context (ISSUE-035)
 }
@@ -82,6 +83,8 @@ export interface CheckOptions {
   maxParallel?: number; // limit concurrent check evaluations (default: unlimited)
   checkTimeoutMs?: number; // per-check timeout (optional)
   dynamicProbe?: boolean; // attempt lightweight runtime '--help' probe to augment strings
+  strictMode?: boolean; // if true, only non-heuristic evidence counts toward pass unless allowHeuristic
+  allowHeuristic?: boolean; // if true in strict mode, heuristic passes are included
 }
 
 export interface SBOMOptions {

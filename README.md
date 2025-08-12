@@ -23,6 +23,42 @@ A comprehensive CLI tool for checking Betanet specification compliance in binary
 
 This tool uses static heuristic analysis. It cannot guarantee runtime compliance or detect dynamic behaviors (e.g., live rotation, runtime-generated keys, or negotiated ciphers). See [plans.md](./plans.md) for roadmap and deferred features (e.g., dynamic probe plugins, confidence metrics).
 
+### Strict Mode vs Heuristic Mode (Transitional)
+Current checks are classified as `heuristic` evidence. Strict mode (default) treats heuristic passes as informational only; they do not count toward an overall PASS unless you explicitly enable `--allow-heuristic`. This prevents overstating normative compliance while the remediation roadmap (see `remedation`) is in progress.
+
+CLI flags:
+```
+--strict (default true)
+--allow-heuristic   # opt-in to count heuristic passes
+```
+Exit codes:
+```
+0 = All required (non-heuristic or allowed heuristic) checks passed
+1 = One or more required checks failed
+2 = Heuristic-only gap (strict mode prevented pass) – no critical failing check, but insufficient normative evidence
+```
+
+JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCount`.
+
+### Preliminary Compliance Matrix
+| Spec §11 Item | Check ID(s) | Current Evidence Type | Status | Notes |
+|---------------|------------|-----------------------|--------|-------|
+| 1 HTX over TCP+QUIC + origin-mirrored TLS + ECH | 1 | heuristic | Partial | Presence only (no calibration / extension order) |
+| 2 Access tickets replay-bound + padding + rate limits | 2 | heuristic | Partial | Token presence; no structure/padding window parse |
+| 3 Noise XK tunnel + key sep + rekey + PQ date | 3,10 | heuristic | Partial | AEAD + PQ token; no transcript / rekey policy |
+| 4 HTTP/2/3 adaptive emulation | (planned) | – | Missing | Not yet implemented |
+| 5 SCION bridging via HTX tunnel (no legacy header) | 4 | heuristic | Partial | SCION/path tokens only |
+| 6 Transport endpoints /betanet/htx & htxquic | 5 | heuristic | Moderate | Version presence only |
+| 7 Rotating rendezvous bootstrap (BeaconSet + PoW + buckets) | 6 | heuristic | Partial | Rotation tokens only |
+| 8 Mixnode selection (BeaconSet + entropy + diversity + hop policy) | 11 | heuristic | Partial | Token weighting only |
+| 9 Alias ledger finality 2-of-3 + Emergency Advance | 7 | heuristic | Shallow | Consensus tokens only |
+|10 Cashu vouchers (128B), FROST n≥5 t=3, PoW adverts, Lightning | 8 | heuristic | Partial | Presence; no struct verify |
+|11 Governance anti-concentration + partition safety | (planned) | – | Missing | Not implemented |
+|12 Anti-correlation fallback behavior | (planned) | – | Missing | Not implemented |
+|13 Reproducible builds + SLSA3 provenance | 9 | heuristic | Partial | Keyword presence only |
+
+All “Partial” / “Shallow” rows will migrate to structural, dynamic, or artifact evidence per `remedation` roadmap.
+
 ## License
 
 MIT License. See [LICENSE](./LICENSE) for details.

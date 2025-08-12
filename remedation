@@ -175,6 +175,71 @@ Open Questions / Future Enhancements
 - Integrate container-based reproducible build sandbox (e.g., Docker + rootless) vs GitHub ephemeral runner only.
 - Optional WASM plugin interface for community-contributed dynamic scenarios.
 
+Key Caveats & Clarifications (Required for Full Normative Claim)
+----------------------------------------------------------------
+1. TLS Calibration: Implement deterministic comparison of ALPN set & order, extension ordering (stable SHA256 over ordered extensions), JA3/JA4 family classification, HTTP/2 SETTINGS tolerance math (±15% where spec allows; else exact). Provide granular failure codes.
+2. ECH Verification: Confirm actual encrypted ClientHello acceptance (e.g., by detecting expected certificate sequence / absence of outer SNI) rather than token presence.
+3. Negative Assertions: Enforce absence of legacy transition header on public network targets; enforce absence of deterministic DHT seed constants in 1.1 builds.
+4. Rekey Policy: Validate triggers (≥8 GiB OR ≥ 2^16 frames OR ≥1 h) via transcript observation or instrumentation counters; fail if unobserved and no static justification.
+5. Anti-Correlation Timing: Measure UDP failure → TCP retry delay window, cover connection launch counts, teardown timing; enforce numeric bounds.
+6. Governance Partition Safety: Consume 7‑day historical path diversity & ACK composition dataset to verify no >20% degradation pre-activation.
+7. Adaptive PoW & Rate-Limits: Assess difficulty adjustment convergence toward target acceptance percentile; token-only signals insufficient.
+8. Emergency Advance Logic: Validate 14-day liveness failure prerequisite, quorum certificate weight sum, unique signatures, epoch monotonicity.
+9. Voucher Cryptographic Check: Optionally verify aggregatedSig64 valid over secret32 when keyset public keys supplied.
+10. FROST Threshold: Confirm n ≥ 5 and t = 3 explicitly (not keyword guess).
+11. Reproducible Build Environment: Pin toolchain versions and record them in provenance materials list; diff both build outputs.
+12. Evidence Authenticity: Future signing (minisign/cosign) for evidence JSON; linter verifies signature before trust.
+13. Statistical Jitter: Collect distributions (PING cadence, idle padding, PRIORITY emission) and test randomness (variance / chi-square heuristic) within ranges.
+14. PQ Date Boundary: UTC-based comparison with explicit ISO date parsing and logged override usage.
+15. Algorithm Agility Registry (Spec §2): Document presence/absence; note non-compliance impact though outside §11.
+16. Multi-Signal Corroboration: Each normative pass must cite ≥2 independent evidence categories.
+
+Testing & Validation Additions
+------------------------------
+Categories:
+- Unit: Parsers (ClientHello, Noise pattern, voucher struct, CBOR quorum cert), provenance verifier, negative assertions.
+- Property/Fuzz: CBOR quorum certificate parser (malformed inputs), voucher entropy/size validation.
+- Dynamic Harness (Mock/Replay): Simulated transcripts for calibration, rekey detection, fallback timing, jitter distribution.
+- Adversarial: Binaries with stuffed spec keywords but no behavior; should fail multi-signal requirements.
+- Golden Evidence: Compliant & intentionally altered evidence fixtures (ALPN order mismatch, missing rekey event) with expected results.
+- Reproducibility: Dual build hash equality; perturbation test (alter SOURCE_DATE_EPOCH) must fail.
+- Performance: Track harness runtime; assert under SLA or mark skipped with downgrade.
+
+Instrumentation & Metrics:
+- Heuristic vs Normative ratio printed in summary.
+- False Positive corpus: require FP < 2%.
+- Randomness sampling counts (must reach minimum sample size before passing adaptive jitter checks).
+
+Automation (CI):
+- jobs: unit-tests / property-tests / harness (nightly) / security-audit / provenance-verify / reproducibility.
+- Action to regenerate compliance matrix & attach to build artifacts.
+
+Documentation Updates
+---------------------
+README:
+- Compliance Matrix table (Spec Item | Check IDs | Evidence Types | Status | Strict Default).
+- Strict Mode semantics & exit codes (0 normative pass; 1 failure; 2 heuristic gap; 3 degraded environment when fail-on-degraded set).
+- Evidence schema versioning & migration.
+- Harness usage walkthrough (generate evidence → run linter with --evidence-file).
+- Provenance verification example command & expected output snippet.
+- Reproducible build guide (toolchain pin list, env vars: SOURCE_DATE_EPOCH, deterministic flags).
+- Governance evidence formats (historical diversity, quorum certificates examples).
+- Security & Hardening section (network off by default, sandbox limits, anti-evasion, planned evidence signing).
+- Limitations & Non-Goals (explicit list until all phases done).
+- Roadmap & phase completion markers.
+
+Additional Docs (new files suggested):
+- docs/evidence-schema.md
+- docs/harness-scenarios.md
+- docs/governance-validation.md
+- docs/repro-build.md
+
+Output & UX Changes (to document):
+- JSON report: add fields: evidenceRefs[], multiSignalScore, heuristicContributionCount, warnings[].
+- CLI flags: --strict (default true), --allow-heuristic, --evidence-file, --evidence-signature, --fail-on-network, --harness, --scenario, --max-harness-seconds, --provenance-file.
+- Exit codes defined above.
+
+
 Change Control
 --------------
 This document should be updated as phases complete. Track completion status inline or in CHANGELOG under a "Roadmap" heading.

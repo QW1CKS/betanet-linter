@@ -44,6 +44,8 @@ program
   .option('--max-parallel <n>', 'Maximum concurrent check evaluations', v => parseInt(v,10))
   .option('--check-timeout <ms>', 'Per-check timeout in milliseconds', v => parseInt(v,10))
   .option('--dynamic-probe', 'Attempt lightweight runtime probe (e.g. --help) to enrich heuristics')
+  .option('--strict', 'Enable strict mode (heuristic passes do not count unless --allow-heuristic)', true)
+  .option('--allow-heuristic', 'In strict mode, allow heuristic passes to count toward compliance', false)
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -71,7 +73,9 @@ program
         forceRefresh: options.forceRefresh,
         maxParallel: options.maxParallel,
         checkTimeoutMs: options.checkTimeout,
-        dynamicProbe: options.dynamicProbe
+        dynamicProbe: options.dynamicProbe,
+        strictMode: options.strict !== undefined ? options.strict : true,
+        allowHeuristic: options.allowHeuristic
       });
       
       if (options.sbom) {
@@ -93,6 +97,13 @@ program
       // Exit with appropriate code
       if (options.failOnDegraded && results.diagnostics?.degraded) {
         process.exit(1);
+      }
+      if (options.failOnDegraded && results.diagnostics?.degraded) {
+        process.exit(1);
+      }
+      // Exit code 2 for heuristic gap in strict mode
+      if (results.strictMode && !results.allowHeuristic && results.heuristicContributionCount > 0 && !results.passed) {
+        process.exit(2);
       }
       process.exit(results.passed ? 0 : 1);
     } catch (error) {

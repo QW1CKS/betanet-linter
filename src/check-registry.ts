@@ -45,7 +45,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           !networkCaps.hasECH && 'ECH',
           !networkCaps.port443 && 'port 443'
         ])}`,
-        severity: 'critical'
+        severity: 'critical',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -73,7 +74,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           !hasTickets && 'access tickets',
           !hasRotation && 'ticket rotation'
         ])}`,
-        severity: 'major'
+        severity: 'major',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -97,7 +99,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           !cryptoCaps.hasChaCha20 && 'ChaCha20',
           !cryptoCaps.hasPoly1305 && 'Poly1305'
         ])}`,
-        severity: 'critical'
+        severity: 'critical',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -123,7 +126,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           !scionSupport.hasIPTransition && 'IP-transition header',
           scionSupport.pathDiversityCount < 2 && '≥2 path diversity markers'
         ])}`,
-        severity: 'critical'
+        severity: 'critical',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -152,7 +156,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
             !hasHTXEndpoint && 'HTX endpoint (v1.1.0 or 1.0.0)',
             !hasQUICEndpoint && 'HTX-QUIC endpoint (v1.1.0 or 1.0.0)'
           ])}`,
-        severity: 'major'
+        severity: 'major',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -178,7 +183,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
             !dhtSupport.hasDHT && 'DHT support',
             !(dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation) && 'deterministic or rendezvous bootstrap'
           ])}`,
-        severity: 'major'
+        severity: 'major',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -203,7 +209,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           !ledgerSupport.hasConsensus && '2-of-3 consensus',
             !ledgerSupport.chainSupport && 'chain verification'
         ])}`,
-        severity: 'major'
+        severity: 'major',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -232,7 +239,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
             !paymentSupport.hasLightning && 'Lightning support',
             !paymentSupport.hasFederation && 'federation support'
           ])}`,
-        severity: 'major'
+        severity: 'major',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -257,7 +265,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           !buildInfo.reproducible && 'reproducible builds',
           !buildInfo.provenance && 'build provenance'
         ])}`,
-        severity: 'minor'
+        severity: 'minor',
+        evidenceType: 'heuristic'
       };
     }
   },
@@ -294,7 +303,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         description: 'Presents X25519-Kyber768 suites once the mandatory date is reached',
         passed,
         details,
-        severity
+        severity,
+        evidenceType: 'heuristic'
       } as ComplianceCheck;
     }
   },
@@ -317,7 +327,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         passed,
         details: passed ? `✅ Privacy weighting ok (mix=${evaluation.mixScore} beacon=${evaluation.beaconScore} diversity=${evaluation.diversityScore} total=${evaluation.totalScore})` :
           `❌ Privacy indicators insufficient (mix=${evaluation.mixScore} beacon=${evaluation.beaconScore} diversity=${evaluation.diversityScore})`,
-        severity: 'major'
+        severity: 'major',
+        evidenceType: 'heuristic'
       };
     }
   }
