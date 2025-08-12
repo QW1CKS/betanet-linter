@@ -116,5 +116,12 @@ export interface IngestedEvidence {
   noise?: any; // placeholder
   governance?: any; // Phase 6 governance snapshot evidence
   ledger?: any; // Phase 6 ledger observation evidence
+  mix?: {
+    samples?: number; // number of path construction samples observed
+    uniqueHopSets?: number; // count of unique hop sets among samples
+    hopSets?: string[][]; // optional raw hop sets for future statistical validation
+    minHopsBalanced?: number; // balanced mode min hops (e.g., 2)
+    minHopsStrict?: number; // strict mode min hops (e.g., 3)
+  }; // Phase 7 mix diversity sampling evidence
   [k: string]: any; // allow forward-compatible keys
 }

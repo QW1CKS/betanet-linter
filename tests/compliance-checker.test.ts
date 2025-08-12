@@ -74,9 +74,9 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-  // Total checks increased to 16 after adding governance & ledger artifact checks
-  expect(result.checks).toHaveLength(16);
-  expect(result.summary.total).toBe(16);
+  // Total checks increased to 17 after adding mix diversity sampling check
+  expect(result.checks).toHaveLength(17);
+  expect(result.summary.total).toBe(17);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
   // Spec summary should be present
@@ -256,7 +256,7 @@ describe('BetanetComplianceChecker', () => {
       });
 
   // With 14 total, excluding id 10 should yield 13
-  expect(result.checks).toHaveLength(15); // 16 total minus excluded 10
+  expect(result.checks).toHaveLength(16); // 17 total minus excluded 10
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 
@@ -1093,6 +1093,33 @@ describe('BetanetComplianceChecker', () => {
       // Sequential would have been roughly 11 * 50ms ≈ 550ms plus overhead; allow generous margin
       expect(elapsed).toBeLessThan(450); // demonstrates some parallelism benefit
       expect(result.parallelDurationMs).toBeDefined();
+    });
+  });
+
+  describe('mix diversity evidence (check 17)', () => {
+    it('passes when uniqueness ratio >= target', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-existing-bin6');
+      await fs.writeFile(tmp, Buffer.from('binary data mix diversity test'));
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['ticket rotation mix diversity beaconset'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      const evidencePath = path.join(__dirname, 'temp-evidence-mix.json');
+      const hopSets = [ ['A','B','C'], ['A','B','D'], ['B','C','E'], ['C','D','E'], ['D','E','F'], ['E','F','G'], ['F','G','H'], ['G','H','I'], ['H','I','J'], ['I','J','K'] ];
+      const evidence = { mix: { samples: hopSets.length, uniqueHopSets: hopSets.length, hopSets, minHopsBalanced: 2, minHopsStrict: 3 } };
+      await fs.writeFile(evidencePath, JSON.stringify(evidence));
+      const result = await checkerLocal.checkCompliance(tmp, { evidenceFile: evidencePath, allowHeuristic: true });
+      const mixCheck = result.checks.find(c => c.id === 17);
+      expect(mixCheck).toBeDefined();
+      expect(mixCheck?.passed).toBe(true);
+      await fs.remove(evidencePath); await fs.remove(tmp);
     });
   });
 

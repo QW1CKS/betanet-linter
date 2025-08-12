@@ -73,6 +73,8 @@ export interface HarnessOptions {
   fallbackTcpPort?: number;
   fallbackUdpTimeoutMs?: number;
   coverConnections?: number; // simulated cover connection count
+  mixSamples?: number; // number of simulated mix path samples to generate
+  mixHopsRange?: [number, number]; // inclusive range of hops per path (e.g., [2,4])
 }
 
 export interface HarnessEvidence {
@@ -82,6 +84,7 @@ export interface HarnessEvidence {
   voucher?: { structLikely?: boolean; tokenHits?: string[]; proximityBytes?: number };
   tlsProbe?: { host: string; port: number; offeredAlpn: string[]; selectedAlpn?: string | null; cipher?: string; protocol?: string | null; handshakeMs?: number; error?: string };
   fallback?: { udpAttempted: boolean; udpTimeoutMs: number; tcpConnected: boolean; tcpConnectMs?: number; tcpRetryDelayMs?: number; coverConnections?: number; coverTeardownMs?: number[]; error?: string };
+  mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
   meta: { generated: string; scenarios: string[] };
 }
 
@@ -172,6 +175,31 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       opts.fallbackUdpTimeoutMs || 300,
       opts.coverConnections || 0
     );
+  }
+  // Simulated mix diversity sampling (Phase 7 foundation)
+  if (opts.mixSamples && opts.mixSamples > 0) {
+    const hopSets: string[][] = [];
+    const range: [number, number] = opts.mixHopsRange || [2, 4];
+    for (let i = 0; i < opts.mixSamples; i++) {
+      const hopCount = Math.max(range[0], Math.min(range[1], range[0] + Math.floor(Math.random() * (range[1]-range[0]+1))));
+      const hops = [] as string[];
+      for (let h = 0; h < hopCount; h++) {
+        // Simulate AS/Org encoded hop identifier e.g., AS123-OrgA-nodeX
+        const asn = 100 + Math.floor(Math.random() * 10); // 10 AS variants
+        const org = String.fromCharCode(65 + (asn % 6)); // OrgA..OrgF
+        const node = 'n' + Math.floor(Math.random() * 50);
+        hops.push(`AS${asn}-${org}-${node}`);
+      }
+      hopSets.push(hops);
+    }
+    const uniqueSet = new Set(hopSets.map(h => h.join('>')));
+    evidence.mix = {
+      samples: hopSets.length,
+      uniqueHopSets: uniqueSet.size,
+      hopSets,
+      minHopsBalanced: 2,
+      minHopsStrict: 3
+    };
   }
   await fs.writeFile(outFile, JSON.stringify(evidence, null, 2));
   return outFile;
