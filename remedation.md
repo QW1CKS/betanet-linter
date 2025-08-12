@@ -162,7 +162,7 @@ Initial Implementation Order (Action Queue)
 2. [x] Add evidence ingestion (JSON path via --evidence-file) wiring; adapt existing checks to accept external evidence.
 3. [x] Harden GitHub Action + provenance generation & reproducibility verify step. (Implemented: workflow scaffold, action SHAs pinned, provenance parsing, binary digest validation, rebuild mismatch enforcement, artifact evidence upgrade, SBOM ingestion + materials/SBOM cross-check, materials completeness flag, signature field placeholder. Future enhancement (outside Step 3 scope): real cryptographic signature verification & advanced materials policy.)
 4. [x] Static parsers (ClientHello template, Noise pattern, voucher struct) — implemented enriched ALPN + TLS extension ordering hash, Noise pattern detection, voucher struct triad with proximity span; checks 12–14 produce static-structural evidence.
-5. [~] Dynamic harness skeleton (implemented: static pattern extraction -> evidence JSON via 'harness' command; added schemaVersion and initial TLS probe scaffold (--probe-host) capturing negotiated ALPN/cipher/handshake time; pending full ClientHello raw capture, fallback simulation, timing metrics).
+5. [x] Dynamic harness foundation (static pattern extraction -> evidence JSON; schemaVersion, TLS probe (--probe-host) capturing negotiated ALPN/cipher/handshake time; added UDP→TCP fallback simulation (--fallback-host) recording delay, connect ms, cover connection teardown timing; pending future expansion for raw ClientHello capture, Noise rekey observation, HTTP/2 SETTINGS tolerances, jitter statistics).
 6. [ ] Governance & ledger evidence validation logic.
 7. [ ] Mix diversity sampling + privacy refinement.
 8. [ ] Multi-signal scoring & anti-evasion heuristics.

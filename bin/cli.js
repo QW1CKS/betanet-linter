@@ -176,10 +176,15 @@ program
   .option('--probe-host <host>', 'Perform a TLS probe against host:443 (foundation for dynamic evidence)')
   .option('--probe-port <port>', 'TLS probe port (default 443)', v => parseInt(v,10))
   .option('--probe-timeout <ms>', 'TLS probe timeout ms (default 5000)', v => parseInt(v,10))
+  .option('--fallback-host <host>', 'Simulate UDP->TCP fallback against host')
+  .option('--fallback-udp-port <port>', 'UDP port for fallback simulation (default 443)', v => parseInt(v,10))
+  .option('--fallback-tcp-port <port>', 'TCP port for fallback simulation (default 443)', v => parseInt(v,10))
+  .option('--fallback-udp-timeout <ms>', 'UDP wait before TCP retry (default 300)', v => parseInt(v,10))
+  .option('--cover-connections <n>', 'Simulated cover TCP connections after main fallback', v => parseInt(v,10))
   .action(async (binaryPath, options) => {
     try {
       const { runHarness } = require('../src/harness');
-      const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout });
+  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections });
       console.log(`✅ Harness evidence written to ${out}`);
     } catch (e) {
       console.error('❌ Harness error:', e.message);
