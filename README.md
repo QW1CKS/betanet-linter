@@ -1,6 +1,11 @@
 
 # Betanet Compliance Linter
 
+> **IMPORTANT – Transitional Compliance Notice (v1.0.0)**  
+> This release provides **heuristic static indicators** for all enumerated Betanet §11 requirements (1.0 baseline + emerging 1.1 deltas). It does **not** yet produce full normative (artifact / structural / dynamic) evidence. By default **strict mode** prevents a heuristic‑only pass from being treated as compliant unless you opt in with `--allow-heuristic`. The remediation roadmap (see `remedation`) tracks migration of each check toward stronger evidence classes.  
+> A check currently reports `evidenceType: "heuristic"` unless explicitly upgraded (e.g. Build Provenance becomes `artifact` when external provenance JSON is supplied via `--evidence-file`).  
+> Treat PASS states as advisory; corroborate via integration / runtime testing.
+
 
 > **Quickstart (from source):**
 > ```bash
@@ -14,7 +19,7 @@
 > ```
 > Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
 
-A comprehensive CLI tool for checking Betanet specification compliance in binary implementations. It fully targets the Betanet 1.0 specification (§11) and provides enhanced heuristic coverage of emerging Betanet 1.1 changes (transport version bump, rendezvous rotation scoring, path diversity, optional WebRTC transport, privacy hop weighting). It generates detailed compliance reports.
+A CLI tool that enumerates Betanet specification §11 requirement placeholders and emits *heuristic* static signals for each (Betanet 1.0 baseline plus emerging 1.1 transport / rendezvous / privacy deltas). Normative enforcement (structural parsing, dynamic probes beyond lightweight help, artifact attestation expansion) is in progress (Phase 1+). The output is designed for early feedback loops, not final certification.
 
 > **Flag Naming:**
 > `--format` is now the canonical flag for SBOM format selection. The older `--sbom-format` still works but is deprecated and will emit a warning; it will be removed in a future minor release. All CLI and GitHub Action usage should migrate to `--format`.
@@ -67,7 +72,8 @@ MIT License. See [LICENSE](./LICENSE) for details.
 
 ## Features
 
-- ✅ **Complete Compliance Checking**: Validates all 11 Betanet specification requirements (§11)
+Current capabilities (heuristic unless noted):
+- 🧭 **Registry-Based Check Set**: 11 enumerated Betanet §11 requirement placeholders evaluated from a single cached extraction pass
 - 🔍 **Binary Analysis**: Deep analysis of executable binaries for compliance patterns
 - 📋 **SBOM Generation**: Creates Software Bill of Materials in CycloneDX or SPDX formats
 - 🔢 **Multi-License Detection**: Extracts multiple SPDX license identifiers (e.g. Apache-2.0 OR MIT) and surfaces all
@@ -80,6 +86,8 @@ MIT License. See [LICENSE](./LICENSE) for details.
 - ⚡ **Parallel Evaluation**: Runs checks concurrently; tune with `--max-parallel` and per-check `--check-timeout`
 - 🧪 **Dynamic Probe (Optional)**: `--dynamic-probe` lightly invokes the binary with `--help` to enrich heuristic surface (no network / destructive actions)
 - 🏷️ **SBOM Feature Tagging**: Adds `betanet.feature` properties (e.g. `transport-quic`, `crypto-pq-hybrid`, `payment-lightning`, `privacy-hop`) to CycloneDX / SPDX outputs for downstream audit traceability
+ - 📥 **External Evidence Ingestion (Phase 1)**: Supply provenance JSON via `--evidence-file` to upgrade Build Provenance (check 9) from heuristic to artifact evidence
+ - 🧪 **Strict vs Heuristic Accounting**: `--strict` (default) + `--allow-heuristic` gate scoring so heuristic-only passes surface as exit code 2 (gap) rather than a silent pass
 
 
 ## Installation
@@ -97,7 +105,7 @@ npm link
 ## Usage
 
 
-> **Note:** This is betanet-linter v1.0.0, targeting Betanet 1.0 compliance (not Betanet 1.1).
+> **Note:** This is betanet-linter v1.0.0. All checks are presently heuristic unless external evidence upgrades them. 1.1 deltas are detected heuristically (transport version, rendezvous rotation signals, privacy hop weighting, optional WebRTC).
 
 ### Basic Compliance Check
 
@@ -217,11 +225,11 @@ Static binary analysis cannot fully confirm dynamic behaviors introduced in Beta
 | Dynamic runtime probe / plugin mode | Deferred | Future (ISSUE-059) |
 
 ### Spec Coverage Summary
-The tool fully covers Betanet 1.0 checks and partially covers emerging 1.1 elements. Runtime output now includes a spec coverage header, e.g.:
+The tool enumerates Betanet 1.0 checks and provides heuristic indicators for each; emerging 1.1 deltas (transport versions, rendezvous rotation signals, privacy hop weighting, optional WebRTC) are likewise heuristic. Normative (non‑heuristic) evidence classes will incrementally land in upcoming minor releases (see `remedation`). Runtime output includes a spec coverage header, e.g.:
 
 ```
-Spec Coverage: baseline 1.0 fully covered; latest known 1.1 checks implemented 11/11
-Pending 1.1 refinements: (none – all heuristic refinements integrated)
+Spec Coverage: baseline 1.0 enumerated (heuristic); latest known 1.1 heuristic signals present 11/11
+Pending normative upgrades: structural parsers, dynamic runtime probes, governance / fallback behaviors
 ```
 
 No pending 1.1 refinement issues remain; prior backlog items (privacy hop refinement, voucher structural detection, PoW context parsing) have been implemented. Dynamic execution (ISSUE-059) remains deferred.
@@ -358,10 +366,18 @@ Feature tagging: For every detected capability, the SBOM appends `betanet.featur
 
 ## Exit Codes
 
-- `0` - All compliance checks passed
-- `1` - One or more compliance checks failed
-- `2` - Error in execution (invalid arguments, file not found, etc.)
-- `3` - SBOM shape validation failed (non-strict); use `--strict-sbom` to escalate to 2
+Primary `check` command:
+- `0` - All required checks passed (includes heuristics only if `--allow-heuristic` supplied under strict mode)
+- `1` - One or more checks failed OR an execution error occurred
+- `2` - Strict mode heuristic gap: no hard failures, but insufficient non-heuristic evidence (heuristic passes excluded from scoring)
+
+SBOM validation (when `--validate-sbom` / `--strict-sbom` used):
+- `2` - Strict SBOM validation failure (base or strict rule set) – process exits immediately
+- `3` - Non-strict SBOM shape warnings (base shape failed without `--strict-sbom`)
+
+Notes:
+- Build provenance (check 9) can upgrade from heuristic to artifact with `--evidence-file provenance.json`, reducing heuristic gap risk.
+- Future phases may introduce additional exit codes for dynamic probe failures; current mapping kept minimal.
 
 ## Environment Variables
 
