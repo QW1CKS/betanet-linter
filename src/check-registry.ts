@@ -584,6 +584,56 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       return { id: 17, name: 'Mix Diversity Sampling', description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth policy', passed, details, severity: 'major', evidenceType: mix ? 'dynamic-protocol' : 'heuristic' };
     }
   }
+  ,
+  {
+    id: 18,
+    key: 'multi-signal-anti-evasion',
+    name: 'Multi-Signal Anti-Evasion',
+    description: 'Requires ≥2 non-heuristic evidence categories for critical spec areas (transport, privacy, provenance, governance)',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence || {};
+      // Lightweight token stuffing heuristic: high proportion of spec keywords without corroborating diverse evidence
+      const analysis = await analyzer.analyze();
+      const strings: string[] = analysis.strings || [];
+      const SPEC_KEYWORDS = ['betanet','htx','quic','ech','ticket','rotation','scion','chacha20','poly1305','cashu','lightning','federation','slsa','reproducible','provenance','kyber','kyber768','x25519','beacon','diversity','voucher','frost','pow','governance','ledger','quorum','finality','mix','hop'];
+      let keywordHits = 0;
+      for (const s of strings) {
+        const lower = s.toLowerCase();
+        if (SPEC_KEYWORDS.some(k => lower.includes(k))) keywordHits++;
+      }
+      const stuffingRatio = strings.length ? keywordHits / strings.length : 0;
+      // Category presence (artifact/dynamic/static) derived from existing evidence objects
+      const categories: { name: string; present: boolean }[] = [
+        { name: 'provenance', present: !!ev.provenance },
+        { name: 'governance', present: !!ev.governance },
+        { name: 'ledger', present: !!ev.ledger },
+        { name: 'mix', present: !!ev.mix },
+        { name: 'clientHello', present: !!ev.clientHello },
+        { name: 'noise', present: !!ev.noise }
+      ];
+      const presentCount = categories.filter(c => c.present).length;
+      // Baseline pass threshold
+      let passed = presentCount >= 2;
+      // Evasion rule: extremely high keyword stuffing with only minimal category corroboration
+      const severeStuffing = stuffingRatio > 0.6 && presentCount < 3; // two categories but heavy stuffing => suspect
+      const moderateStuffing = stuffingRatio > 0.45 && presentCount < 2; // already would fail threshold but annotate reason
+      let evasionFlag = false;
+      if (severeStuffing) { passed = false; evasionFlag = true; }
+      return {
+        id: 18,
+        name: 'Multi-Signal Anti-Evasion',
+        description: 'Requires ≥2 non-heuristic evidence categories for critical spec areas (transport, privacy, provenance, governance)',
+        passed,
+        details: passed ? `✅ Multi-signal categories=${presentCount} (${categories.filter(c=>c.present).map(c=>c.name).join(', ')}) keywordDensity=${(stuffingRatio*100).toFixed(1)}%` : (
+          evasionFlag ? `❌ Suspected keyword stuffing (density ${(stuffingRatio*100).toFixed(1)}% with only ${presentCount} category evidences)` : `❌ Insufficient multi-signal evidence (${presentCount}/2) keywordDensity=${(stuffingRatio*100).toFixed(1)}%`
+        ),
+        severity: 'major',
+        evidenceType: presentCount ? 'artifact' : 'heuristic'
+      };
+    }
+  }
 ];
 
 export function getChecksByIds(ids: number[]): CheckDefinitionMeta[] {

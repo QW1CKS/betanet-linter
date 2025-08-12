@@ -74,9 +74,9 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-  // Total checks increased to 17 after adding mix diversity sampling check
-  expect(result.checks).toHaveLength(17);
-  expect(result.summary.total).toBe(17);
+  // Total checks increased to 18 after adding multi-signal anti-evasion check
+  expect(result.checks).toHaveLength(18);
+  expect(result.summary.total).toBe(18);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
   // Spec summary should be present
@@ -256,7 +256,7 @@ describe('BetanetComplianceChecker', () => {
       });
 
   // With 14 total, excluding id 10 should yield 13
-  expect(result.checks).toHaveLength(16); // 17 total minus excluded 10
+  expect(result.checks).toHaveLength(17); // 18 total minus excluded 10
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 
@@ -1124,6 +1124,58 @@ describe('BetanetComplianceChecker', () => {
       expect(mixCheck).toBeDefined();
       expect(mixCheck?.passed).toBe(true);
       await fs.remove(evidencePath); await fs.remove(tmp);
+    });
+  });
+
+  describe('multi-signal anti-evasion (check 18)', () => {
+    it('passes when at least two evidence categories present', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-existing-bin7');
+      await fs.writeFile(tmp, Buffer.from('binary data multi-signal test'));
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['ticket rotation mix diversity beaconset'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+  const evidence = { clientHello: { alpn: ['h2','http/1.1'], extOrderSha256: 'abc' }, provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'example/builder', binaryDigest: 'sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef' }, mix: { samples: 5, uniqueHopSets: 5, hopSets: [['A','B'],['B','C'],['C','D'],['D','E'],['E','F']], minHopsBalanced: 2, minHopsStrict: 3, pathLengths: [2,2,2,2,2], uniquenessRatio: 1.0, diversityIndex: 0.8 } };
+  (checkerLocal as any)._analyzer.evidence = evidence;
+  const result = await checkerLocal.checkCompliance(tmp, { allowHeuristic: true });
+      const multi = result.checks.find(c => c.id === 18);
+      expect(multi).toBeDefined();
+      expect(multi?.passed).toBe(true);
+  const ms = result.multiSignal!;
+  expect((ms.passedArtifact + ms.passedDynamic + ms.passedStatic + ms.passedHeuristic)).toBeGreaterThan(0);
+  await fs.remove(tmp);
+    });
+    it('fails when severe keyword stuffing with minimal corroboration', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-existing-bin7b');
+      // Create many spec token strings to inflate keyword density
+      const tokenBlob = Array.from({length: 120}).map((_,i)=>`betanet htx quic ech ticket rotation scion mix hop ${i}`).join(' ');
+      await fs.writeFile(tmp, Buffer.from(tokenBlob));
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: tokenBlob.split(/\s+/), symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      // Provide only two superficial categories to trigger severe stuffing rule (provenance + clientHello)
+      (checkerLocal as any)._analyzer.evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'x', binaryDigest: 'sha256:deadbeef' }, clientHello: { alpn: ['h2','http/1.1'], extOrderSha256: 'abc' } };
+      const result = await checkerLocal.checkCompliance(tmp, { allowHeuristic: true });
+      const multi = result.checks.find(c => c.id === 18);
+      expect(multi).toBeDefined();
+      expect(multi?.passed).toBe(false);
+      expect(multi?.details).toMatch(/Suspected keyword stuffing/);
+      await fs.remove(tmp);
     });
   });
 

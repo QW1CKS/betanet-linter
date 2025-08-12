@@ -292,6 +292,39 @@ export class BetanetComplianceChecker {
     const implementedChecks = CHECK_REGISTRY.filter(c => isVersionLE(c.introducedIn, SPEC_VERSION_PARTIAL)).length;
     const specSummary = { baseline: SPEC_VERSION_SUPPORTED_BASE, latestKnown: SPEC_VERSION_PARTIAL, implementedChecks, totalChecks: CHECK_REGISTRY.length, pendingIssues: SPEC_11_PENDING_ISSUES };
     const result: ComplianceResult = { binaryPath, timestamp: new Date().toISOString(), overallScore, passed, checks, summary: { total: considered.length, passed: passedChecks.length, failed: considered.length - passedChecks.length, critical: criticalChecks.length }, specSummary, diagnostics };
+    // Multi-signal scoring (Step 8)
+    const catCounts = { heuristic: 0, 'static-structural': 0, 'dynamic-protocol': 0, artifact: 0 } as any;
+    for (const c of checks) {
+      const et = (c.evidenceType || 'heuristic') as keyof typeof catCounts;
+      if (catCounts[et] !== undefined && c.passed) catCounts[et]++;
+    }
+    const weightedScore = (catCounts.artifact * 3) + (catCounts['dynamic-protocol'] * 2) + (catCounts['static-structural'] * 1);
+    result.multiSignal = {
+      passedHeuristic: catCounts.heuristic,
+      passedStatic: catCounts['static-structural'],
+      passedDynamic: catCounts['dynamic-protocol'],
+      passedArtifact: catCounts.artifact,
+      weightedScore
+    };
+    // Augment multi-signal with category presence & stuffing heuristic summary
+    try {
+      const evidence: any = (this._analyzer as any).evidence || {};
+      const categoriesPresent = ['provenance','governance','ledger','mix','clientHello','noise'].filter(k => !!evidence[k]);
+      const SPEC_KEYWORDS = ['betanet','htx','quic','ech','ticket','rotation','scion','chacha20','poly1305','cashu','lightning','federation','slsa','reproducible','provenance','kyber','kyber768','x25519','beacon','diversity','voucher','frost','pow','governance','ledger','quorum','finality','mix','hop'];
+      const analysisPromise = this._analyzer.analyze ? this._analyzer.analyze() : Promise.resolve({ strings: [] });
+      analysisPromise.then(analysis => {
+        const strings: string[] = analysis.strings || [];
+        let keywordHits = 0;
+        for (const s of strings) { const lower = s.toLowerCase(); if (SPEC_KEYWORDS.some(k => lower.includes(k))) keywordHits++; }
+        const stuffingRatio = strings.length ? keywordHits / strings.length : 0;
+        const suspicious = stuffingRatio > 0.6 && categoriesPresent.length < 3;
+  Object.assign(result.multiSignal!, { categoriesPresent, stuffingRatio, suspiciousStuffing: suspicious });
+        if (suspicious) {
+          (result as any).warnings = (result as any).warnings || [];
+          (result as any).warnings.push(`Potential keyword stuffing detected (density ${(stuffingRatio*100).toFixed(1)}% with only ${categoriesPresent.length} evidence categories). Provide additional independent evidence.`);
+        }
+      }).catch(()=>{/* ignore */});
+    } catch {/* ignore augmentation errors */}
     (result as any).strictMode = strictMode;
     (result as any).allowHeuristic = allowHeuristic;
     (result as any).heuristicContributionCount = heuristicContributionCount;

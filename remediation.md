@@ -165,7 +165,7 @@ Initial Implementation Order (Action Queue)
 5. [x] Dynamic harness foundation (static pattern extraction -> evidence JSON; schemaVersion, TLS probe (--probe-host) capturing negotiated ALPN/cipher/handshake time; added UDP→TCP fallback simulation (--fallback-host) recording delay, connect ms, cover connection teardown timing; pending future expansion for raw ClientHello capture, Noise rekey observation, HTTP/2 SETTINGS tolerances, jitter statistics).
 6. [x] Governance & ledger evidence validation logic (ingestion via --governance-file; artifact checks 15 & 16; derives AS/org caps from raw weights; parses CBOR quorum certificates, validates aggregate threshold; flags partitions & emergency advance; future enhancement: signature cryptographic validation & historical diversity dataset integration).
 7. [x] Mix diversity sampling + privacy refinement. (Implemented: mix evidence schema, harness simulation w/ deterministic option, CLI flags --mix-samples/--mix-hops-range/--mix-deterministic, Check 17 with hop depth + uniqueness + diversity index thresholds, Privacy Hop Enforcement upgraded to dynamic when mix evidence present.)
-8. [ ] Multi-signal scoring & anti-evasion heuristics.
+8. [x] Multi-signal scoring & anti-evasion heuristics. (Implemented: Check 18 requiring ≥2 category evidences, weighted multi-signal scoring summary, keyword stuffing density heuristic that flags/fails suspected token padding when evidence diversity insufficient, warnings surfaced in result for suspicious cases.)
 9. [ ] Full dynamic harness expansion (rekey observation, HTTP/2/3 adaptive tolerances, timing jitter stats).
 
 Potential Risks & Mitigations

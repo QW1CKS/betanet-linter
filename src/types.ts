@@ -22,6 +22,16 @@ export interface ComplianceResult {
     failed: number;
     critical: number;
   };
+  multiSignal?: {
+    passedHeuristic: number;
+    passedStatic: number;
+    passedDynamic: number;
+    passedArtifact: number;
+    weightedScore: number; // artifact=3, dynamic=2, static=1, heuristic=0
+  categoriesPresent?: string[]; // names of evidence categories present
+  stuffingRatio?: number; // keyword stuffing detection ratio (0-1)
+  suspiciousStuffing?: boolean; // flag when evasion suspected
+  };
   specSummary?: {
     baseline: string; // fully covered baseline spec version
     latestKnown: string; // latest spec version known to tool
