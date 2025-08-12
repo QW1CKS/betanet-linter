@@ -167,4 +167,21 @@ program
     }
   });
 
+program
+  .command('harness')
+  .description('Run dynamic harness skeleton to generate evidence JSON')
+  .argument('<binary>', 'Path to the binary')
+  .option('-o, --out <file>', 'Output evidence JSON file', 'harness-evidence.json')
+  .option('-s, --scenarios <list>', 'Comma-separated scenario keys', v => v.split(',').map(x=>x.trim()).filter(Boolean))
+  .action(async (binaryPath, options) => {
+    try {
+      const { runHarness } = require('../src/harness');
+      const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios });
+      console.log(`✅ Harness evidence written to ${out}`);
+    } catch (e) {
+      console.error('❌ Harness error:', e.message);
+      process.exit(1);
+    }
+  });
+
 program.parse();
