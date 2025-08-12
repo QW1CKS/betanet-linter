@@ -485,13 +485,23 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const patterns = await (analyzer as any).getStaticPatterns?.();
       const noise = patterns?.noise;
-      const passed = !!(noise && noise.pattern === 'XK');
+      let passed = !!(noise && noise.pattern === 'XK');
+      let details = passed ? '✅ Noise_XK pattern detected' : '❌ Noise_XK pattern not found';
+      // Step 10 enhancement: leverage noisePatternDetail evidence for stronger structural validation
+      const ev: any = (analyzer as any).evidence;
+      const npd = ev?.noisePatternDetail;
+      if (passed && npd) {
+        const hkdfOk = (npd.hkdfLabelsFound || 0) >= 2;
+        const msgOk = (npd.messageTokensFound || 0) >= 2; // placeholder heuristic
+        passed = passed && hkdfOk && msgOk;
+        details = passed ? `✅ Noise_XK pattern with hkdfLabels=${npd.hkdfLabelsFound} msgTokens=${npd.messageTokensFound}` : `❌ Incomplete Noise evidence hkdfLabels=${npd.hkdfLabelsFound||0} msgTokens=${npd.messageTokensFound||0}`;
+      }
       return {
         id: 13,
         name: 'Noise XK Pattern',
         description: 'Detects Noise_XK handshake pattern tokens',
         passed,
-        details: passed ? '✅ Noise_XK pattern detected' : '❌ Noise_XK pattern not found',
+        details,
         severity: 'minor',
         evidenceType: 'static-structural'
       };
@@ -677,6 +687,66 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     }
   }
 ];
+
+// Step 10 appended checks (IDs 21-23) added after existing registry for stability
+export const STEP_10_CHECKS = [
+  {
+    id: 21,
+    key: 'binary-structural-meta',
+    name: 'Binary Structural Meta',
+    description: 'Parses binary format, sections, imports sample (structural baseline)',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      await analyzer.getStaticPatterns?.(); // ensure augmentation
+      const ev = analyzer.evidence || {};
+      const meta = ev.binaryMeta;
+      const passed = !!meta && meta.format !== 'unknown' && Array.isArray(meta.sections) && meta.sections.length > 0;
+      const details = meta ? (passed ? `✅ format=${meta.format} sections=${meta.sections.length} importsSample=${(meta.importsSample||[]).length}` : `❌ Incomplete binary meta format=${meta.format} sections=${(meta.sections||[]).length}`) : '❌ No binary meta';
+      return { id: 21, name: 'Binary Structural Meta', description: 'Parses binary format, sections, imports sample (structural baseline)', passed, details, severity: 'minor', evidenceType: meta ? 'static-structural' : 'heuristic' };
+    }
+  },
+  {
+    id: 22,
+    key: 'tls-static-template-calibration',
+    name: 'TLS Static Template Calibration',
+    description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      await analyzer.getStaticPatterns?.();
+      const ev = analyzer.evidence || {};
+      const ch = ev.clientHelloTemplate;
+      const passed = !!(ch && Array.isArray(ch.alpn) && ch.alpn.length >= 2 && ch.extOrderSha256);
+      const details = passed ? `✅ static ALPN=${ch.alpn.join(',')} extHash=${ch.extOrderSha256.slice(0,12)}` : '❌ Incomplete static ClientHello evidence';
+      return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration', passed, details, severity: 'minor', evidenceType: ch ? 'static-structural' : 'heuristic' };
+    }
+  },
+  {
+    id: 23,
+    key: 'negative-assertions',
+    name: 'Negative Assertions',
+    description: 'Ensures forbidden legacy/seed tokens absent (deterministic seeds, legacy transition header)',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      await analyzer.getStaticPatterns?.();
+      const ev = analyzer.evidence || {};
+      const neg = ev.negative;
+      const forbiddenPresent: string[] = neg?.forbiddenPresent || [];
+      const passed = forbiddenPresent.length === 0;
+      const details = passed ? '✅ No forbidden legacy tokens present' : `❌ Forbidden tokens present: ${forbiddenPresent.join(', ')}`;
+      return { id: 23, name: 'Negative Assertions', description: 'Ensures forbidden legacy/seed tokens absent (deterministic seeds, legacy transition header)', passed, details, severity: 'major', evidenceType: 'static-structural' };
+    }
+  }
+];
+
+// Append new checks to registry
+// (Avoid mutation side-effects if imported elsewhere before evaluation)
+// Only push if not already present (idempotent on re-import in tests)
+for (const c of STEP_10_CHECKS) {
+  if (!CHECK_REGISTRY.find(existing => existing.id === (c as any).id)) (CHECK_REGISTRY as any).push(c);
+}
 
 export function getChecksByIds(ids: number[]): CheckDefinitionMeta[] {
   const set = new Set(ids);

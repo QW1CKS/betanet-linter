@@ -6,6 +6,7 @@ import { FALLBACK_MAX_BYTES, DEFAULT_FALLBACK_STRING_MIN_LEN, DEFAULT_TOOL_TIMEO
 import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
 import * as crypto from 'crypto';
 import { extractStaticPatterns, StaticPatterns } from './static-parsers';
+import { introspectBinary } from './binary-introspect';
 // Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 
 export class BinaryAnalyzer {
@@ -29,6 +30,7 @@ export class BinaryAnalyzer {
   private toolsReady: Promise<void>;
   private binarySha256: string | null = null;
   private staticPatterns: StaticPatterns | null = null;
+  private structuralAugmented = false; // guard to avoid repeating Step 10 augmentation
 
   constructor(binaryPath: string, verbose: boolean = false) {
     this.binaryPath = binaryPath;
@@ -63,6 +65,53 @@ export class BinaryAnalyzer {
   this.staticPatterns = extractStaticPatterns(analysis.strings, raw);
     } catch {
       this.staticPatterns = {} as StaticPatterns;
+    }
+    // Step 10 augmentation: populate structural evidence once
+    if (!this.structuralAugmented) {
+      try {
+        const anySelf: any = this as any;
+        anySelf.evidence = anySelf.evidence || {};
+        anySelf.evidence.schemaVersion = 2;
+        // Binary meta introspection
+        const meta = await introspectBinary(this.binaryPath, analysis.strings);
+        anySelf.evidence.binaryMeta = {
+          format: meta.format,
+            sections: meta.sections,
+            importsSample: meta.importsSample,
+            hasDebug: meta.hasDebug,
+            sizeBytes: meta.sizeBytes
+        };
+        // ClientHello & Noise pattern details to new evidence keys
+        if (this.staticPatterns?.clientHello) {
+          const ch = this.staticPatterns.clientHello;
+          anySelf.evidence.clientHelloTemplate = {
+            alpn: ch.alpn,
+            extensions: ch.extensions,
+            extOrderSha256: ch.extOrderSha256
+          };
+        }
+        if (this.staticPatterns?.noise) {
+          const np = this.staticPatterns.noise;
+          // Heuristic count of HKDF labels & message tokens among strings
+          const lower = analysis.strings.map(s => s.toLowerCase());
+          const hkdfLabels = ['hkdf','chacha20','poly1305','hmac'];
+          const messageTokens = ['-> e,', '-> s,', '-> es', '-> se', '-> ee', 'noise_xk'];
+          let hkdfLabelsFound = 0; hkdfLabels.forEach(l => { if (lower.some(s => s.includes(l))) hkdfLabelsFound++; });
+          let messageTokensFound = 0; messageTokens.forEach(t => { if (lower.some(s => s.includes(t.trim()))) messageTokensFound++; });
+          anySelf.evidence.noisePatternDetail = {
+            pattern: np.pattern,
+            hkdfLabelsFound,
+            messageTokensFound
+          };
+        }
+        // Negative assertions: forbidden tokens
+        const forbidden = ['deterministic_seed','legacy_transition_header'];
+        const present: string[] = [];
+        const lowerAll = analysis.strings.map(s => s.toLowerCase());
+        forbidden.forEach(f => { if (lowerAll.some(s => s.includes(f))) present.push(f); });
+        anySelf.evidence.negative = { forbiddenPresent: present };
+      } catch {/* ignore */}
+      this.structuralAugmented = true;
     }
     return this.staticPatterns as StaticPatterns;
   }

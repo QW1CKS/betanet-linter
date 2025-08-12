@@ -107,6 +107,7 @@ export interface SBOMOptions {
 
 // Minimal evidence schema starter (will expand in later phases)
 export interface IngestedEvidence {
+  schemaVersion?: number; // evidence schema version (bumped to 2 with binaryMeta & negative assertions)
   provenance?: {
     predicateType?: string;
     builderId?: string;
@@ -135,5 +136,25 @@ export interface IngestedEvidence {
     minHopsStrict?: number; // strict mode min hops (e.g., 3)
   }; // Phase 7 mix diversity sampling evidence
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
+  binaryMeta?: {
+    format?: 'elf' | 'pe' | 'macho' | 'unknown';
+    sections?: string[];
+    importsSample?: string[];
+    hasDebug?: boolean;
+    sizeBytes?: number;
+  };
+  clientHelloTemplate?: {
+    alpn?: string[];
+    extensions?: number[];
+    extOrderSha256?: string;
+  };
+  noisePatternDetail?: {
+    pattern?: string;
+    hkdfLabelsFound?: number;
+    messageTokensFound?: number;
+  };
+  negative?: {
+    forbiddenPresent?: string[]; // list of forbidden tokens discovered
+  };
   [k: string]: any; // allow forward-compatible keys
 }

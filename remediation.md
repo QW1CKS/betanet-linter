@@ -3,8 +3,8 @@ Betanet Linter Remediation Strategy (Reference)
 
 Progress Summary
 ----------------
-Completed so far: 9 tasks (Implementation Order steps 1–9; Step 3 advanced with provenance parsing, action pinning, rebuild mismatch enforcement; cryptographic signature & some extended materials policy still pending; Step 9 initial simulation scope complete)  
-Pending: Remaining tasks across Phases 1–7 beyond Step 9 (real transcript capture, HTTP/3 adaptive, calibration baselines, statistical variance tests, signature verification, negative assertions, governance depth, etc.).  
+Completed so far: 10 tasks (Implementation Order steps 1–10; Step 3 advanced with provenance parsing, action pinning, rebuild mismatch enforcement; Step 9 simulation scope complete; Step 10 structural introspection + static template & negative assertions delivered)  
+Pending: Remaining tasks across Phases 1–7 beyond Step 10 (real transcript capture, HTTP/3 adaptive, calibration baselines, statistical variance tests, signature verification, governance depth, dynamic ClientHello calibration, Noise transcript capture).  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
 Purpose
@@ -167,6 +167,7 @@ Initial Implementation Order (Action Queue)
 7. [x] Mix diversity sampling + privacy refinement. (Implemented: mix evidence schema, harness simulation w/ deterministic option, CLI flags --mix-samples/--mix-hops-range/--mix-deterministic, Check 17 with hop depth + uniqueness + diversity index thresholds, Privacy Hop Enforcement upgraded to dynamic when mix evidence present.)
 8. [x] Multi-signal scoring & anti-evasion heuristics. (Implemented: Check 18 requiring ≥2 category evidences, weighted multi-signal scoring summary, keyword stuffing density heuristic that flags/fails suspected token padding when evidence diversity insufficient, warnings surfaced in result for suspicious cases.)
 9. [x] Full dynamic harness expansion (initial simulation implemented: rekey event, HTTP/2 adaptive jitter metrics, Checks 19 & 20, CLI flags --rekey-simulate/--h2-adaptive-simulate/--jitter-samples; future: real capture, HTTP/3, calibration baselines, statistical variance tests).
+10. [x] Structural introspection & negative assertions (binary meta introspection, static ClientHello template extraction, enhanced Noise XK pattern detail, negative assertion check, evidence schema v2 + documentation, new checks 21–23; pending future dynamic calibration & deeper JA3/JA4 + QUIC Initial capture).
 
 Potential Risks & Mitigations
 -----------------------------
