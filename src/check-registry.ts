@@ -477,6 +477,17 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       let passed = false;
       let details = '❌ No governance evidence';
       if (gov && typeof gov === 'object') {
+        // Derive caps if raw weights present
+        if (!('maxASShare' in gov) && Array.isArray(gov.weights)) {
+          try {
+            const { deriveGovernanceMetrics } = require('./governance-parser');
+            const derived = deriveGovernanceMetrics(gov.weights);
+            gov.maxASShare = derived.maxASShare;
+            gov.maxOrgShare = derived.maxOrgShare;
+            gov.asCapApplied = derived.asCapApplied;
+            gov.orgCapApplied = derived.orgCapApplied;
+          } catch {/* ignore */}
+        }
         const { asCapApplied, orgCapApplied, maxASShare, maxOrgShare, partitionsDetected } = gov;
         passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false);
         details = passed ? `✅ Caps enforced (AS<=${maxASShare} org<=${maxOrgShare}) no partitions` : `❌ Governance issues: ${missingList([
@@ -503,6 +514,16 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       let passed = false;
       let details = '❌ No ledger evidence';
       if (ledger && typeof ledger === 'object') {
+        // Parse CBOR quorum certs if provided as base64 array
+        if (!ledger.quorumCertificatesValid && Array.isArray(ledger.quorumCertificatesCbor)) {
+          try {
+            const { parseQuorumCertificates, validateQuorumCertificates } = require('./governance-parser');
+            const buffers = ledger.quorumCertificatesCbor.map((b: string) => Buffer.from(b, 'base64'));
+            const qcs = parseQuorumCertificates(buffers);
+            ledger.quorumCertificatesValid = validateQuorumCertificates(qcs);
+            ledger.finalitySets = ledger.finalitySets || qcs.map((q: any) => `epoch-${q.epoch}`);
+          } catch {/* ignore */}
+        }
         const { finalitySets, quorumCertificatesValid, emergencyAdvanceUsed } = ledger;
         const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2; // simplified proxy
         passed = !!(has2of3 && quorumCertificatesValid === true && emergencyAdvanceUsed !== true);

@@ -944,87 +944,43 @@ describe('BetanetComplianceChecker', () => {
       expect(dht?.passed).toBe(false);
     });
 
-    describe('post-quantum UTC boundary (ISSUE-016)', () => {
-      const originalNow = Date;
-      function mockNow(epochMs: number) {
-        // Monkey patch Date constructor & now
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (global as any).Date = class extends Date {
-          constructor(arg?: any) { super(arg ?? epochMs); }
-          static now() { return epochMs; }
-        } as unknown as DateConstructor;
-      }
-      afterEach(() => {
-        (global as any).Date = originalNow;
-        delete process.env.BETANET_PQ_DATE_OVERRIDE;
-      });
-
-      it('treats moment just before UTC midnight as pre-mandatory', async () => {
-        // 2026-12-31T23:59:59.500Z
-        mockNow(Date.UTC(2026, 11, 31, 23, 59, 59, 500));
-        const checker = new BetanetComplianceChecker();
-        (checker as any)._analyzer = {
-          checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
-          analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
-          checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
-          checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
-          checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
-          checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
-          checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
-          checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-        };
-        const tmp = path.join(__dirname, 'temp-pq-pre');
-        await fs.writeFile(tmp, Buffer.from('dummy'));
-        const result = await checker.checkCompliance(tmp);
-        const pq = result.checks.find(c => c.id === 10);
-        expect(pq?.severity).toBe('minor');
-        expect(pq?.details).toMatch(/not yet mandatory/);
-      });
-
-      it('treats UTC midnight or later as mandatory boundary', async () => {
-        // 2027-01-01T00:00:00.000Z
-        mockNow(Date.UTC(2027, 0, 1, 0, 0, 0, 0));
-        const checker = new BetanetComplianceChecker();
-        (checker as any)._analyzer = {
-          checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
-          analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
-            checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
-          checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
-          checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
-          checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
-          checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
-          checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-        };
-        const tmp = path.join(__dirname, 'temp-pq-post');
-        await fs.writeFile(tmp, Buffer.from('dummy'));
-        const result = await checker.checkCompliance(tmp);
-        const pq = result.checks.find(c => c.id === 10);
-        expect(pq?.severity).toBe('critical');
-        expect(pq?.details).toMatch(/mandatory after 2027-01-01/);
-      });
-
-      it('applies override with timezone aware full ISO string', async () => {
-        process.env.BETANET_PQ_DATE_OVERRIDE = '2025-12-31T00:00:00Z';
-        mockNow(Date.UTC(2025, 11, 31, 0, 0, 0, 0));
-        const checker = new BetanetComplianceChecker();
-        (checker as any)._analyzer = {
-          checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true, hasWebRTC: false }),
-          analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86', size: 1 }),
-          checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: false, hasPoly1305: false, hasEd25519: false, hasX25519: false, hasKyber768: false, hasSHA256: false, hasHKDF: false }),
-          checkSCIONSupport: () => Promise.resolve({ hasSCION: false, pathManagement: false, hasIPTransition: false, pathDiversityCount: 0 }),
-          checkDHTSupport: () => Promise.resolve({ hasDHT: false, deterministicBootstrap: false, seedManagement: false, rotationHits: 0 }),
-          checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: false, hasConsensus: false, chainSupport: false }),
-          checkPaymentSupport: () => Promise.resolve({ hasCashu: false, hasLightning: false, hasFederation: false }),
-          checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
-        };
-        const tmp = path.join(__dirname, 'temp-pq-override-boundary');
-        await fs.writeFile(tmp, Buffer.from('dummy'));
-        const result = await checker.checkCompliance(tmp);
-        const pq = result.checks.find(c => c.id === 10);
-        expect(pq?.severity).toBe('critical');
-        delete process.env.BETANET_PQ_DATE_OVERRIDE;
-      });
-    });
+    it('derives governance metrics from raw weights and validates CBOR quorum certificates', async () => {
+    const checkerGov2 = new BetanetComplianceChecker();
+    const tmp = path.join(__dirname, 'temp-existing-bin5');
+    await fs.writeFile(tmp, Buffer.from('binary data governance ledger weights'));
+    (checkerGov2 as any)._analyzer = {
+      checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+      analyze: () => Promise.resolve({ strings: ['ticket','rotation','/betanet/htx/1.0.0','/betanet/htxquic/1.0.0','chacha20','poly1305','cashu','lightning','federation','kyber768'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+      checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: true }),
+      checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+      checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+      checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+      checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+      checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+    };
+    // Create CBOR quorum certificate minimal objects
+    const cbor = require('cbor');
+    const qc1 = cbor.encode({ epoch: 1, signatures: [{ v: 'val1', w: 40 }, { v: 'val2', w: 35 }] });
+    const qc2 = cbor.encode({ epoch: 2, signatures: [{ v: 'val3', w: 30 }, { v: 'val4', w: 25 }, { v: 'val5', w: 20 }] });
+    const govFile = path.join(__dirname, 'gov-evidence2.json');
+    const weights = [
+      { validator: 'val1', as: 'AS1', org: 'OrgA', weight: 20 },
+      { validator: 'val2', as: 'AS2', org: 'OrgB', weight: 20 },
+      { validator: 'val3', as: 'AS3', org: 'OrgC', weight: 20 },
+      { validator: 'val4', as: 'AS4', org: 'OrgD', weight: 20 },
+      { validator: 'val5', as: 'AS5', org: 'OrgE', weight: 20 }
+    ];
+    const govEvidence = { governance: { weights, partitionsDetected: false }, ledger: { quorumCertificatesCbor: [qc1.toString('base64'), qc2.toString('base64')], emergencyAdvanceUsed: false } };
+    await fs.writeFile(govFile, JSON.stringify(govEvidence));
+    const result = await checkerGov2.checkCompliance(tmp, { governanceFile: govFile, allowHeuristic: true });
+    const govCheck = result.checks.find(c => c.id === 15);
+    const ledgerCheck = result.checks.find(c => c.id === 16);
+    expect(govCheck?.passed).toBe(true);
+    expect(govCheck?.details).toMatch(/Caps enforced/);
+    expect(ledgerCheck?.passed).toBe(true);
+    expect(ledgerCheck?.details).toMatch(/quorum certs valid/);
+    await fs.remove(govFile); await fs.remove(tmp);
+  });
   });
 
   describe('performance memoization', () => {

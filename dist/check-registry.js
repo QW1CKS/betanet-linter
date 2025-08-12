@@ -245,6 +245,10 @@ exports.CHECK_REGISTRY = [
             const buildInfo = rawBuildInfo || { hasSLSA: false, reproducible: false, provenance: false };
             const evidence = analyzer.evidence || {};
             const prov = evidence.provenance || {};
+            const materialsValidated = prov.materialsValidated === true;
+            const materialsMismatchCount = prov.materialsMismatchCount || 0;
+            const materialsComplete = prov.materialsComplete === true;
+            const signatureVerified = prov.signatureVerified === true;
             // Validate normative provenance
             let normativeDetails = [];
             let hasNormative = false;
@@ -307,7 +311,13 @@ exports.CHECK_REGISTRY = [
                 buildInfo.reproducible = buildInfo.reproducible || true;
                 buildInfo.provenance = buildInfo.provenance || true;
             }
-            const passed = (buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative;
+            // Enforce reproducible rebuild if a mismatch flag present in evidence (future: CI injects)
+            let rebuildMismatch = false;
+            if (prov.rebuildDigestMismatch === true) {
+                rebuildMismatch = true;
+                normativeDetails.push('rebuild digest mismatch flagged');
+            }
+            const passed = !rebuildMismatch && ((buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative) && (!materialsMismatchCount);
             const missing = (0, format_1.missingList)([
                 !(buildInfo.hasSLSA || prov.predicateType) && 'SLSA support/predicate',
                 !(buildInfo.reproducible || hasNormative) && 'reproducible builds',
@@ -318,7 +328,7 @@ exports.CHECK_REGISTRY = [
                 name: 'Build Provenance',
                 description: 'Builds reproducibly and publishes SLSA 3 provenance',
                 passed,
-                details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : `❌ Missing: ${missing}`,
+                details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; signature verified' : ''})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (rebuildMismatch ? '❌ Rebuild digest mismatch (non-reproducible)' : (materialsMismatchCount ? `❌ Materials/SBOM mismatch (${materialsMismatchCount} unmatched)` : `❌ Missing: ${missing}`)),
                 severity: 'minor',
                 evidenceType: hasNormative ? 'artifact' : 'heuristic'
             };
@@ -384,6 +394,123 @@ exports.CHECK_REGISTRY = [
                 severity: 'major',
                 evidenceType: 'heuristic'
             };
+        }
+    },
+    {
+        id: 12,
+        key: 'clienthello-static-template',
+        name: 'TLS ClientHello Static Template',
+        description: 'Extracts ALPN set/order & extension ordering hash (static approximation)',
+        severity: 'minor',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const patterns = await analyzer.getStaticPatterns?.();
+            const ch = patterns?.clientHello;
+            const passed = !!(ch && ch.alpn && ch.alpn.length >= 2);
+            return {
+                id: 12,
+                name: 'TLS ClientHello Static Template',
+                description: 'Extracts ALPN set/order & extension ordering hash (static approximation)',
+                passed,
+                details: passed ? `✅ ALPN: ${ch.alpn.join(', ')} extCount=${ch.extensions?.length || 0} hash=${ch.extOrderSha256?.slice(0, 12)}` : '❌ Insufficient ALPN evidence',
+                severity: 'minor',
+                evidenceType: 'static-structural'
+            };
+        }
+    },
+    {
+        id: 13,
+        key: 'noise-xk-pattern',
+        name: 'Noise XK Pattern',
+        description: 'Detects Noise_XK handshake pattern tokens',
+        severity: 'minor',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const patterns = await analyzer.getStaticPatterns?.();
+            const noise = patterns?.noise;
+            const passed = !!(noise && noise.pattern === 'XK');
+            return {
+                id: 13,
+                name: 'Noise XK Pattern',
+                description: 'Detects Noise_XK handshake pattern tokens',
+                passed,
+                details: passed ? '✅ Noise_XK pattern detected' : '❌ Noise_XK pattern not found',
+                severity: 'minor',
+                evidenceType: 'static-structural'
+            };
+        }
+    },
+    {
+        id: 14,
+        key: 'voucher-struct-heuristic',
+        name: 'Voucher Struct Heuristic',
+        description: 'Detects presence of 128B voucher struct token triad',
+        severity: 'minor',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const patterns = await analyzer.getStaticPatterns?.();
+            const voucher = patterns?.voucher;
+            const passed = !!(voucher && voucher.structLikely);
+            return {
+                id: 14,
+                name: 'Voucher Struct Heuristic',
+                description: 'Detects presence of 128B voucher struct token triad',
+                passed,
+                details: voucher ? (voucher.structLikely ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}`) : '❌ No voucher struct tokens',
+                severity: 'minor',
+                evidenceType: 'static-structural'
+            };
+        }
+    },
+    {
+        id: 15,
+        key: 'governance-anti-concentration',
+        name: 'Governance Anti-Concentration',
+        description: 'Validates AS/org caps & partition safety (evidence-based)',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence;
+            const gov = ev?.governance;
+            let passed = false;
+            let details = '❌ No governance evidence';
+            if (gov && typeof gov === 'object') {
+                const { asCapApplied, orgCapApplied, maxASShare, maxOrgShare, partitionsDetected } = gov;
+                passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false);
+                details = passed ? `✅ Caps enforced (AS<=${maxASShare} org<=${maxOrgShare}) no partitions` : `❌ Governance issues: ${(0, format_1.missingList)([
+                    !asCapApplied && 'AS caps not applied',
+                    !orgCapApplied && 'Org caps not applied',
+                    (maxASShare > 0.2) && `AS share ${maxASShare}`,
+                    (maxOrgShare > 0.25) && `Org share ${maxOrgShare}`,
+                    partitionsDetected === true && 'partitions detected'
+                ])}`;
+            }
+            return { id: 15, name: 'Governance Anti-Concentration', description: 'Validates AS/org caps & partition safety (evidence-based)', passed, details, severity: 'major', evidenceType: gov ? 'artifact' : 'heuristic' };
+        }
+    },
+    {
+        id: 16,
+        key: 'ledger-finality-observation',
+        name: 'Ledger Finality Observation',
+        description: 'Evidence of 2-of-3 finality & quorum certificate validity',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence;
+            const ledger = ev?.ledger;
+            let passed = false;
+            let details = '❌ No ledger evidence';
+            if (ledger && typeof ledger === 'object') {
+                const { finalitySets, quorumCertificatesValid, emergencyAdvanceUsed } = ledger;
+                const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2; // simplified proxy
+                passed = !!(has2of3 && quorumCertificatesValid === true && emergencyAdvanceUsed !== true);
+                details = passed ? `✅ Finality sets=${finalitySets.length} quorum certs valid` : `❌ Ledger issues: ${(0, format_1.missingList)([
+                    !has2of3 && 'insufficient finality sets',
+                    quorumCertificatesValid !== true && 'invalid quorum certificates',
+                    emergencyAdvanceUsed === true && 'emergency advance used'
+                ])}`;
+            }
+            return { id: 16, name: 'Ledger Finality Observation', description: 'Evidence of 2-of-3 finality & quorum certificate validity', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
         }
     }
 ];

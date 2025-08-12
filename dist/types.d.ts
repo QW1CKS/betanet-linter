@@ -84,6 +84,8 @@ export interface CheckOptions {
     strictMode?: boolean;
     allowHeuristic?: boolean;
     evidenceFile?: string;
+    sbomFile?: string;
+    governanceFile?: string;
 }
 export interface SBOMOptions {
     format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json';
@@ -107,9 +109,17 @@ export interface IngestedEvidence {
         }[];
         verified?: boolean;
         sourceDateEpoch?: number;
+        rebuildDigestMismatch?: boolean;
+        materialsValidated?: boolean;
+        materialsMismatchCount?: number;
+        materialsComplete?: boolean;
+        signatureVerified?: boolean;
+        signatureError?: string;
     };
     clientHello?: any;
     noise?: any;
+    governance?: any;
+    ledger?: any;
     [k: string]: any;
 }
 //# sourceMappingURL=types.d.ts.map

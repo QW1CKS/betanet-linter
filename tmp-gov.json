@@ -1,0 +1,1 @@
+{"governance":{"weights":[{"validator":"v1","as":"AS1","org":"OrgA","weight":20},{"validator":"v2","as":"AS2","org":"OrgB","weight":20},{"validator":"v3","as":"AS3","org":"OrgA","weight":20},{"validator":"v4","as":"AS4","org":"OrgC","weight":20},{"validator":"v5","as":"AS5","org":"OrgD","weight":20}],"partitionsDetected":false},"ledger":{}}

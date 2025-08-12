@@ -39,6 +39,7 @@ const safe_exec_1 = require("./safe-exec");
 const constants_1 = require("./constants");
 const heuristics_1 = require("./heuristics");
 const crypto = __importStar(require("crypto"));
+const static_parsers_1 = require("./static-parsers");
 // Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 class BinaryAnalyzer {
     constructor(binaryPath, verbose = false) {
@@ -51,6 +52,7 @@ class BinaryAnalyzer {
         };
         this.analysisStartHr = null;
         this.binarySha256 = null;
+        this.staticPatterns = null;
         this.binaryPath = binaryPath;
         this.verbose = verbose;
         this.toolsReady = this.detectTools();
@@ -73,6 +75,23 @@ class BinaryAnalyzer {
             stream.on('error', reject);
         });
         return this.binarySha256;
+    }
+    async getStaticPatterns() {
+        if (this.staticPatterns)
+            return this.staticPatterns;
+        const analysis = await this.analyze();
+        try {
+            let raw;
+            try {
+                raw = await fs.readFile(this.binaryPath);
+            }
+            catch { /* ignore */ }
+            this.staticPatterns = (0, static_parsers_1.extractStaticPatterns)(analysis.strings, raw);
+        }
+        catch {
+            this.staticPatterns = {};
+        }
+        return this.staticPatterns;
     }
     setDynamicProbe(flag) {
         this.dynamicProbe = !!flag;

@@ -1,4 +1,5 @@
 import { AnalyzerDiagnostics } from './types';
+import { StaticPatterns } from './static-parsers';
 export declare class BinaryAnalyzer {
     private binaryPath;
     private verbose;
@@ -8,8 +9,10 @@ export declare class BinaryAnalyzer {
     private analysisStartHr;
     private toolsReady;
     private binarySha256;
+    private staticPatterns;
     constructor(binaryPath: string, verbose?: boolean);
     getBinarySha256(): Promise<string>;
+    getStaticPatterns(): Promise<StaticPatterns>;
     setDynamicProbe(flag: boolean): void;
     getDiagnostics(): AnalyzerDiagnostics;
     private detectTools;
