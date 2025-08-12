@@ -107,6 +107,9 @@ export interface IngestedEvidence {
   rebuildDigestMismatch?: boolean; // flag set when CI detects non-reproducible rebuild
   materialsValidated?: boolean; // set true when all provenance.materials digests accounted for in SBOM
   materialsMismatchCount?: number; // count of material digests not matched in SBOM (if sbom provided)
+  materialsComplete?: boolean; // all listed materials include a digest
+  signatureVerified?: boolean; // DSSE / provenance signature verified with provided key
+  signatureError?: string; // capture signature verification error reason
   };
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder

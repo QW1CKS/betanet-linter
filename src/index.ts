@@ -68,6 +68,12 @@ export class BetanetComplianceChecker {
                 if (!isNaN(sde)) evidence.provenance.sourceDateEpoch = sde;
               }
             }
+            // Minimal detached signature placeholder: if envelope has 'signatures[0].sig', mark present (not cryptographically validated here)
+            if (Array.isArray(parsed.signatures) && parsed.signatures.length) {
+              // Future: integrate cosign/DSSE key verification; here we mark presence only
+              evidence.provenance = evidence.provenance || {};
+              evidence.provenance.signatureVerified = false; // will remain false until real verification added
+            }
           } catch {/* swallow decoding errors */}
         } else if (parsed.predicateType && parsed.predicate) {
           // Raw provenance JSON (unwrapped)
@@ -98,6 +104,15 @@ export class BetanetComplianceChecker {
           Object.assign(evidence, parsed);
         }
         (this._analyzer as any).evidence = evidence; // attach for evaluators
+        // Compute materials completeness metric
+        try {
+          if (evidence.provenance?.materials) {
+            const mats = evidence.provenance.materials;
+            if (mats.length) {
+              evidence.provenance.materialsComplete = mats.every(m => !!m.digest && m.digest.startsWith('sha256:'));
+            }
+          }
+        } catch {/* ignore */}
       } catch (e: any) {
         console.warn(`⚠️  Failed to load evidence file ${options.evidenceFile}: ${e.message}`);
       }
