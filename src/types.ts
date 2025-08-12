@@ -87,6 +87,7 @@ export interface CheckOptions {
   allowHeuristic?: boolean; // if true in strict mode, heuristic passes are included
   evidenceFile?: string; // path to external evidence JSON (Phase 1 ingestion)
   sbomFile?: string; // optional SBOM file path to cross-check provenance materials (Phase 3 extension)
+  governanceFile?: string; // governance & ledger evidence (Phase 6)
 }
 
 export interface SBOMOptions {
@@ -113,5 +114,7 @@ export interface IngestedEvidence {
   };
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder
+  governance?: any; // Phase 6 governance snapshot evidence
+  ledger?: any; // Phase 6 ledger observation evidence
   [k: string]: any; // allow forward-compatible keys
 }

@@ -463,6 +463,58 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       };
     }
   }
+  ,
+  {
+    id: 15,
+    key: 'governance-anti-concentration',
+    name: 'Governance Anti-Concentration',
+    description: 'Validates AS/org caps & partition safety (evidence-based)',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence;
+      const gov = ev?.governance;
+      let passed = false;
+      let details = '❌ No governance evidence';
+      if (gov && typeof gov === 'object') {
+        const { asCapApplied, orgCapApplied, maxASShare, maxOrgShare, partitionsDetected } = gov;
+        passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false);
+        details = passed ? `✅ Caps enforced (AS<=${maxASShare} org<=${maxOrgShare}) no partitions` : `❌ Governance issues: ${missingList([
+          !asCapApplied && 'AS caps not applied',
+          !orgCapApplied && 'Org caps not applied',
+          (maxASShare > 0.2) && `AS share ${maxASShare}`,
+          (maxOrgShare > 0.25) && `Org share ${maxOrgShare}`,
+          partitionsDetected === true && 'partitions detected'
+        ])}`;
+      }
+      return { id: 15, name: 'Governance Anti-Concentration', description: 'Validates AS/org caps & partition safety (evidence-based)', passed, details, severity: 'major', evidenceType: gov ? 'artifact' : 'heuristic' };
+    }
+  },
+  {
+    id: 16,
+    key: 'ledger-finality-observation',
+    name: 'Ledger Finality Observation',
+    description: 'Evidence of 2-of-3 finality & quorum certificate validity',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence;
+      const ledger = ev?.ledger;
+      let passed = false;
+      let details = '❌ No ledger evidence';
+      if (ledger && typeof ledger === 'object') {
+        const { finalitySets, quorumCertificatesValid, emergencyAdvanceUsed } = ledger;
+        const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2; // simplified proxy
+        passed = !!(has2of3 && quorumCertificatesValid === true && emergencyAdvanceUsed !== true);
+        details = passed ? `✅ Finality sets=${finalitySets.length} quorum certs valid` : `❌ Ledger issues: ${missingList([
+          !has2of3 && 'insufficient finality sets',
+          quorumCertificatesValid !== true && 'invalid quorum certificates',
+          emergencyAdvanceUsed === true && 'emergency advance used'
+        ])}`;
+      }
+      return { id: 16, name: 'Ledger Finality Observation', description: 'Evidence of 2-of-3 finality & quorum certificate validity', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
+    }
+  }
 ];
 
 export function getChecksByIds(ids: number[]): CheckDefinitionMeta[] {

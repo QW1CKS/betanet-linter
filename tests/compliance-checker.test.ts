@@ -17,8 +17,8 @@ describe('BetanetComplianceChecker', () => {
 
   describe('checkCompliance', () => {
     it('should return a compliance result with all checks', async () => {
-  // Inject mock analyzer directly (private field access via casting)
-  (checker as any)._analyzer = {
+      // Inject mock analyzer directly (private field access via casting)
+      (checker as any)._analyzer = {
         checkNetworkCapabilities: () => Promise.resolve({
           hasTLS: true,
           hasQUIC: true,
@@ -74,9 +74,9 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-  // Total checks increased to 14 after adding static structural parsers (IDs 12-14)
-  expect(result.checks).toHaveLength(14);
-  expect(result.summary.total).toBe(14);
+  // Total checks increased to 16 after adding governance & ledger artifact checks
+  expect(result.checks).toHaveLength(16);
+  expect(result.summary.total).toBe(16);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
   // Spec summary should be present
@@ -256,7 +256,7 @@ describe('BetanetComplianceChecker', () => {
       });
 
   // With 14 total, excluding id 10 should yield 13
-  expect(result.checks).toHaveLength(13); // 14 total minus excluded 10
+  expect(result.checks).toHaveLength(15); // 16 total minus excluded 10
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 

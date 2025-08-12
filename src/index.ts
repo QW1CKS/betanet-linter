@@ -178,6 +178,19 @@ export class BetanetComplianceChecker {
         console.warn(`⚠️  Failed to ingest SBOM file ${options.sbomFile}: ${e.message}`);
       }
     }
+    // Phase 6: Governance & ledger evidence ingestion (single JSON file) if provided
+    if (options.governanceFile && fs.existsSync(options.governanceFile)) {
+      try {
+        const rawGov = fs.readFileSync(options.governanceFile, 'utf8');
+        const govObj = JSON.parse(rawGov);
+        const analyzerAny: any = this._analyzer as any;
+        analyzerAny.evidence = analyzerAny.evidence || {};
+        if (govObj.governance) analyzerAny.evidence.governance = govObj.governance;
+        if (govObj.ledger) analyzerAny.evidence.ledger = govObj.ledger;
+      } catch (e: any) {
+        console.warn(`⚠️  Failed to ingest governance evidence ${options.governanceFile}: ${e.message}`);
+      }
+    }
     // Enable dynamic probe if requested or via env toggle
     if ((options.dynamicProbe || process.env.BETANET_DYNAMIC_PROBE === '1') && typeof (this._analyzer as any).setDynamicProbe === 'function') {
       (this._analyzer as any).setDynamicProbe(true);
