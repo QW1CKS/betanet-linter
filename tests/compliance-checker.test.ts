@@ -85,6 +85,32 @@ describe('BetanetComplianceChecker', () => {
   expect(result.specSummary?.implementedChecks).toBeGreaterThanOrEqual(11);
     });
 
+    it('should ingest external evidence file and upgrade build provenance evidenceType', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmpBin = path.join(__dirname, 'temp-existing-bin');
+      await fs.writeFile(tmpBin, Buffer.from('binary data slsa reproducible provenance'));
+      // Analyzer lacking native provenance signals to force reliance on evidence
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['slsa','reproducible','provenance','ticket','rotation','/betanet/htx/1.0.0','/betanet/htxquic/1.0.0','chacha20','poly1305','cashu','lightning','federation','kyber768','x25519','mix beaconset diversity'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+      };
+      const evidencePath = path.join(__dirname, 'temp-evidence.json');
+      const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:abc123' } };
+      await fs.writeFile(evidencePath, JSON.stringify(evidence));
+      const result = await checkerLocal.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
+      const buildProv = result.checks.find(c => c.id === 9);
+      expect(buildProv).toBeDefined();
+      expect(buildProv?.evidenceType).toBe('artifact');
+      expect(buildProv?.details).toMatch(/External provenance evidence/);
+      await fs.remove(evidencePath);
+    });
+
     it('should throw if binary does not exist', async () => {
       const localChecker = new BetanetComplianceChecker();
       await expect(localChecker.checkCompliance('/non/existent/path/binary')).rejects.toThrow(/Binary not found/);

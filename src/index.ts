@@ -1,5 +1,5 @@
 import { BinaryAnalyzer } from './analyzer';
-import { ComplianceCheck, ComplianceResult, CheckOptions } from './types';
+import { ComplianceCheck, ComplianceResult, CheckOptions, IngestedEvidence } from './types';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
@@ -35,6 +35,16 @@ export class BetanetComplianceChecker {
     if (!fs.existsSync(binaryPath)) throw new Error(`Binary not found at path: ${binaryPath}`);
     if (!this._analyzer || options.forceRefresh) {
       this._analyzer = new BinaryAnalyzer(binaryPath, options.verbose);
+    }
+    // Evidence ingestion (Phase 1 start)
+    if (options.evidenceFile && fs.existsSync(options.evidenceFile)) {
+      try {
+        const raw = fs.readFileSync(options.evidenceFile, 'utf8');
+        const parsed: IngestedEvidence = JSON.parse(raw);
+        (this._analyzer as any).evidence = parsed; // attach for check evaluators
+      } catch (e: any) {
+        console.warn(`⚠️  Failed to load evidence file ${options.evidenceFile}: ${e.message}`);
+      }
     }
     // Enable dynamic probe if requested or via env toggle
     if ((options.dynamicProbe || process.env.BETANET_DYNAMIC_PROBE === '1') && typeof (this._analyzer as any).setDynamicProbe === 'function') {

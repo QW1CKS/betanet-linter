@@ -85,9 +85,23 @@ export interface CheckOptions {
   dynamicProbe?: boolean; // attempt lightweight runtime '--help' probe to augment strings
   strictMode?: boolean; // if true, only non-heuristic evidence counts toward pass unless allowHeuristic
   allowHeuristic?: boolean; // if true in strict mode, heuristic passes are included
+  evidenceFile?: string; // path to external evidence JSON (Phase 1 ingestion)
 }
 
 export interface SBOMOptions {
   format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json';
   outputPath?: string;
+}
+
+// Minimal evidence schema starter (will expand in later phases)
+export interface IngestedEvidence {
+  provenance?: {
+    predicateType?: string;
+    builderId?: string;
+    binaryDigest?: string;
+    materials?: { uri?: string; digest?: string }[];
+  };
+  clientHello?: any; // placeholder; future structured shape
+  noise?: any; // placeholder
+  [k: string]: any; // allow forward-compatible keys
 }

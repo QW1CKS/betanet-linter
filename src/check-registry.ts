@@ -254,19 +254,23 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const buildInfo = await analyzer.checkBuildProvenance();
-      const passed = buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance;
+      const evidence = (analyzer as any).evidence || {};
+      const prov = evidence.provenance || {};
+      const hasNormative = !!(prov.predicateType && prov.builderId && prov.binaryDigest);
+      const passed = (buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative;
+      const missing = missingList([
+        !(buildInfo.hasSLSA || prov.predicateType) && 'SLSA support/predicate',
+        !(buildInfo.reproducible || prov.binaryDigest) && 'reproducible builds',
+        !(buildInfo.provenance || prov.builderId) && 'build provenance'
+      ]);
       return {
         id: 9,
         name: 'Build Provenance',
         description: 'Builds reproducibly and publishes SLSA 3 provenance',
         passed,
-        details: passed ? '✅ Found SLSA, reproducible builds, and provenance' : `❌ Missing: ${missingList([
-          !buildInfo.hasSLSA && 'SLSA support',
-          !buildInfo.reproducible && 'reproducible builds',
-          !buildInfo.provenance && 'build provenance'
-        ])}`,
+        details: passed ? (hasNormative ? '✅ External provenance evidence ingested' : '✅ Found SLSA, reproducible builds, and provenance') : `❌ Missing: ${missing}`,
         severity: 'minor',
-        evidenceType: 'heuristic'
+        evidenceType: hasNormative ? 'artifact' : 'heuristic'
       };
     }
   },
