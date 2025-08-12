@@ -412,6 +412,48 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   }
   ,
   {
+    id: 19,
+    key: 'noise-rekey-policy',
+    name: 'Noise Rekey Policy',
+    description: 'Observes at least one rekey event and validates trigger thresholds (bytes/time/frames)',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence;
+      const n = ev?.noiseExtended;
+      let passed = false;
+      let details = '❌ No rekey evidence';
+      if (n) {
+        const bytesOk = !n.rekeyTriggers?.bytes || n.rekeyTriggers.bytes >= (8 * 1024 * 1024 * 1024);
+        const timeOk = !n.rekeyTriggers?.timeMinSec || n.rekeyTriggers.timeMinSec >= 3600;
+        const framesOk = !n.rekeyTriggers?.frames || n.rekeyTriggers.frames >= 65536;
+        passed = (n.rekeysObserved || 0) >= 1 && bytesOk && timeOk && framesOk;
+        details = passed ? `✅ rekeysObserved=${n.rekeysObserved}` : `❌ Rekey policy insufficient rekeysObserved=${n.rekeysObserved||0}`;
+      }
+      return { id: 19, name: 'Noise Rekey Policy', description: 'Observes at least one rekey event and validates trigger thresholds (bytes/time/frames)', passed, details, severity: 'minor', evidenceType: ev?.noiseExtended ? 'dynamic-protocol' : 'heuristic' };
+    }
+  },
+  {
+    id: 20,
+    key: 'http2-adaptive-emulation',
+    name: 'HTTP/2 Adaptive Emulation',
+    description: 'Validates adaptive padding jitter & settings tolerances',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence;
+      const h2 = ev?.h2Adaptive;
+      let passed = false;
+      let details = '❌ No adaptive HTTP/2 evidence';
+      if (h2) {
+        passed = !!(h2.withinTolerance && h2.sampleCount >= 5);
+        details = passed ? `✅ jitterMean=${h2.paddingJitterMeanMs?.toFixed(1)}ms p95=${h2.paddingJitterP95Ms?.toFixed(1)}ms samples=${h2.sampleCount}` : `❌ Adaptive jitter out of tolerance mean=${h2.paddingJitterMeanMs?.toFixed(1)} p95=${h2.paddingJitterP95Ms?.toFixed(1)} samples=${h2.sampleCount}`;
+      }
+      return { id: 20, name: 'HTTP/2 Adaptive Emulation', description: 'Validates adaptive padding jitter & settings tolerances', passed, details, severity: 'minor', evidenceType: h2 ? 'dynamic-protocol' : 'heuristic' };
+    }
+  }
+  ,
+  {
     id: 12,
     key: 'clienthello-static-template',
     name: 'TLS ClientHello Static Template',

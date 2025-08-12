@@ -74,9 +74,9 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-  // Total checks increased to 18 after adding multi-signal anti-evasion check
-  expect(result.checks).toHaveLength(18);
-  expect(result.summary.total).toBe(18);
+  // Total checks increased to 20 after adding rekey policy (19) and HTTP/2 adaptive emulation (20)
+  expect(result.checks).toHaveLength(20);
+  expect(result.summary.total).toBe(20);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
   // Spec summary should be present
@@ -255,8 +255,8 @@ describe('BetanetComplianceChecker', () => {
         checkFilters: { exclude: [10] }
       });
 
-  // With 14 total, excluding id 10 should yield 13
-  expect(result.checks).toHaveLength(17); // 18 total minus excluded 10
+  // With 20 total, excluding id 10 should yield 19
+  expect(result.checks).toHaveLength(19); // 20 total minus excluded 10
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 
@@ -1175,6 +1175,34 @@ describe('BetanetComplianceChecker', () => {
       expect(multi).toBeDefined();
       expect(multi?.passed).toBe(false);
       expect(multi?.details).toMatch(/Suspected keyword stuffing/);
+      await fs.remove(tmp);
+    });
+  });
+
+  describe('rekey policy & HTTP/2 adaptive (checks 19 & 20)', () => {
+    it('passes rekey and adaptive checks with simulated evidence', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-existing-bin9');
+      await fs.writeFile(tmp, Buffer.from('binary data rekey adaptive'));
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['noise','xk','adaptive','padding','betanet'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      (checkerLocal as any)._analyzer.evidence = {
+        noiseExtended: { pattern: 'XK', rekeysObserved: 1, rekeyTriggers: { bytes: 8*1024*1024*1024, timeMinSec: 3600, frames: 65536 } },
+        h2Adaptive: { withinTolerance: true, paddingJitterMeanMs: 40, paddingJitterP95Ms: 60, sampleCount: 20 }
+      };
+      const result = await checkerLocal.checkCompliance(tmp, { allowHeuristic: true });
+      const rekey = result.checks.find(c => c.id === 19);
+      const h2 = result.checks.find(c => c.id === 20);
+      expect(rekey?.passed).toBe(true);
+      expect(h2?.passed).toBe(true);
       await fs.remove(tmp);
     });
   });

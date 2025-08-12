@@ -76,16 +76,23 @@ export interface HarnessOptions {
   mixSamples?: number; // number of simulated mix path samples to generate
   mixHopsRange?: [number, number]; // inclusive range of hops per path (e.g., [2,4])
   mixDeterministic?: boolean; // if true, use seeded patterns for reproducibility
+  rekeySimulate?: boolean; // simulate observing a Noise rekey event
+  h2AdaptiveSimulate?: boolean; // simulate HTTP/2 adaptive padding/jitter metrics
+  jitterSamples?: number; // number of jitter samples to simulate
 }
 
 export interface HarnessEvidence {
   schemaVersion?: string;
   clientHello?: { alpn?: string[]; extOrderSha256?: string };
   noise?: { pattern?: string };
+  // Extended noise evidence (Step 9)
+  // eslint-disable-next-line @typescript-eslint/consistent-type-definitions
+  noiseExtended?: { pattern?: string; rekeysObserved?: number; rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number } };
   voucher?: { structLikely?: boolean; tokenHits?: string[]; proximityBytes?: number };
   tlsProbe?: { host: string; port: number; offeredAlpn: string[]; selectedAlpn?: string | null; cipher?: string; protocol?: string | null; handshakeMs?: number; error?: string };
   fallback?: { udpAttempted: boolean; udpTimeoutMs: number; tcpConnected: boolean; tcpConnectMs?: number; tcpRetryDelayMs?: number; coverConnections?: number; coverTeardownMs?: number[]; error?: string };
   mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
+  h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
   meta: { generated: string; scenarios: string[] };
 }
 
@@ -176,6 +183,35 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       opts.fallbackUdpTimeoutMs || 300,
       opts.coverConnections || 0
     );
+  }
+  // Simulate a Noise rekey observation (Step 9 placeholder)
+  if (opts.rekeySimulate) {
+    const rekeysObserved = 1; // single rekey event
+    evidence.noiseExtended = {
+      pattern: evidence.noise?.pattern || 'XK',
+      rekeysObserved,
+      rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024, timeMinSec: 3600, frames: 65536 }
+    };
+  }
+  // Simulate HTTP/2 adaptive emulation jitter metrics (Step 9 placeholder)
+  if (opts.h2AdaptiveSimulate) {
+    const samples = Math.max(5, opts.jitterSamples || 20);
+    // crude pseudo-random jitter distribution
+    const rnd = Math.random;
+    const values: number[] = [];
+    for (let i = 0; i < samples; i++) values.push(20 + Math.floor(rnd() * 30)); // 20–50ms padding jitter
+    values.sort((a,b)=>a-b);
+    const mean = values.reduce((a,b)=>a+b,0)/values.length;
+    const p95 = values[Math.min(values.length-1, Math.floor(values.length*0.95))];
+    // Accept tolerance if mean within target window (e.g., 15–60ms) and p95 < 75ms
+    const withinTolerance = mean >= 15 && mean <= 60 && p95 < 75;
+    evidence.h2Adaptive = {
+      settings: { INITIAL_WINDOW_SIZE: 6291456, MAX_FRAME_SIZE: 16384 },
+      paddingJitterMeanMs: mean,
+      paddingJitterP95Ms: p95,
+      withinTolerance,
+      sampleCount: samples
+    };
   }
   // Simulated mix diversity sampling (Phase 7 foundation)
   if (opts.mixSamples && opts.mixSamples > 0) {
