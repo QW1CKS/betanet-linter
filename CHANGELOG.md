@@ -1,3 +1,31 @@
+## Unreleased
+
+### Added
+- Evidence schema v2: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative` assertions (see `docs/evidence-schema.md`).
+- Multi-signal scoring (artifact=3, dynamic=2, static=1) and anti-evasion keyword stuffing heuristic (Check 18).
+- Simulated dynamic harness signals: Noise rekey policy (Check 19), HTTP/2 adaptive jitter (Check 20).
+- Structural & calibration groundwork: binary structural meta (Check 21), static ClientHello template hash (Check 12 baseline + Check 22 scaffold), enhanced Noise pattern detail in check 13.
+- Negative assertions (forbidden legacy header / deterministic seed) (Check 23).
+- Total checks expanded 11 → 23.
+
+### Changed
+- Noise XK Pattern (Check 13) now enforces HKDF + message token thresholds.
+- Provenance wording clarified; strict mode still excludes heuristic-only passes unless `--allow-heuristic`.
+
+### Fixed
+- Exclusion tests updated for new registry size.
+- Mitigated false multi-signal inflation via anti-evasion check.
+
+### Deprecated
+- Schema v1 (implicit) superseded by schema v2 (backward tolerant for consumers ignoring new fields).
+
+### Pending
+- Real TLS/QUIC transcript capture & extension order calibration.
+- HTTP/3 adaptive + statistical jitter variance verification.
+- Governance historical diversity dataset & deeper alias ledger quorum cert validation.
+- Reproducible rebuild signature + full materials graph attestation.
+- Evidence signing & trust chain anchoring.
+
 ## 1.0.0 - 2025-08-11
 
 Highlights (betanet-linter v1.0.0):

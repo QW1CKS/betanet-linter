@@ -8,8 +8,9 @@ betanet-linter/
 ├── src/
 │   ├── index.ts              # Orchestrator: registry-driven compliance + SBOM delegation
 │   ├── check-registry.ts     # Declarative check metadata + evaluate() functions
-│   ├── analyzer.ts           # Binary analysis (memoized)
-│   ├── heuristics.ts         # Heuristic pattern detection (Plan 2)
+│   ├── analyzer.ts           # Binary + structural analysis (memoized, schema v2 population)
+│   ├── heuristics.ts         # Heuristic pattern detection (legacy + supplemental)
+│   ├── binary-introspect.ts  # Lightweight binary format + section/import introspection
 │   ├── constants.ts          # Spec/version constants (Betanet 1.0 + partial 1.1)
 │   ├── sbom/                 # Advanced SBOM generator (active)
 │   └── types.ts              # TypeScript type definitions
@@ -38,8 +39,9 @@ betanet-linter/
    - Aggregates results (score, pass/fail, diagnostics) & delegates SBOM generation to sbom generator
    - Lazy analyzer instantiation → enables dependency injection during tests
 
-- **Check Registry** (`src/check-registry.ts`)
-   - Central list of 11 compliance checks (id, key, name, description, severity, version metadata)
+-- **Check Registry** (`src/check-registry.ts`)
+   - Central list of 23 compliance checks (ids 1–23) (id, key, name, description, severity, version metadata, evidenceType)
+   - Evidence categories: heuristic, static-structural, dynamic-protocol (sim/sample), artifact
 5. Feature tagging: injects `betanet.feature` properties (transport-htx, transport-quic, transport-webrtc, crypto-pq-hybrid, payment-lightning, privacy-hop, etc.) across formats
 
 ## Performance & Diagnostics
@@ -55,11 +57,13 @@ betanet-linter/
    - Each entry exposes `evaluate(analyzer, now)` returning a `ComplianceCheck`
    - Handles dynamic severity escalation (post-quantum critical date) & version acceptances (transport 1.0 / 1.1)
 
-- **BinaryAnalyzer** (`src/analyzer.ts`)
-  - Performs deep binary analysis
-  - Extracts strings, symbols, and dependencies
-  - Detects network capabilities, cryptographic features, and other compliance indicators
-  - Provides fallback methods when system tools are unavailable
+- **Analyzer / Structural Augmentation** (`src/analyzer.ts`)
+   - Extracts strings, symbols, dependencies (legacy heuristic base)
+   - Populates schema v2 evidence: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative`
+   - Integrates `binary-introspect.ts` for format, section list sample, imports sample, debug marker
+   - Injects simulated dynamic evidence (`noiseRekeySim`, `h2Adaptive`) pending real capture
+   - Counts Noise HKDF/message tokens for strengthened Check 13
+   - Single-pass memoization; sets `schemaVersion=2`
 
 ### 2. CLI Interface
 
@@ -71,19 +75,9 @@ betanet-linter/
 
 ### 3. Compliance Checks
 
-All checks (now 11 including Privacy Hop Enforcement) are declaratively defined in the registry (data + evaluate function). Orchestrator iterates filtered subset (include/exclude). This allows adding a new check by appending one object—no orchestration changes.
+All 23 checks are declaratively defined. Append-only registration keeps orchestrator stable; multi-signal scoring consumes evidence categories post evaluation.
 
-1. **HTX Implementation** - Checks for TLS, QUIC, HTX, ECH, and port 443 support
-2. **Access Tickets** - Detects ticket rotation mechanisms
-3. **Frame Encryption** - Validates ChaCha20-Poly1305 support
-4. **SCION Paths** - Checks for SCION support or IP-transition headers
-5. **Transport Endpoints** - Detects `/betanet/htx/{1.1.0|1.0.0}`, `/betanet/htxquic/{1.1.0|1.0.0}`, optional `/betanet/webrtc/1.0.0`
-6. **DHT Bootstrap** - (1.0 heuristic) deterministic bootstrap; rendezvous rotation (1.1) partial
-7. **Alias Ledger** - Checks for consensus-based ledger verification
-8. **Payment System** - Detects Cashu and Lightning support
-9. **Build Provenance** - Validates SLSA and reproducible build support
-10. **Post-Quantum** - Checks for X25519-Kyber768 (mandatory after 2027-01-01, override with `BETANET_PQ_DATE_OVERRIDE`)
-11. **Privacy Hop Enforcement** - Weighted multi-token heuristic (mix, beacon/epoch, diversity) with scoring visibility
+Abbreviated check map (1–23): Transport Presence, Access Tickets, Frame Encryption, SCION / legacy header absence, Transport Endpoints, DHT Bootstrap & rotation, Alias Ledger, Payment System, Build Provenance, Post-Quantum, Privacy Hop Enforcement, TLS ClientHello Template, Noise Pattern (enhanced), Payment Struct Detail, Governance Anti-Concentration, Ledger Emergency Advance, Diversity Sampling, Multi-Signal Anti-Evasion, Noise Rekey Simulation, HTTP/2 Adaptive Jitter Simulation, Binary Structural Meta, TLS Template Calibration Scaffold, Negative Assertions.
 
 ### 4. SBOM Generation
 
@@ -166,6 +160,7 @@ Each compliance check uses a combination of:
 ## Performance & Diagnostics
 
 - Single-pass memoized analysis (analyze() cached)
-- Diagnostics object: analyze invocation count, cache hit flag, tool availability
-- Implemented: per-analysis memoization, force refresh option, environment fail-on-degraded gate
-- Future: parallel capability evaluation, per-check timing export in machine-readable format
+- Diagnostics: invocation count, cache hit, tool availability, degradation reasons
+- Per-check timing captured; multi-signal scoring aggregated (artifact=3, dynamic=2, static=1, heuristic=0)
+- Environment gates: `BETANET_FAIL_ON_DEGRADED`, `BETANET_PQ_DATE_OVERRIDE`
+- Future: real dynamic handshake capture, HTTP/3 adaptive metrics, signed evidence bundle

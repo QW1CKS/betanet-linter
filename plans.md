@@ -138,3 +138,43 @@ Residual / Future (optional):
 - Confidence scoring per heuristic token group
 - Structured JSON export for per-check timings (Observability plan)
 
+---
+## Plan 11: Structural & Dynamic Escalation (IN PROGRESS / NEXT)
+Goals:
+- Evidence schema v2 adoption (DONE) – structural augmentation fields consumed by new checks.
+- Binary structural meta introspection (DONE) – Check 21 baseline integrity.
+- Static ClientHello template hashing (DONE) – Check 12 baseline & Check 22 calibration scaffold.
+- Enhanced Noise pattern detail (DONE) – HKDF/message token counts strengthen Check 13.
+- Negative assertions (DONE) – Check 23 enumerates forbidden legacy constructs.
+- Multi-signal scoring & anti-evasion (DONE) – Check 18 guards against keyword stuffing.
+- Simulated dynamic signals (DONE) – Rekey policy (19), HTTP/2 adaptive jitter (20).
+- Real TLS/QUIC handshake capture (PENDING) – populate dynamic template evidence & transition Check 22 from scaffold to calibrated enforcement.
+- HTTP/3 adaptive + jitter variance (PENDING) – extend dynamic evidence set & new check (future ID TBD).
+- Diversity statistical baseline (PENDING) – convert sampling into variance/confidence outputs.
+- Governance artifact deep validation (PENDING) – signature set, quorum cert structure.
+- Evidence signing (PENDING) – cryptographic signature over emitted JSON / SBOM digests.
+
+Deliverables (Partial Complete):
+- Registry expanded to 23 checks (IDs 1–23). ✅
+- Schema version bump to 2 with docs (`docs/evidence-schema.md`). ✅
+- Analyzer structural pass sets `schemaVersion=2` & populates new fields. ✅
+
+Next Implementation Steps:
+1. Real handshake capture: minimal pluggable probe interface (avoid executing target binary until sandbox clarified).
+2. Calibration store: persist baseline ClientHello ALPN/extension ordering for drift detection.
+3. Jitter statistics: capture distribution (p50/p90/stddev) vs expected adaptive ranges.
+4. Governance dataset ingestion: schema + diversity metrics (org, autonomous system, jurisdiction).
+5. Evidence signing: detached signature file (.sig) with canonical JSON serialization.
+6. Structured timing export: JSON timings artifact for observability (ties back to Plan 9 deferred item).
+7. Anti-correlation fallback harness: simulate UDP failure and measure fallback timing threshold.
+
+Risk / Considerations:
+- Sandbox & network egress policies for active probes.
+- Deterministic ordering of captured extension lists to avoid flaky diffs.
+- Time sync & monotonic clock usage for jitter metrics.
+
+Success Criteria:
+- ≥2 dynamic-protocol checks rely on real capture (not simulated) without flakiness.
+- Check 22 graduates from scaffold to calibrated enforcement.
+- Multi-signal scoring shows ≥1 static + ≥1 dynamic + ≥1 artifact category for a fully instrumented binary.
+
