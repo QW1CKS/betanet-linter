@@ -45,4 +45,4 @@ noisePatternDetail supplements basic Noise_XK detection with heuristic counts of
 - statisticalJitter: distribution metrics for padding / PING / PRIORITY
 - signedEvidence: signature block (public key, signature, digest chain)
 
-This document will evolve; breaking changes will bump schemaVersion.
+This document will evolve; breaking changes will bump schemaVersion. See `ROADMAP.md` for planned additions.

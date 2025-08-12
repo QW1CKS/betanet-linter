@@ -1,11 +1,7 @@
-Deprecated
-==========
+Betanet Linter Roadmap (Canonical)
+=================================
 
-Canonical roadmap is now `ROADMAP.md`. This file remains only as a historical pointer and will not be updated further.
-
----
-Betanet Linter Remediation Strategy (Reference)
-=============================================
+This document is the single authoritative roadmap & progress tracker. (Historical remediation content retained below.)
 
 Progress Summary
 ----------------

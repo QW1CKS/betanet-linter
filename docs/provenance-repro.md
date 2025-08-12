@@ -51,4 +51,4 @@ Normative upgrade (artifact evidence) is granted only if:
 - builderId is present
 - A subject digest (sha256) matches the analyzed binary's computed sha256
 
-See `remedation.md` Implementation Order step 3 for progress tracking.
+See `ROADMAP.md` (Step 3 and subsequent) for progress tracking.

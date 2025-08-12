@@ -2,7 +2,7 @@
 
 > **IMPORTANT – Transitional Compliance Notice (post Step 10)**  
 > The linter now contains **23 registered checks** (IDs 1–23) spanning heuristic, static-structural, dynamic-protocol and artifact evidence classes. Steps 8–10 introduced multi‑signal scoring & anti‑evasion, simulated dynamic harness evidence (Noise rekey policy & HTTP/2 adaptive jitter), structural binary introspection, static ClientHello template extraction, enhanced Noise pattern detail, negative assertions, and evidence schema **v2**.  
-> Many behaviors (real transcript capture, HTTP/3, calibration baselines, statistical variance tests, governance depth) remain pending; by default **strict mode** still excludes purely heuristic passes unless `--allow-heuristic` is provided. See the living roadmap in [remediation.md](./remediation.md).  
+> Many behaviors (real transcript capture, HTTP/3, calibration baselines, statistical variance tests, governance depth) remain pending; by default **strict mode** still excludes purely heuristic passes unless `--allow-heuristic` is provided. See the living roadmap in [ROADMAP.md](./ROADMAP.md).  
 > Treat PASS states as advisory unless supported by ≥2 non‑heuristic categories (see Multi‑Signal section).
 
 
@@ -25,7 +25,7 @@ A CLI tool that enumerates Betanet specification §11 requirements (1.0 baseline
 
 ## Limitations
 
-This tool relies on static + simulated evidence. It cannot yet fully guarantee runtime compliance or capture genuine TLS / QUIC handshakes, live jitter distributions, or actual Noise transcripts (planned). See [plans.md](./plans.md) and [remediation.md](./remediation.md) for remaining milestones.
+This tool relies on static + simulated evidence. It cannot yet fully guarantee runtime compliance or capture genuine TLS / QUIC handshakes, live jitter distributions, or actual Noise transcripts (planned). See the consolidated [ROADMAP.md](./ROADMAP.md) for remaining milestones.
 
 ### Strict Mode vs Heuristic Mode (Transitional)
 Checks advertise `evidenceType` among: `heuristic`, `static-structural`, `dynamic-protocol`, `artifact`. Strict mode (default) only counts non‑heuristic passes unless `--allow-heuristic`. Multi‑signal scoring (artifact=3, dynamic=2, static=1, heuristic=0) plus keyword stuffing detection (anti‑evasion) appear in JSON output under `multiSignal`.
@@ -63,7 +63,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |– Binary structural meta (foundational) | 21 | static-structural | Baseline | Supports multi-signal diversity |
 |– Negative assertions (forbidden legacy/seed) | 23 | static-structural | Baseline | Expands denial surface |
 
-Legend: *sim* = simulated dynamic evidence (to be replaced by real capture). See [remediation.md](./remediation.md) for remaining gaps.
+Legend: *sim* = simulated dynamic evidence (to be replaced by real capture). See [ROADMAP.md](./ROADMAP.md) for remaining gaps.
 
 ### Provenance & Reproducible Build (Artifact Upgrade Path)
 An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
@@ -73,7 +73,7 @@ An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 4. Clean rebuild diff to assert reproducibility.
 5. Evidence ingestion via `--evidence-file` (DSSE envelope, raw SLSA JSON, or simple reference with provenance object) to upgrade Build Provenance (check 9) to `artifact` status when predicateType + builderId + binary/subject SHA256 digest are validated against the analyzed binary (or accepted if analyzer hashing unavailable in degraded environments).
 
-Limitations: Some action refs pinned; full signature validation & advanced materials policy pending; reproducible rebuild mismatch enforcement supported via evidence flag. See roadmap (Step 3 & subsequent) in `remediation.md`.
+Limitations: Some action refs pinned; full signature validation & advanced materials policy pending; reproducible rebuild mismatch enforcement supported via evidence flag. See roadmap (Step 3 & subsequent) in `ROADMAP.md`.
 
 ### Multi-Signal Scoring & Anti-Evasion
 JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Keyword stuffing detection flags excessive spec-token density with insufficient category diversity and can fail the multi-signal anti‑evasion check (ID 18).
@@ -250,7 +250,7 @@ Pending (selected): real handshake capture (TLS/QUIC), HTTP/3 adaptive, statisti
 | Dynamic runtime probe / plugin mode | Deferred | Future (ISSUE-059) |
 
 ### Spec Coverage Summary
-The tool enumerates Betanet 1.0 checks and provides heuristic indicators for each; emerging 1.1 deltas (transport versions, rendezvous rotation signals, privacy hop weighting, optional WebRTC) are likewise heuristic. Normative (non‑heuristic) evidence classes will incrementally land in upcoming minor releases (see [remedation.md](./remedation.md)). Runtime output includes a spec coverage header, e.g.:
+The tool enumerates Betanet 1.0 checks and provides heuristic indicators for each; emerging 1.1 deltas (transport versions, rendezvous rotation signals, privacy hop weighting, optional WebRTC) are likewise heuristic. Normative (non‑heuristic) evidence classes will incrementally land in upcoming minor releases (see [ROADMAP.md](./ROADMAP.md)). Runtime output includes a spec coverage header, e.g.:
 
 ```
 Spec Coverage: baseline 1.0 enumerated (heuristic); latest known 1.1 heuristic signals present 11/11
@@ -472,7 +472,7 @@ npm run lint
 
 For deeper insight into project direction and open/refined issues:
 
-- Roadmap & plan status: see [plans.md](./plans.md)
+- Roadmap status: see [ROADMAP.md](./ROADMAP.md)
 - Issues, inconsistencies & improvement backlog: see [issues-inconsistencies.txt](./issues-inconsistencies.txt)
 
 These documents complement the README by outlining historical decisions, completed milestones, and pending enhancement tracks.

@@ -1,6 +1,6 @@
-Pre-1.0 Release Polish & Finalization Checklist
-=============================================
-Purpose: Capture remaining high-impact, low-effort tasks to confidently tag v1.0.0 while meeting the $4,000 bounty scope and stabilizing CLI/outputs.
+Archived: Pre-1.0 Release Polish & Finalization Checklist
+========================================================
+This file is archived. Historical pre-1.0 tasks have been completed and merged into the canonical roadmap (`ROADMAP.md`).
 
 CORE (Must Complete Before Tagging 1.0.0)
 ----------------------------------------
@@ -52,7 +52,7 @@ SECONDARY (Nice-to-Have, Time Permitting Pre-1.0)
 DOCUMENT & DISCLOSE (If Deferring Secondary Items)
 --------------------------------------------------
 - README "Limitations" subsection: Note version inference is heuristic; dynamic runtime behaviors (ISSUE-059) out of scope for static 1.0.
-- Provide roadmap pointer to plans.md for deferred refactors & dynamic probe concept.
+- Provide roadmap pointer to ROADMAP.md for deferred refactors & dynamic probe concept.
 
 SECURITY & TRUST VERIFICATION
 -----------------------------
@@ -92,10 +92,4 @@ IMPLEMENTATION ORDER (Recommended)
 4) Tag v1.0.0-rc1 & smoke test; adjust.
 5) (Optional) 028 & 027 if time before final tag.
 
-Status Snapshot (as of creation)
---------------------------------
-- Total tests: 43 PASS.
-- Resolved security & robustness: timeouts (034), sanitized names (037), streaming fallback (038), degraded hints (035), filters parity (040).
-- Remaining CORE polish items: 042, 044, plus version flag & docs tasks (non-issue operational items).
-
-End of file.
+Archive end.

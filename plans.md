@@ -1,6 +1,8 @@
-# Roadmap Plans
+# Deprecated Roadmap Plans
 
-This file tracks structured improvement plans following the initial performance & diagnostics enhancements.
+This file is deprecated. The canonical roadmap is now in `ROADMAP.md`.
+
+Historical plan sections (1–11) have been merged and superseded. Remove or archive after external references update.
 
 ## Plan 1 (DONE): Performance & Diagnostics Baseline
 Implemented:
