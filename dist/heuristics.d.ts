@@ -17,11 +17,13 @@ export declare function detectNetwork(src: TextSources): {
     hasHTX: boolean;
     hasECH: boolean;
     port443: boolean;
+    hasWebRTC: boolean;
 };
 export declare function detectSCION(src: TextSources): {
     hasSCION: boolean;
     pathManagement: boolean;
     hasIPTransition: boolean;
+    pathDiversityCount: number;
 };
 export declare function detectDHT(src: TextSources): {
     hasDHT: boolean;
@@ -29,6 +31,7 @@ export declare function detectDHT(src: TextSources): {
     rendezvousRotation: boolean;
     beaconSetIndicator: boolean;
     seedManagement: boolean;
+    rotationHits: number;
 };
 export declare function detectLedger(src: TextSources): {
     hasAliasLedger: boolean;
@@ -47,6 +50,13 @@ export declare function detectBuildProvenance(src: TextSources): {
     hasSLSA: boolean;
     reproducible: boolean;
     provenance: boolean;
+};
+export declare function evaluatePrivacyTokens(strings: string[]): {
+    mixScore: number;
+    beaconScore: number;
+    diversityScore: number;
+    totalScore: number;
+    passed: boolean;
 };
 export {};
 //# sourceMappingURL=heuristics.d.ts.map

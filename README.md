@@ -59,7 +59,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |10 Cashu vouchers (128B), FROST n≥5 t=3, PoW adverts, Lightning | 8 | heuristic | Partial | Presence; no struct verify |
 |11 Governance anti-concentration + partition safety | (planned) | – | Missing | Not implemented |
 |12 Anti-correlation fallback behavior | (planned) | – | Missing | Not implemented |
-|13 Reproducible builds + SLSA3 provenance | 9 | heuristic | Partial | Keyword presence only |
+|13 Reproducible builds + SLSA3 provenance | 9 | heuristic / artifact* | Partial | *Upgrades to artifact when external provenance (predicateType+builderId+matching digest) supplied via --evidence-file; pending action SHA pinning & reproducible rebuild enforcement |
 
 All “Partial” / “Shallow” rows will migrate to structural, dynamic, or artifact evidence per [remedation.md](./remedation.md) roadmap.
 
@@ -69,9 +69,9 @@ An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 2. Per-file SHA256 manifest + aggregate digest.
 3. (Placeholder) SLSA provenance generation referencing the aggregate digest.
 4. Clean rebuild diff to assert reproducibility.
-5. Evidence ingestion via `--evidence-file` to begin upgrading Build Provenance (check 9) toward `artifact` status.
+5. Evidence ingestion via `--evidence-file` (DSSE envelope, raw SLSA JSON, or simple reference with provenance object) to upgrade Build Provenance (check 9) to `artifact` status when predicateType + builderId + binary/subject SHA256 digest are validated against the analyzed binary (or accepted if analyzer hashing unavailable in degraded environments).
 
-Limitations: Action refs currently pinned by major version tag (will move to commit SHAs); provenance predicate not yet parsed/validated—treated as advisory evidence. See roadmap step 3 in `remedation.md`.
+Limitations: Action refs currently pinned by major version tag (commit SHA pin TODO); reproducible rebuild enforcement not yet fails run; signature & materials (SBOM digest) validation pending. See roadmap step 3 in `remedation.md`.
 
 ## License
 

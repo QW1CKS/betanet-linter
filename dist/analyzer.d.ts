@@ -2,10 +2,15 @@ import { AnalyzerDiagnostics } from './types';
 export declare class BinaryAnalyzer {
     private binaryPath;
     private verbose;
+    private dynamicProbe;
     private cachedAnalysis;
     private diagnostics;
     private analysisStartHr;
+    private toolsReady;
+    private binarySha256;
     constructor(binaryPath: string, verbose?: boolean);
+    getBinarySha256(): Promise<string>;
+    setDynamicProbe(flag: boolean): void;
     getDiagnostics(): AnalyzerDiagnostics;
     private detectTools;
     analyze(): Promise<{
@@ -28,6 +33,7 @@ export declare class BinaryAnalyzer {
         hasHTX: boolean;
         hasECH: boolean;
         port443: boolean;
+        hasWebRTC: boolean;
     }>;
     checkCryptographicCapabilities(): Promise<{
         hasChaCha20: boolean;
@@ -42,6 +48,7 @@ export declare class BinaryAnalyzer {
         hasSCION: boolean;
         pathManagement: boolean;
         hasIPTransition: boolean;
+        pathDiversityCount: number;
     }>;
     checkDHTSupport(): Promise<{
         hasDHT: boolean;
@@ -49,6 +56,7 @@ export declare class BinaryAnalyzer {
         rendezvousRotation?: boolean;
         beaconSetIndicator?: boolean;
         seedManagement: boolean;
+        rotationHits?: number;
     }>;
     checkLedgerSupport(): Promise<{
         hasAliasLedger: boolean;

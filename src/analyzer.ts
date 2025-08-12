@@ -4,6 +4,7 @@ import { AnalyzerDiagnostics } from './types';
 import { safeExec, isToolSkipped } from './safe-exec';
 import { FALLBACK_MAX_BYTES, DEFAULT_FALLBACK_STRING_MIN_LEN, DEFAULT_TOOL_TIMEOUT_MS } from './constants';
 import { detectNetwork, detectCrypto, detectSCION, detectDHT, detectLedger, detectPayment, detectBuildProvenance } from './heuristics';
+import * as crypto from 'crypto';
 // Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 
 export class BinaryAnalyzer {
@@ -25,11 +26,30 @@ export class BinaryAnalyzer {
   };
   private analysisStartHr: [number, number] | null = null;
   private toolsReady: Promise<void>;
+  private binarySha256: string | null = null;
 
   constructor(binaryPath: string, verbose: boolean = false) {
     this.binaryPath = binaryPath;
     this.verbose = verbose;
   this.toolsReady = this.detectTools();
+  }
+
+  async getBinarySha256(): Promise<string> {
+    if (this.binarySha256) return this.binarySha256;
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(this.binaryPath);
+    this.binarySha256 = await new Promise<string>((resolve, reject) => {
+      stream.on('data', (d: any) => {
+        if (typeof d === 'string') {
+          hash.update(Buffer.from(d));
+        } else {
+          hash.update(d as Buffer);
+        }
+      });
+      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('error', reject);
+    });
+    return this.binarySha256;
   }
 
   setDynamicProbe(flag: boolean) {

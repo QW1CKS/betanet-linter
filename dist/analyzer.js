@@ -32,17 +32,17 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BinaryAnalyzer = void 0;
 const fs = __importStar(require("fs-extra"));
-const execa_1 = __importDefault(require("execa"));
+const safe_exec_1 = require("./safe-exec");
+const constants_1 = require("./constants");
 const heuristics_1 = require("./heuristics");
-// Removed unused imports (which, types)
+const crypto = __importStar(require("crypto"));
+// Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 class BinaryAnalyzer {
     constructor(binaryPath, verbose = false) {
+        this.dynamicProbe = false; // enable lightweight runtime '--help' probe enrichment
         this.cachedAnalysis = null;
         this.diagnostics = {
             tools: [],
@@ -50,14 +50,40 @@ class BinaryAnalyzer {
             cached: false
         };
         this.analysisStartHr = null;
+        this.binarySha256 = null;
         this.binaryPath = binaryPath;
         this.verbose = verbose;
-        void this.detectTools();
+        this.toolsReady = this.detectTools();
+    }
+    async getBinarySha256() {
+        if (this.binarySha256)
+            return this.binarySha256;
+        const hash = crypto.createHash('sha256');
+        const stream = fs.createReadStream(this.binaryPath);
+        this.binarySha256 = await new Promise((resolve, reject) => {
+            stream.on('data', (d) => {
+                if (typeof d === 'string') {
+                    hash.update(Buffer.from(d));
+                }
+                else {
+                    hash.update(d);
+                }
+            });
+            stream.on('end', () => resolve(hash.digest('hex')));
+            stream.on('error', reject);
+        });
+        return this.binarySha256;
+    }
+    setDynamicProbe(flag) {
+        this.dynamicProbe = !!flag;
     }
     getDiagnostics() {
         return this.diagnostics;
     }
     async detectTools() {
+        const isWindows = process.platform === 'win32';
+        this.diagnostics.platform = process.platform;
+        const degradationReasons = [];
         const toolCandidates = [
             { name: 'strings', args: ['--version'] },
             { name: 'nm', args: ['--version'] },
@@ -69,16 +95,49 @@ class BinaryAnalyzer {
         const checks = toolCandidates.map(async (t) => {
             const start = Date.now();
             try {
-                await (0, execa_1.default)(t.name, t.args, { timeout: 2000 });
-                this.diagnostics.tools.push({ name: t.name, available: true, durationMs: Date.now() - start });
+                if ((0, safe_exec_1.isToolSkipped)(t.name)) {
+                    this.diagnostics.tools.push({ name: t.name, available: false, error: 'skipped-by-config' });
+                    this.diagnostics.degraded = true;
+                    this.diagnostics.skippedTools = [...(this.diagnostics.skippedTools || []), t.name];
+                    return;
+                }
+                const res = await (0, safe_exec_1.safeExec)(t.name, t.args, constants_1.DEFAULT_TOOL_TIMEOUT_MS);
+                if (!res.failed) {
+                    this.diagnostics.tools.push({ name: t.name, available: true, durationMs: Date.now() - start });
+                }
+                else {
+                    this.diagnostics.tools.push({ name: t.name, available: false, error: res.errorMessage });
+                    if (res.timedOut) {
+                        this.diagnostics.timedOutTools = [...(this.diagnostics.timedOutTools || []), t.name];
+                    }
+                }
             }
             catch (e) {
                 this.diagnostics.tools.push({ name: t.name, available: false, error: e?.shortMessage || e?.message });
             }
         });
         await Promise.all(checks);
+        const unavailable = this.diagnostics.tools.filter(t => !t.available);
+        if (unavailable.length) {
+            this.diagnostics.degraded = true;
+            this.diagnostics.skippedTools = unavailable.filter(t => t.error === 'skipped-by-config').map(t => t.name);
+            this.diagnostics.missingCoreTools = unavailable.map(t => t.name);
+            if (isWindows)
+                degradationReasons.push('native-windows-missing-unix-tools');
+        }
+        if (isWindows)
+            degradationReasons.push('consider-installing-binutils-or-use-WSL');
+        if (this.diagnostics.degraded)
+            this.diagnostics.degradationReasons = degradationReasons;
     }
     async analyze() {
+        // Ensure tool detection finished (especially for tests manipulating env)
+        if (this.toolsReady) {
+            try {
+                await this.toolsReady;
+            }
+            catch { /* ignore */ }
+        }
         if (this.cachedAnalysis) {
             this.diagnostics.cached = true;
             return this.cachedAnalysis;
@@ -90,7 +149,7 @@ class BinaryAnalyzer {
         this.analysisStartHr = process.hrtime();
         this.cachedAnalysis = (async () => {
             const [strings, symbols, fileFormat, architecture, dependencies, size] = await Promise.all([
-                this.extractStrings(),
+                this.extractStrings(this.dynamicProbe),
                 this.extractSymbols(),
                 this.detectFileFormat(),
                 this.detectArchitecture(),
@@ -105,83 +164,237 @@ class BinaryAnalyzer {
         })();
         return this.cachedAnalysis;
     }
-    async extractStrings() {
-        try {
-            const { stdout } = await (0, execa_1.default)('strings', [this.binaryPath]);
-            return stdout.split('\n').filter((line) => line.length > 0);
-        }
-        catch (error) {
-            if (this.verbose) {
-                console.warn('⚠️  strings command failed, trying fallback method');
-            }
-            // Fallback: read file and extract printable strings
-            const buffer = await fs.readFile(this.binaryPath);
-            const strings = [];
-            let currentString = '';
-            for (let i = 0; i < buffer.length; i++) {
-                const byte = buffer[i];
-                if (byte >= 32 && byte <= 126) { // Printable ASCII
-                    currentString += String.fromCharCode(byte);
+    async extractStrings(dynamicProbe) {
+        const forceFallback = process.env.BETANET_FORCE_FALLBACK_STRINGS === '1';
+        if (!forceFallback) {
+            // Primary path: external 'strings'
+            try {
+                const res = await (0, safe_exec_1.safeExec)('strings', [this.binaryPath]);
+                if (!res.failed) {
+                    let out = res.stdout.split('\n').filter((line) => line.length > 0);
+                    if (dynamicProbe) {
+                        const probes = [
+                            [this.binaryPath, ['--help']],
+                            [this.binaryPath, ['--version']]
+                        ];
+                        for (const [cmd, args] of probes) {
+                            try {
+                                const probe = await (0, safe_exec_1.safeExec)(cmd, args, constants_1.DEFAULT_TOOL_TIMEOUT_MS);
+                                if (!probe.failed && probe.stdout) {
+                                    out = out.concat(probe.stdout.split('\n').slice(0, 300));
+                                }
+                            }
+                            catch { /* ignore */ }
+                        }
+                    }
+                    return out;
                 }
                 else {
-                    if (currentString.length >= 4) { // Minimum string length
-                        strings.push(currentString);
-                    }
-                    currentString = '';
+                    if (this.verbose)
+                        console.warn('⚠️  strings unavailable (', res.errorMessage, ') falling back to streaming scan');
+                    this.diagnostics.degraded = true;
+                    this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons || []), 'strings-missing'];
                 }
             }
-            return strings;
+            catch {
+                if (this.verbose)
+                    console.warn('⚠️  strings invocation error, using fallback streaming scan');
+                this.diagnostics.degraded = true;
+                this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons || []), 'strings-error'];
+            }
         }
+        // Fallback: streaming scan with size cap & UTF-8 decoding (ISSUE-038 + ISSUE-047)
+        const strings = [];
+        let current = '';
+        let bytesReadTotal = 0;
+        let truncated = false;
+        const minLen = constants_1.DEFAULT_FALLBACK_STRING_MIN_LEN;
+        const maxSegmentLen = 4096; // guard against pathological very long runs
+        function flush() {
+            if (current.length >= minLen)
+                strings.push(current);
+            current = '';
+        }
+        function appendChar(ch) {
+            current += ch;
+            if (current.length >= maxSegmentLen)
+                flush();
+        }
+        function isAcceptableCodePoint(cp) {
+            if (cp < 32)
+                return false; // control chars
+            if (cp >= 0xD800 && cp <= 0xDFFF)
+                return false; // surrogates
+            if (cp === 0xFEFF)
+                return false; // BOM
+            if (cp > 0x10FFFF)
+                return false;
+            return true;
+        }
+        try {
+            await new Promise((resolve, reject) => {
+                const stream = fs.createReadStream(this.binaryPath, { highWaterMark: 64 * 1024 });
+                stream.on('data', (chunk) => {
+                    if (truncated)
+                        return;
+                    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+                    bytesReadTotal += buf.length;
+                    for (let i = 0; i < buf.length; i++) {
+                        const byte = buf[i];
+                        if (byte <= 0x7F) { // ASCII
+                            if (byte >= 32 && byte <= 126) {
+                                appendChar(String.fromCharCode(byte));
+                            }
+                            else {
+                                flush();
+                            }
+                            continue;
+                        }
+                        // Multi-byte UTF-8 start? Determine expected length
+                        let needed = 0;
+                        if (byte >= 0xC2 && byte <= 0xDF)
+                            needed = 1; // 2-byte
+                        else if (byte >= 0xE0 && byte <= 0xEF)
+                            needed = 2; // 3-byte
+                        else if (byte >= 0xF0 && byte <= 0xF4)
+                            needed = 3; // 4-byte
+                        else {
+                            // Invalid start byte - treat as delimiter
+                            flush();
+                            continue;
+                        }
+                        if (i + needed >= buf.length) {
+                            // Incomplete sequence at chunk boundary; flush and break to next chunk
+                            flush();
+                            break;
+                        }
+                        let cp = byte & (needed === 1 ? 0x1F : needed === 2 ? 0x0F : 0x07);
+                        let valid = true;
+                        for (let j = 1; j <= needed; j++) {
+                            const nb = buf[i + j];
+                            if ((nb & 0xC0) !== 0x80) {
+                                valid = false;
+                                break;
+                            }
+                            cp = (cp << 6) | (nb & 0x3F);
+                        }
+                        if (!valid) {
+                            flush();
+                            i += needed; // skip attempted bytes
+                            continue;
+                        }
+                        i += needed; // advance past continuation bytes
+                        if (isAcceptableCodePoint(cp)) {
+                            try {
+                                appendChar(String.fromCodePoint(cp));
+                            }
+                            catch {
+                                flush();
+                            }
+                        }
+                        else {
+                            flush();
+                        }
+                    }
+                    if (bytesReadTotal >= constants_1.FALLBACK_MAX_BYTES) {
+                        truncated = true;
+                        stream.destroy();
+                    }
+                });
+                stream.on('end', () => { flush(); resolve(); });
+                stream.on('error', err => reject(err));
+            });
+        }
+        catch (e) {
+            if (this.verbose)
+                console.warn('⚠️  streaming fallback failed:', e?.message);
+            this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons || []), 'strings-fallback-error'];
+        }
+        if (truncated) {
+            this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons || []), 'strings-fallback-truncated'];
+            this.diagnostics.fallbackStringsTruncated = true;
+        }
+        this.diagnostics.unicodeEnriched = true;
+        if (dynamicProbe) {
+            const probes = [
+                [this.binaryPath, ['--help']],
+                [this.binaryPath, ['--version']]
+            ];
+            for (const [cmd, args] of probes) {
+                try {
+                    const probe = await (0, safe_exec_1.safeExec)(cmd, args, constants_1.DEFAULT_TOOL_TIMEOUT_MS);
+                    if (!probe.failed && probe.stdout)
+                        strings.push(...probe.stdout.split('\n').slice(0, 300));
+                }
+                catch { /* ignore */ }
+            }
+        }
+        return strings;
     }
     async extractSymbols() {
         try {
-            const { stdout } = await (0, execa_1.default)('nm', ['-D', this.binaryPath]);
-            return stdout.split('\n')
-                .filter((line) => line.trim())
-                .map((line) => line.split(' ').pop() || '')
-                .filter((symbol) => symbol);
+            const res = await (0, safe_exec_1.safeExec)('nm', ['-D', this.binaryPath]);
+            if (!res.failed) {
+                return res.stdout.split('\n')
+                    .filter((line) => line.trim())
+                    .map((line) => line.split(' ').pop() || '')
+                    .filter((symbol) => symbol);
+            }
         }
         catch (error) {
             if (this.verbose) {
                 console.warn('⚠️  nm command failed, trying objdump');
             }
             try {
-                const { stdout } = await (0, execa_1.default)('objdump', ['-t', this.binaryPath]);
-                return stdout.split('\n')
-                    .filter((line) => line.includes('.text'))
-                    .map((line) => line.split(' ').pop() || '')
-                    .filter((symbol) => symbol);
+                const res2 = await (0, safe_exec_1.safeExec)('objdump', ['-t', this.binaryPath]);
+                if (!res2.failed) {
+                    return res2.stdout.split('\n')
+                        .filter((line) => line.includes('.text'))
+                        .map((line) => line.split(' ').pop() || '')
+                        .filter((symbol) => symbol);
+                }
             }
             catch (error2) {
                 if (this.verbose) {
                     console.warn('⚠️  Symbol extraction failed');
                 }
+                this.diagnostics.degraded = true;
+                this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons || []), 'symbols-missing'];
                 return [];
             }
         }
+        return [];
     }
     async detectFileFormat() {
         try {
-            const { stdout } = await (0, execa_1.default)('file', [this.binaryPath]);
-            return stdout.trim();
+            const res = await (0, safe_exec_1.safeExec)('file', [this.binaryPath]);
+            return res.failed ? 'unknown' : res.stdout.trim();
         }
-        catch (error) {
+        catch {
             return 'unknown';
         }
     }
     async detectArchitecture() {
         try {
-            const { stdout } = await (0, execa_1.default)('uname', ['-m']);
-            return stdout.trim();
+            const res = await (0, safe_exec_1.safeExec)('uname', ['-m']);
+            return res.failed ? 'unknown' : res.stdout.trim();
         }
-        catch (error) {
+        catch {
             return 'unknown';
         }
     }
     async detectDependencies() {
         try {
-            const { stdout } = await (0, execa_1.default)('ldd', [this.binaryPath]);
-            return stdout.split('\n')
+            const res = await (0, safe_exec_1.safeExec)('ldd', [this.binaryPath]);
+            if (res.failed) {
+                if (this.verbose) {
+                    console.warn('⚠️  ldd unavailable (', res.errorMessage, ')');
+                }
+                this.diagnostics.degraded = true;
+                this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons || []), 'ldd-missing'];
+                return [];
+            }
+            return res.stdout.split('\n')
                 .filter((line) => line.includes('=>'))
                 .map((line) => line.split('=>')[1]?.split('(')[0]?.trim() || '')
                 .filter((dep) => dep && !dep.includes('not found'));
@@ -190,6 +403,8 @@ class BinaryAnalyzer {
             if (this.verbose) {
                 console.warn('⚠️  ldd command failed');
             }
+            this.diagnostics.degraded = true;
+            this.diagnostics.degradationReasons = [...(this.diagnostics.degradationReasons || []), 'ldd-failed'];
             return [];
         }
     }

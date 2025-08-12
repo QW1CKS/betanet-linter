@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ComplianceChecker = void 0;
 const analyzer_1 = require("./analyzer");
+const format_1 = require("./format");
 class ComplianceChecker {
     constructor(binaryPath, options = {}) {
         this.analyzer = new analyzer_1.BinaryAnalyzer(binaryPath, options.verbose);
@@ -54,12 +55,12 @@ class ComplianceChecker {
             passed,
             details: passed
                 ? "✅ Found HTX implementation with TLS 1.3 and ECH support"
-                : `❌ Missing: ${[
+                : `❌ Missing: ${(0, format_1.missingList)([
                     !hasTCP443 && 'TCP-443',
                     !hasQUIC443 && 'QUIC-443',
                     !hasTLS13 && 'TLS 1.3',
                     !hasECH && 'ECH'
-                ].filter(Boolean).join(', ')}`,
+                ])}`,
             severity: 'critical'
         };
     }
@@ -94,11 +95,11 @@ class ComplianceChecker {
             passed,
             details: passed
                 ? "✅ Found ChaCha20-Poly1305 frame encryption implementation"
-                : `❌ Missing: ${[
+                : `❌ Missing: ${(0, format_1.missingList)([
                     !hasChaCha20 && 'ChaCha20',
                     !hasPoly1305 && 'Poly1305',
                     !hasFrameEncryption && 'Frame encryption'
-                ].filter(Boolean).join(', ')}`,
+                ])}`,
             severity: 'critical'
         };
     }
@@ -136,10 +137,10 @@ class ComplianceChecker {
             passed,
             details: passed
                 ? "✅ Both transport endpoints found"
-                : `❌ Missing: ${[
+                : `❌ Missing: ${(0, format_1.missingList)([
                     !hasHTXEndpoint && '/betanet/htx/1.0.0',
                     !hasHTXQUICEndpoint && '/betanet/htxquic/1.0.0'
-                ].filter(Boolean).join(', ')}`,
+                ])}`,
             severity: 'critical'
         };
     }
@@ -158,10 +159,10 @@ class ComplianceChecker {
             passed,
             details: passed
                 ? "✅ Found deterministic DHT bootstrap implementation"
-                : `❌ Missing: ${[
+                : `❌ Missing: ${(0, format_1.missingList)([
                     !hasDHT && 'DHT implementation',
                     !hasDeterministic && 'Deterministic seeding'
-                ].filter(Boolean).join(', ')}`,
+                ])}`,
             severity: 'major'
         };
     }
@@ -180,10 +181,10 @@ class ComplianceChecker {
             passed,
             details: passed
                 ? "✅ Found alias ledger with consensus verification"
-                : `❌ Missing: ${[
+                : `❌ Missing: ${(0, format_1.missingList)([
                     !hasAlias && 'Alias ledger',
                     !hasConsensus && 'Consensus mechanism'
-                ].filter(Boolean).join(', ')}`,
+                ])}`,
             severity: 'major'
         };
     }
@@ -202,10 +203,10 @@ class ComplianceChecker {
             passed,
             details: passed
                 ? "✅ Found Cashu and Lightning payment support"
-                : `❌ Missing: ${[
+                : `❌ Missing: ${(0, format_1.missingList)([
                     !hasCashu && 'Cashu support',
                     !hasLightning && 'Lightning support'
-                ].filter(Boolean).join(', ')}`,
+                ])}`,
             severity: 'major'
         };
     }
@@ -224,10 +225,10 @@ class ComplianceChecker {
             passed,
             details: passed
                 ? "✅ Found reproducible build and SLSA provenance support"
-                : `❌ Missing: ${[
+                : `❌ Missing: ${(0, format_1.missingList)([
                     !hasReproducible && 'Reproducible build evidence',
                     !hasVersioning && 'Version/provenance info'
-                ].filter(Boolean).join(', ')}`,
+                ])}`,
             severity: 'minor'
         };
     }

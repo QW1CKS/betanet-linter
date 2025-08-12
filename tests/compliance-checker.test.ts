@@ -89,6 +89,9 @@ describe('BetanetComplianceChecker', () => {
       const checkerLocal = new BetanetComplianceChecker();
       const tmpBin = path.join(__dirname, 'temp-existing-bin');
       await fs.writeFile(tmpBin, Buffer.from('binary data slsa reproducible provenance'));
+      // Compute actual digest to satisfy new validation logic BEFORE stubbing analyzer
+      const fileBuf = await fs.readFile(tmpBin);
+      const actualDigest = require('crypto').createHash('sha256').update(fileBuf).digest('hex');
       // Analyzer lacking native provenance signals to force reliance on evidence
       (checkerLocal as any)._analyzer = {
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
@@ -98,16 +101,17 @@ describe('BetanetComplianceChecker', () => {
         checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true, rotationHits: 0 }),
         checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
         checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
-        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false })
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false }),
+        getBinarySha256: () => Promise.resolve(actualDigest)
       };
       const evidencePath = path.join(__dirname, 'temp-evidence.json');
-      const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:abc123' } };
+  const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest } };
       await fs.writeFile(evidencePath, JSON.stringify(evidence));
       const result = await checkerLocal.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
       const buildProv = result.checks.find(c => c.id === 9);
       expect(buildProv).toBeDefined();
       expect(buildProv?.evidenceType).toBe('artifact');
-      expect(buildProv?.details).toMatch(/External provenance evidence/);
+  expect(buildProv?.details).toMatch(/Provenance verified|validated predicateType/);
       await fs.remove(evidencePath);
     });
 

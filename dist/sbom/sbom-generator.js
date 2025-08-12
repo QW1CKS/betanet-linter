@@ -32,52 +32,150 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SBOMGenerator = void 0;
 const fs = __importStar(require("fs-extra"));
 const path = __importStar(require("path"));
-const execa_1 = __importDefault(require("execa"));
+const analyzer_1 = require("../analyzer");
+const safe_exec_1 = require("../safe-exec");
+const heuristics_1 = require("../heuristics");
+const constants_1 = require("../constants");
 class SBOMGenerator {
-    async generate(binaryPath, format = 'cyclonedx') {
+    async generate(binaryPath, format = 'cyclonedx', analyzer) {
         const binaryInfo = await this.getBinaryInfo(binaryPath);
         const components = await this.extractComponents(binaryPath);
         const dependencies = await this.extractDependencies(binaryPath);
-        if (format === 'cyclonedx') {
+        // Derive feature tags (Betanet spec-era capabilities) if we can analyze the binary
+        try {
+            const features = await this.deriveFeatures(binaryPath, analyzer);
+            if (features.length) {
+                binaryInfo.betanetFeatures = features.sort();
+            }
+        }
+        catch { /* non-fatal */ }
+        // Attempt per-component hashing when a concrete path exists
+        await this.addComponentHashes(components);
+        // Sanitize & dedupe
+        const finalComponents = this.dedupeComponents(components);
+        // Detect license for root package
+        const rootLicenseInfo = await this.detectLicense(binaryPath);
+        if (rootLicenseInfo) {
+            binaryInfo.license = rootLicenseInfo.primary;
+            if (rootLicenseInfo.all && rootLicenseInfo.all.length > 1) {
+                binaryInfo.licenses = rootLicenseInfo.all;
+            }
+        }
+        if (format === 'cyclonedx' || format === 'cyclonedx-json') {
             return {
-                format: 'cyclonedx',
-                data: this.generateCycloneDX(binaryInfo, components, dependencies),
+                format: format === 'cyclonedx-json' ? 'cyclonedx-json' : 'cyclonedx',
+                data: this.generateCycloneDX(binaryInfo, finalComponents, dependencies),
                 generated: new Date().toISOString()
             };
         }
-        else {
+        else if (format === 'spdx') {
             return {
                 format: 'spdx',
-                data: this.generateSPDX(binaryInfo, components, dependencies),
+                data: this.generateSPDXTagValue(binaryInfo, finalComponents, dependencies),
+                generated: new Date().toISOString()
+            };
+        }
+        else { // spdx-json
+            return {
+                format: 'spdx-json',
+                data: this.generateSPDXJson(binaryInfo, finalComponents, dependencies),
                 generated: new Date().toISOString()
             };
         }
     }
+    async deriveFeatures(binaryPath, analyzer) {
+        const features = [];
+        let a = analyzer;
+        if (!a) {
+            try {
+                a = new analyzer_1.BinaryAnalyzer(binaryPath);
+            }
+            catch { /* ignore */ }
+        }
+        if (!a)
+            return features;
+        try {
+            // Run minimal capability detections leveraging existing analyzer helpers
+            const [network, crypto, scion, dht, ledger, payment, build] = await Promise.all([
+                a.checkNetworkCapabilities().catch(() => ({})),
+                a.checkCryptographicCapabilities().catch(() => ({})),
+                a.checkSCIONSupport().catch(() => ({})),
+                a.checkDHTSupport().catch(() => ({})),
+                a.checkLedgerSupport().catch(() => ({})),
+                a.checkPaymentSupport().catch(() => ({})),
+                a.checkBuildProvenance().catch(() => ({}))
+            ]);
+            // Analyze strings once for privacy evaluation (avoid double analyze())
+            const analysis = await a.analyze();
+            const privacy = (0, heuristics_1.evaluatePrivacyTokens)(analysis.strings);
+            // Mapping rules
+            if (network.hasHTX)
+                features.push('transport-htx');
+            if (network.hasQUIC)
+                features.push('transport-quic');
+            if (network.port443)
+                features.push('transport-443');
+            if (network.hasWebRTC)
+                features.push('transport-webrtc');
+            if (network.hasECH)
+                features.push('security-ech');
+            if (crypto.hasChaCha20 && crypto.hasPoly1305)
+                features.push('crypto-chacha20poly1305');
+            if (crypto.hasKyber768 && crypto.hasX25519)
+                features.push('crypto-pq-hybrid');
+            if (scion.hasSCION)
+                features.push('scion');
+            if (scion.pathDiversityCount >= 2)
+                features.push('scion-path-diversity');
+            if (dht.rendezvousRotation)
+                features.push('dht-rotation');
+            if (dht.deterministicBootstrap)
+                features.push('dht-deterministic');
+            if (dht.beaconSetIndicator)
+                features.push('dht-beaconset');
+            if (ledger.hasAliasLedger && ledger.hasConsensus)
+                features.push('alias-ledger');
+            if (payment.hasCashu)
+                features.push('payment-cashu');
+            if (payment.hasLightning)
+                features.push('payment-lightning');
+            if (payment.hasVoucherFormat)
+                features.push('payment-voucher-format');
+            if (payment.hasFROST)
+                features.push('payment-frost');
+            if (payment.hasPoW22)
+                features.push('payment-pow22');
+            if (build.hasSLSA && build.reproducible && build.provenance)
+                features.push('build-provenance');
+            if (privacy.passed)
+                features.push('privacy-hop');
+        }
+        catch { /* ignore feature derivation errors */ }
+        return Array.from(new Set(features));
+    }
     async getBinaryInfo(binaryPath) {
         try {
-            const [fileInfo, stat] = await Promise.all([
-                (0, execa_1.default)('file', [binaryPath]),
+            const [fileInfoRes, stat] = await Promise.all([
+                (0, safe_exec_1.safeExec)('file', [binaryPath], 3000),
                 fs.stat(binaryPath)
             ]);
+            const fileType = fileInfoRes.failed ? 'Unknown' : fileInfoRes.stdout;
             return {
-                name: path.basename(binaryPath),
+                name: (0, constants_1.sanitizeName)(path.basename(binaryPath)),
                 path: binaryPath,
                 size: stat.size,
                 modified: stat.mtime.toISOString(),
-                type: fileInfo.stdout,
+                type: fileType,
                 hash: await this.calculateHash(binaryPath)
             };
         }
         catch (error) {
             return {
-                name: path.basename(binaryPath),
+                name: (0, constants_1.sanitizeName)(path.basename(binaryPath)),
                 path: binaryPath,
                 size: 0,
                 modified: new Date().toISOString(),
@@ -89,8 +187,10 @@ class SBOMGenerator {
     }
     async calculateHash(binaryPath) {
         try {
-            const { stdout } = await (0, execa_1.default)('sha256sum', [binaryPath]);
-            return stdout.split(' ')[0];
+            const hashRes = await (0, safe_exec_1.safeExec)('sha256sum', [binaryPath], constants_1.DEFAULT_HASH_TIMEOUT_MS);
+            if (!hashRes.failed && hashRes.stdout) {
+                return hashRes.stdout.split(' ')[0];
+            }
         }
         catch (error) {
             try {
@@ -105,87 +205,165 @@ class SBOMGenerator {
                 return '';
             }
         }
+        return '';
     }
     async extractComponents(binaryPath) {
         const components = [];
-        try {
-            // Extract strings to find version information
-            const { stdout } = await (0, execa_1.default)('strings', [binaryPath]);
-            const lines = stdout.split('\n');
-            // Look for version patterns
-            const versionPatterns = [
-                /(\d+\.\d+\.\d+)/,
-                /v(\d+\.\d+\.\d+)/,
-                /version\s+(\d+\.\d+\.\d+)/i,
-                /(\d+\.\d+\.\d+[-_]\w+)/,
-                /([a-zA-Z]+)\s+(\d+\.\d+\.\d+)/i
-            ];
-            const foundVersions = new Set();
-            for (const line of lines) {
-                for (const pattern of versionPatterns) {
-                    const match = line.match(pattern);
-                    if (match && match[1]) {
-                        foundVersions.add(match[1]);
-                    }
+        const versionCandidates = [];
+        // ISSUE-021: Improved version inference with context & scoring
+        // Scoring tiers: semver (3), semver+pre (3), date-like (2), sha/hash near keyword (1)
+        const versionRegexes = [
+            { re: /\b[vV]?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z\.-]+)?)\b/g, score: 3, normalize: m => m[1] }, // semver & prerelease
+            { re: /\b(\d{4}\.\d{1,2}\.\d{1,2})\b/g, score: 2, normalize: m => m[1] }, // date style
+            { re: /\b([0-9a-f]{7,12})\b/g, score: 1, normalize: m => m[1] } // short git hash
+        ];
+        const KEYWORD_WINDOW = 24; // chars window to look back for keyword
+        const keywords = constants_1.VERSION_KEYWORDS;
+        const collectVersions = (text) => {
+            versionRegexes.forEach(vr => {
+                let match;
+                while ((match = vr.re.exec(text)) !== null) {
+                    const norm = vr.normalize(match);
+                    // Skip improbable all-zero or trivial versions
+                    if (/^0\.0\.0$/.test(norm))
+                        continue;
+                    // Context: ensure not part of a longer token already handled (regex boundaries should cover) but validate surrounding chars
+                    const idx = match.index;
+                    const contextStart = Math.max(0, idx - KEYWORD_WINDOW);
+                    const context = text.slice(contextStart, idx + norm.length + KEYWORD_WINDOW);
+                    const pre = text.slice(Math.max(0, idx - KEYWORD_WINDOW), idx).toLowerCase();
+                    const hasKeyword = keywords.some(k => pre.includes(k));
+                    // Git hash style candidates require keyword proximity else ignore (to suppress random hex)
+                    if (vr.score === 1 && !hasKeyword)
+                        continue;
+                    versionCandidates.push({ raw: match[0], normalized: norm, context, score: vr.score + (hasKeyword ? 1 : 0) });
                 }
-            }
-            // Convert found versions to components
-            foundVersions.forEach(version => {
-                components.push({
-                    type: 'library',
-                    name: 'Unknown',
-                    version: version,
-                    purl: `pkg:generic/unknown@${version}`,
-                    detected: true
-                });
             });
-            // Try to get more detailed component info using ldd
+        };
+        const debug = process.env.BETANET_DEBUG_SBOM === '1';
+        // On Windows, skip external *nix tools and attempt lightweight fallback
+        if (process.platform === 'win32') {
             try {
-                const { stdout: lddOutput } = await (0, execa_1.default)('ldd', [binaryPath]);
-                const lddLines = lddOutput.split('\n');
-                for (const line of lddLines) {
-                    const libMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
-                    if (libMatch) {
-                        const libName = libMatch[1];
-                        const libPath = libMatch[2];
-                        components.push({
-                            type: 'library',
-                            name: libName,
-                            path: libPath,
-                            purl: `pkg:generic/${libName}`,
-                            system: true
-                        });
+                if (await fs.pathExists(binaryPath)) {
+                    const data = await fs.readFile(binaryPath);
+                    const ascii = [];
+                    let current = '';
+                    for (const byte of data) {
+                        if (byte >= 32 && byte <= 126) {
+                            current += String.fromCharCode(byte);
+                        }
+                        else {
+                            if (current.length >= 4)
+                                ascii.push(current);
+                            current = '';
+                        }
                     }
+                    if (current.length >= 4)
+                        ascii.push(current);
+                    collectVersions(ascii.join('\n'));
                 }
             }
             catch (e) {
-                // ldd failed, continue without library info
+                if (debug)
+                    console.warn('SBOM fallback (windows strings) failed:', e?.message);
+            }
+            return components;
+        }
+        // Non-Windows: attempt `strings`
+        try {
+            const res = await (0, safe_exec_1.safeExec)('strings', [binaryPath], constants_1.DEFAULT_STRINGS_TIMEOUT_MS);
+            if (!res.failed) {
+                collectVersions(res.stdout);
+            }
+            else {
+                throw new Error(res.errorMessage || 'strings-failed');
             }
         }
-        catch (error) {
-            console.warn('Error extracting components:', error?.message);
+        catch (e) {
+            const msg = e?.message || '';
+            if (debug)
+                console.warn('SBOM strings exec skipped:', msg);
+        }
+        // Attempt ldd for component library names (best-effort)
+        try {
+            const lddRes = await (0, safe_exec_1.safeExec)('ldd', [binaryPath], constants_1.DEFAULT_LDD_TIMEOUT_MS);
+            if (lddRes.failed)
+                throw new Error(lddRes.errorMessage || 'ldd-failed');
+            const lddLines = lddRes.stdout.split('\n');
+            for (const line of lddLines) {
+                const libMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
+                if (libMatch) {
+                    const libName = (0, constants_1.sanitizeName)(libMatch[1]);
+                    const libPath = libMatch[2];
+                    components.push({
+                        type: 'library',
+                        name: libName,
+                        path: libPath,
+                        purl: `pkg:generic/${libName}`,
+                        system: true
+                    });
+                }
+            }
+        }
+        catch (e) {
+            // Silent unless debug
+            if (debug)
+                console.warn('SBOM ldd exec skipped:', e?.message);
+        }
+        // Consolidate collected version candidates into synthetic components (Unknown until better attribution)
+        if (versionCandidates.length) {
+            // Prefer highest score, then longest (for prerelease richness)
+            const byNorm = new Map();
+            versionCandidates.forEach(vc => {
+                const existing = byNorm.get(vc.normalized);
+                if (!existing || vc.score > existing.score || (vc.score === existing.score && vc.normalized.length > existing.normalized.length)) {
+                    byNorm.set(vc.normalized, { normalized: vc.normalized, score: vc.score, example: vc.raw });
+                }
+            });
+            Array.from(byNorm.values()).forEach(v => {
+                components.push({
+                    type: 'library',
+                    name: 'Unknown',
+                    version: v.normalized,
+                    purl: `pkg:generic/unknown@${v.normalized}`,
+                    detected: true,
+                    _versionScore: v.score
+                });
+            });
+            // Attach versionsDetectedQuality metric (optional quick win)
+            components._versionsDetectedQuality = {
+                candidates: versionCandidates.length,
+                accepted: byNorm.size,
+                suppressionRate: versionCandidates.length ? Number(((versionCandidates.length - byNorm.size) / versionCandidates.length).toFixed(2)) : 0
+            };
         }
         return components;
     }
     async extractDependencies(binaryPath) {
         const dependencies = [];
-        try {
-            // Try to get dynamic dependencies
-            const { stdout: lddOutput } = await (0, execa_1.default)('ldd', [binaryPath]);
-            const lddLines = lddOutput.split('\n');
-            for (const line of lddLines) {
-                const depMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
-                if (depMatch) {
-                    const libName = depMatch[1];
-                    const libPath = depMatch[2];
-                    dependencies.push({
-                        ref: libName,
-                        path: libPath,
-                        type: 'dynamic'
-                    });
+        const debug = process.env.BETANET_DEBUG_SBOM === '1';
+        if (process.platform !== 'win32') {
+            try {
+                const lddRes = await (0, safe_exec_1.safeExec)('ldd', [binaryPath], constants_1.DEFAULT_LDD_TIMEOUT_MS);
+                if (lddRes.failed)
+                    throw new Error(lddRes.errorMessage || 'ldd-failed');
+                const lddLines = lddRes.stdout.split('\n');
+                for (const line of lddLines) {
+                    const depMatch = line.match(/\s+(.+?)\s+=>\s+(.+?)\s+\(/);
+                    if (depMatch) {
+                        const libName = (0, constants_1.sanitizeName)(depMatch[1]);
+                        const libPath = depMatch[2];
+                        dependencies.push({ ref: libName, path: libPath, type: 'dynamic' });
+                    }
                 }
             }
-            // Try to get package dependencies if this is a packaged binary
+            catch (e) {
+                if (debug)
+                    console.warn('SBOM dependency ldd skipped:', e?.message);
+            }
+        }
+        // Local package metadata (works cross-platform)
+        try {
             const packageFiles = ['package.json', 'requirements.txt', 'Cargo.toml', 'go.mod'];
             const binaryDir = path.dirname(binaryPath);
             for (const pkgFile of packageFiles) {
@@ -196,10 +374,81 @@ class SBOMGenerator {
                 }
             }
         }
-        catch (error) {
-            console.warn('Error extracting dependencies:', error?.message);
+        catch (e) {
+            if (debug)
+                console.warn('SBOM package parsing issue:', e?.message);
         }
         return dependencies;
+    }
+    async addComponentHashes(components) {
+        for (const comp of components) {
+            if (comp.path && !comp.hash) {
+                try {
+                    const exists = await fs.pathExists(comp.path);
+                    if (exists) {
+                        comp.hash = await this.calculateHash(comp.path);
+                    }
+                }
+                catch { /* ignore */ }
+            }
+        }
+    }
+    dedupeComponents(components) {
+        const map = new Map();
+        for (const c of components) {
+            const name = (c.name || 'unknown').trim();
+            const version = (c.version || 'unknown').trim();
+            const key = `${name.toLowerCase()}@${version}`;
+            if (!map.has(key)) {
+                map.set(key, { ...c, name, version });
+            }
+            else {
+                const existing = map.get(key);
+                // Merge flags
+                existing.system = existing.system || c.system;
+                existing.detected = existing.detected || c.detected;
+                if (!existing.hash && c.hash)
+                    existing.hash = c.hash;
+                if (!existing.path && c.path)
+                    existing.path = c.path;
+            }
+        }
+        return Array.from(map.values());
+    }
+    async detectLicense(binaryPath) {
+        try {
+            const maxRead = 64 * 1024; // 64KB
+            const fd = await fs.open(binaryPath, 'r');
+            const buffer = Buffer.alloc(maxRead);
+            const { bytesRead } = await fs.read(fd, buffer, 0, maxRead, 0);
+            await fs.close(fd);
+            const text = buffer.slice(0, bytesRead).toString('utf8');
+            const candidates = [
+                'Apache-2.0', 'MIT', 'BSD-3-Clause', 'BSD-2-Clause', 'GPL-3.0-only', 'GPL-3.0-or-later',
+                'LGPL-3.0-only', 'LGPL-3.0-or-later', 'MPL-2.0', 'AGPL-3.0-only', 'AGPL-3.0-or-later', 'Unlicense', 'ISC'
+            ];
+            const found = [];
+            // Capture composite expressions like "Apache-2.0 OR MIT" or "Apache-2.0 AND MIT"
+            const compositeMatch = text.match(/((?:[A-Za-z0-9\.-]+\s+(?:OR|AND)\s+)+[A-Za-z0-9\.-]+)/);
+            if (compositeMatch) {
+                const expr = compositeMatch[1];
+                expr.split(/\s+(?:OR|AND)\s+/).forEach(token => {
+                    if (candidates.includes(token) && !found.includes(token))
+                        found.push(token);
+                });
+            }
+            for (const id of candidates) {
+                if (text.includes(id) && !found.includes(id))
+                    found.push(id);
+            }
+            if (found.length === 0 && /permission is hereby granted/i.test(text))
+                found.push('MIT');
+            if (found.length) {
+                return { primary: found[0], all: found };
+            }
+        }
+        catch { /* ignore */ }
+        return null;
     }
     async parsePackageFile(packagePath) {
         const ext = path.extname(packagePath);
@@ -210,11 +459,12 @@ class SBOMGenerator {
                     const pkgJson = await fs.readJSON(packagePath);
                     if (pkgJson.dependencies) {
                         Object.entries(pkgJson.dependencies).forEach(([name, version]) => {
+                            const safe = (0, constants_1.sanitizeName)(name);
                             dependencies.push({
-                                ref: name,
+                                ref: safe,
                                 version: version,
                                 type: 'npm',
-                                purl: `pkg:npm/${name}@${version}`
+                                purl: `pkg:npm/${safe}@${version}`
                             });
                         });
                     }
@@ -225,11 +475,12 @@ class SBOMGenerator {
                     lines.forEach(line => {
                         const match = line.match(/^([a-zA-Z0-9\-_]+)==(.+)$/);
                         if (match) {
+                            const safe = (0, constants_1.sanitizeName)(match[1]);
                             dependencies.push({
-                                ref: match[1],
+                                ref: safe,
                                 version: match[2],
                                 type: 'pip',
-                                purl: `pkg:pypi/${match[1]}@${match[2]}`
+                                purl: `pkg:pypi/${safe}@${match[2]}`
                             });
                         }
                     });
@@ -244,11 +495,12 @@ class SBOMGenerator {
                         depPairs.forEach(pair => {
                             const [name, version] = pair.split('=').map(s => s.trim().replace(/"/g, ''));
                             if (name && version) {
+                                const safe = (0, constants_1.sanitizeName)(name);
                                 dependencies.push({
-                                    ref: name,
+                                    ref: safe,
                                     version: version,
                                     type: 'cargo',
-                                    purl: `pkg:cargo/${name}@${version}`
+                                    purl: `pkg:cargo/${safe}@${version}`
                                 });
                             }
                         });
@@ -261,11 +513,12 @@ class SBOMGenerator {
                         requireMatches.forEach(match => {
                             const parts = match.split(/\s+/);
                             if (parts.length >= 3) {
+                                const safe = (0, constants_1.sanitizeName)(parts[1]);
                                 dependencies.push({
-                                    ref: parts[1],
+                                    ref: safe,
                                     version: parts[2],
                                     type: 'go',
-                                    purl: `pkg:golang/${parts[1]}@${parts[2]}`
+                                    purl: `pkg:golang/${safe}@${parts[2]}`
                                 });
                             }
                         });
@@ -279,6 +532,16 @@ class SBOMGenerator {
         return dependencies;
     }
     generateCycloneDX(binaryInfo, components, dependencies) {
+        const depsSection = dependencies.length ? [
+            {
+                ref: binaryInfo.name,
+                dependsOn: dependencies.map(dep => dep.ref)
+            },
+            ...dependencies.map(dep => ({
+                ref: dep.ref,
+                dependsOn: []
+            }))
+        ] : undefined;
         return {
             bomFormat: 'CycloneDX',
             specVersion: '1.4',
@@ -288,100 +551,133 @@ class SBOMGenerator {
                 timestamp: new Date().toISOString(),
                 component: {
                     type: 'application',
-                    name: binaryInfo.name,
+                    name: (0, constants_1.sanitizeName)(binaryInfo.name),
                     version: '1.0.0',
-                    purl: `pkg:generic/${binaryInfo.name}@1.0.0`,
+                    purl: `pkg:generic/${(0, constants_1.sanitizeName)(binaryInfo.name)}@1.0.0`,
                     hashes: [
                         {
                             alg: 'SHA-256',
                             content: binaryInfo.hash
                         }
                     ],
+                    licenses: binaryInfo.licenses ? binaryInfo.licenses.map((l) => ({ license: { id: l } })) : (binaryInfo.license ? [{ license: { id: binaryInfo.license } }] : undefined),
                     properties: [
-                        {
-                            name: 'binary:size',
-                            value: binaryInfo.size.toString()
-                        },
-                        {
-                            name: 'binary:type',
-                            value: binaryInfo.type
-                        }
+                        { name: 'binary:size', value: binaryInfo.size.toString() },
+                        { name: 'binary:type', value: binaryInfo.type },
+                        ...(binaryInfo.betanetFeatures ? binaryInfo.betanetFeatures.map(f => ({ name: 'betanet.feature', value: f })) : [])
                     ]
                 }
             },
             components: components.map(comp => ({
                 type: comp.type || 'library',
-                name: comp.name,
+                name: (0, constants_1.sanitizeName)(comp.name),
                 version: comp.version || 'unknown',
                 purl: comp.purl,
+                hashes: comp.hash ? [{ alg: 'SHA-256', content: comp.hash }] : undefined,
+                licenses: comp.license ? [{ license: { id: comp.license } }] : undefined,
                 properties: comp.detected ? [{
                         name: 'detected',
                         value: 'true'
                     }] : []
             })),
-            dependencies: [
-                {
-                    ref: binaryInfo.name,
-                    dependsOn: dependencies.map(dep => dep.ref)
-                },
-                ...dependencies.map(dep => ({
-                    ref: dep.ref,
-                    dependsOn: []
-                }))
-            ]
+            dependencies: depsSection
         };
     }
-    generateSPDX(binaryInfo, components, dependencies) {
-        const spdxContent = {
-            SPDXID: 'SPDXRef-DOCUMENT',
+    generateSPDXTagValue(binaryInfo, components, dependencies) {
+        // Enhanced SPDX Tag-Value output (ISSUE-017)
+        const safeDocName = (0, constants_1.sanitizeName)(binaryInfo.name);
+        const docNs = `https://spdx.org/spdxdocs/${safeDocName}-${this.generateUUID()}`;
+        const lines = [];
+        lines.push('SPDXVersion: SPDX-2.3');
+        lines.push('DataLicense: CC0-1.0');
+        lines.push('SPDXID: SPDXRef-DOCUMENT');
+        lines.push(`DocumentName: ${safeDocName}`);
+        lines.push(`DocumentNamespace: ${docNs}`);
+        lines.push(`Created: ${new Date().toISOString()}`);
+        lines.push('Creator: Tool: betanet-compliance-linter');
+        lines.push('');
+        const rootSpdxId = 'SPDXRef-Package-Root';
+        lines.push(`PackageName: ${safeDocName}`);
+        lines.push(`SPDXID: ${rootSpdxId}`);
+        lines.push('PackageVersion: 1.0.0');
+        lines.push('PackageDownloadLocation: NOASSERTION');
+        lines.push('FilesAnalyzed: false');
+        lines.push('PackageLicenseConcluded: NOASSERTION');
+        lines.push(`PackageLicenseDeclared: ${(binaryInfo.licenses && binaryInfo.licenses.length > 1) ? binaryInfo.licenses.join(' OR ') : (binaryInfo.license || 'NOASSERTION')}`);
+        lines.push('PackageCopyrightText: NOASSERTION');
+        if (binaryInfo.hash)
+            lines.push(`PackageChecksum: SHA256: ${binaryInfo.hash}`);
+        if (binaryInfo.betanetFeatures && binaryInfo.betanetFeatures.length) {
+            binaryInfo.betanetFeatures.forEach((f) => lines.push(`PackageComment: betanet.feature=${f}`));
+        }
+        components.forEach((c, idx) => {
+            const compId = `SPDXRef-Comp-${idx}`;
+            lines.push('');
+            lines.push(`PackageName: ${(0, constants_1.sanitizeName)(c.name)}`);
+            lines.push(`SPDXID: ${compId}`);
+            lines.push(`PackageVersion: ${c.version || 'unknown'}`);
+            lines.push('PackageDownloadLocation: NOASSERTION');
+            lines.push('FilesAnalyzed: false');
+            lines.push('PackageLicenseConcluded: NOASSERTION');
+            lines.push(`PackageLicenseDeclared: ${c.license || 'NOASSERTION'}`);
+            if (c.hash)
+                lines.push(`PackageChecksum: SHA256: ${c.hash}`);
+        });
+        if (dependencies.length) {
+            lines.push('');
+            dependencies.forEach(dep => {
+                const depRef = `SPDXRef-${dep.ref.replace(/[^A-Za-z0-9]/g, '_')}`;
+                lines.push(`Relationship: ${rootSpdxId} DEPENDS_ON ${depRef}`);
+            });
+        }
+        return lines.join('\n');
+    }
+    generateSPDXJson(binaryInfo, components, dependencies) {
+        const docId = `SPDXRef-DOCUMENT`;
+        const safeBin = (0, constants_1.sanitizeName)(binaryInfo.name);
+        const packageId = `SPDXRef-Package-Root`;
+        const relationships = dependencies.length ? dependencies.map(dep => ({
+            spdxElementId: packageId,
+            relationshipType: 'DEPENDS_ON',
+            relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
+        })) : [];
+        return {
+            SPDXID: docId,
             spdxVersion: 'SPDX-2.3',
+            dataLicense: 'CC0-1.0',
+            name: safeBin,
+            documentNamespace: `https://spdx.org/spdxdocs/${safeBin}-${this.generateUUID()}`,
             creationInfo: {
                 created: new Date().toISOString(),
                 creators: ['Tool: betanet-compliance-linter']
             },
-            name: binaryInfo.name,
-            documentNamespace: `https://spdx.org/spdxdocs/${binaryInfo.name}-${this.generateUUID()}`,
-            packages: [{
-                    name: binaryInfo.name,
-                    SPDXID: 'SPDXRef-PACKAGE',
+            packages: [
+                {
+                    name: safeBin,
+                    SPDXID: packageId,
                     versionInfo: '1.0.0',
-                    downloadLocation: 'NOASSERTION',
                     filesAnalyzed: false,
-                    checksums: [{
-                            algorithm: 'SHA256',
-                            checksumValue: binaryInfo.hash
-                        }],
+                    downloadLocation: 'NOASSERTION',
+                    checksums: binaryInfo.hash ? [{ algorithm: 'SHA256', checksumValue: binaryInfo.hash }] : [],
+                    licenseDeclared: binaryInfo.licenses && binaryInfo.licenses.length > 1 ? binaryInfo.licenses.join(' OR ') : (binaryInfo.license || 'NOASSERTION'),
                     licenseConcluded: 'NOASSERTION',
-                    licenseDeclared: 'NOASSERTION',
-                    copyrightText: 'NOASSERTION'
-                }],
-            relationships: dependencies.map(dep => ({
-                spdxElementId: 'SPDXRef-PACKAGE',
-                relationshipType: 'DEPENDS_ON',
-                relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
-            }))
+                    copyrightText: 'NOASSERTION',
+                    betanetFeatures: binaryInfo.betanetFeatures && binaryInfo.betanetFeatures.length ? binaryInfo.betanetFeatures : undefined
+                },
+                ...components.map((c, idx) => ({
+                    name: (0, constants_1.sanitizeName)(c.name),
+                    SPDXID: `SPDXRef-Comp-${idx}`,
+                    versionInfo: c.version || 'unknown',
+                    filesAnalyzed: false,
+                    downloadLocation: 'NOASSERTION',
+                    licenseDeclared: c.license || 'NOASSERTION',
+                    licenseConcluded: 'NOASSERTION',
+                    copyrightText: 'NOASSERTION',
+                    checksums: c.hash ? [{ algorithm: 'SHA256', checksumValue: c.hash }] : []
+                }))
+            ],
+            relationships
         };
-        // Convert to SPDX format
-        let spdxText = `SPDXVersion: SPDX-2.3\n`;
-        spdxText += `DataLicense: CC0-1.0\n`;
-        spdxText += `SPDXID: SPDXRef-DOCUMENT\n`;
-        spdxText += `DocumentName: ${binaryInfo.name}\n`;
-        spdxText += `DocumentNamespace: https://spdx.org/spdxdocs/${binaryInfo.name}-${this.generateUUID()}\n`;
-        spdxText += `Created: ${new Date().toISOString()}\n`;
-        spdxText += `Creator: Tool: betanet-compliance-linter\n\n`;
-        spdxText += `Package: ${binaryInfo.name}\n`;
-        spdxText += `SPDXID: SPDXRef-PACKAGE\n`;
-        spdxText += `PackageName: ${binaryInfo.name}\n`;
-        spdxText += `PackageVersion: 1.0.0\n`;
-        spdxText += `PackageDownloadLocation: NOASSERTION\n`;
-        spdxText += `FilesAnalyzed: false\n`;
-        spdxText += `PackageLicenseConcluded: NOASSERTION\n`;
-        spdxText += `PackageLicenseDeclared: NOASSERTION\n`;
-        spdxText += `PackageCopyrightText: NOASSERTION\n`;
-        if (binaryInfo.hash) {
-            spdxText += `PackageChecksum: SHA256: ${binaryInfo.hash}\n`;
-        }
-        return spdxText;
     }
     generateUUID() {
         return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {

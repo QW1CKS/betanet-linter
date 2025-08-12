@@ -35,11 +35,14 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BetanetComplianceChecker = void 0;
 const analyzer_1 = require("./analyzer");
-const constants_1 = require("./constants");
 const fs = __importStar(require("fs-extra"));
 const path = __importStar(require("path"));
 const yaml = __importStar(require("js-yaml"));
 const xml2js = __importStar(require("xml2js"));
+const check_registry_1 = require("./check-registry");
+const constants_1 = require("./constants");
+const sbom_generator_1 = require("./sbom/sbom-generator");
+const constants_2 = require("./constants");
 class BetanetComplianceChecker {
     constructor() {
         // Will be initialized when checking compliance
@@ -50,385 +53,360 @@ class BetanetComplianceChecker {
         return this._analyzer;
     }
     async checkCompliance(binaryPath, options = {}) {
-        this._analyzer = new analyzer_1.BinaryAnalyzer(binaryPath, options.verbose);
-        if (options.verbose) {
-            console.log('🔍 Starting Betanet compliance check...');
+        // Decomposed path (ISSUE-030)
+        this.ensureAnalyzer(binaryPath, options);
+        const definitions = this.resolveDefinitions(options);
+        const { checks, timings, wallMs } = await this.runChecks(definitions, options);
+        return this.assembleResult(binaryPath, checks, timings, wallMs, options);
+    }
+    // === Helper decomposition (ISSUE-030) ===
+    ensureAnalyzer(binaryPath, options) {
+        if (!fs.existsSync(binaryPath))
+            throw new Error(`Binary not found at path: ${binaryPath}`);
+        if (!this._analyzer || options.forceRefresh) {
+            this._analyzer = new analyzer_1.BinaryAnalyzer(binaryPath, options.verbose);
         }
-        // Run all compliance checks
-        const checks = [];
-        // Filter checks if specified
-        const allCheckIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-        let checkIdsToRun = allCheckIds;
-        if (options.checkFilters?.include) {
-            checkIdsToRun = checkIdsToRun.filter(id => options.checkFilters.include.includes(id));
-        }
-        if (options.checkFilters?.exclude) {
-            checkIdsToRun = checkIdsToRun.filter(id => !options.checkFilters.exclude.includes(id));
-        }
-        // Run each check
-        for (const checkId of checkIdsToRun) {
-            const check = await this.runCheck(checkId);
-            checks.push(check);
-        }
-        // Calculate overall results
-        const passedChecks = checks.filter(c => c.passed);
-        const criticalChecks = checks.filter(c => c.severity === 'critical' && !c.passed);
-        // Guard against zero checks (filters may exclude all)
-        const overallScore = checks.length === 0 ? 0 : Math.round((passedChecks.length / checks.length) * 100);
-        const passed = checks.length > 0 && passedChecks.length === checks.length && criticalChecks.length === 0;
-        const diagnostics = (() => {
-            const a = this.analyzer;
-            if (a && typeof a.getDiagnostics === 'function') {
-                try {
-                    return a.getDiagnostics();
+        // Evidence ingestion (Phase 1 start)
+        if (options.evidenceFile && fs.existsSync(options.evidenceFile)) {
+            try {
+                const raw = fs.readFileSync(options.evidenceFile, 'utf8');
+                const parsed = JSON.parse(raw);
+                const evidence = {};
+                // Accept either direct structured evidence JSON or raw SLSA provenance / DSSE envelope
+                // DSSE envelope detection
+                if (parsed.payloadType && parsed.payload && typeof parsed.payload === 'string') {
+                    try {
+                        const decoded = Buffer.from(parsed.payload, 'base64').toString('utf8');
+                        const inner = JSON.parse(decoded);
+                        // Map SLSA fields
+                        if (inner.predicateType) {
+                            evidence.provenance = evidence.provenance || {};
+                            evidence.provenance.predicateType = inner.predicateType;
+                            const pred = inner.predicate || {};
+                            if (pred.builder?.id)
+                                evidence.provenance.builderId = pred.builder.id;
+                            if (Array.isArray(inner.subject)) {
+                                evidence.provenance.subjects = inner.subject;
+                                // Attempt to locate primary subject digest
+                                const first = inner.subject.find((s) => s?.digest?.sha256);
+                                if (first?.digest?.sha256)
+                                    evidence.provenance.binaryDigest = 'sha256:' + first.digest.sha256;
+                            }
+                            if (pred.materials) {
+                                evidence.provenance.materials = pred.materials.map((m) => ({ uri: m.uri, digest: m.digest?.sha256 ? 'sha256:' + m.digest.sha256 : undefined }));
+                            }
+                            if (pred.metadata?.buildInvocation?.environment?.SOURCE_DATE_EPOCH) {
+                                const sde = parseInt(pred.metadata.buildInvocation.environment.SOURCE_DATE_EPOCH, 10);
+                                if (!isNaN(sde))
+                                    evidence.provenance.sourceDateEpoch = sde;
+                            }
+                        }
+                    }
+                    catch { /* swallow decoding errors */ }
                 }
-                catch {
-                    return undefined;
+                else if (parsed.predicateType && parsed.predicate) {
+                    // Raw provenance JSON (unwrapped)
+                    evidence.provenance = evidence.provenance || {};
+                    evidence.provenance.predicateType = parsed.predicateType;
+                    if (parsed.predicate?.builder?.id)
+                        evidence.provenance.builderId = parsed.predicate.builder.id;
+                    if (Array.isArray(parsed.subject)) {
+                        evidence.provenance.subjects = parsed.subject;
+                        const first = parsed.subject.find((s) => s?.digest?.sha256);
+                        if (first?.digest?.sha256)
+                            evidence.provenance.binaryDigest = 'sha256:' + first.digest.sha256;
+                    }
+                    if (parsed.predicate?.materials) {
+                        evidence.provenance.materials = parsed.predicate.materials.map((m) => ({ uri: m.uri, digest: m.digest?.sha256 ? 'sha256:' + m.digest.sha256 : undefined }));
+                    }
                 }
+                else if (parsed.binaryDistDigest || parsed.provenance) {
+                    // Fallback simple reference format (our earlier placeholder)
+                    if (parsed.provenance && typeof parsed.provenance === 'object') {
+                        evidence.provenance = { ...parsed.provenance };
+                    }
+                    else {
+                        evidence.provenance = {
+                            binaryDigest: parsed.binaryDistDigest,
+                            predicateType: parsed.predicateType,
+                            builderId: parsed.builderId
+                        };
+                    }
+                }
+                else {
+                    // Assume already shape of IngestedEvidence
+                    Object.assign(evidence, parsed);
+                }
+                this._analyzer.evidence = evidence; // attach for evaluators
             }
-            return undefined;
-        })();
-        const result = {
-            binaryPath,
-            timestamp: new Date().toISOString(),
-            overallScore,
-            passed,
-            checks,
-            summary: {
-                total: checks.length,
-                passed: passedChecks.length,
-                failed: checks.length - passedChecks.length,
-                critical: criticalChecks.length
-            },
-            diagnostics
+            catch (e) {
+                console.warn(`⚠️  Failed to load evidence file ${options.evidenceFile}: ${e.message}`);
+            }
+        }
+        // Enable dynamic probe if requested or via env toggle
+        if ((options.dynamicProbe || process.env.BETANET_DYNAMIC_PROBE === '1') && typeof this._analyzer.setDynamicProbe === 'function') {
+            this._analyzer.setDynamicProbe(true);
+        }
+    }
+    resolveDefinitions(options) {
+        let ids = check_registry_1.CHECK_REGISTRY.map(c => c.id);
+        if (options.checkFilters?.include)
+            ids = ids.filter(id => options.checkFilters.include.includes(id));
+        if (options.checkFilters?.exclude)
+            ids = ids.filter(id => !options.checkFilters.exclude.includes(id));
+        return (0, check_registry_1.getChecksByIds)(ids);
+    }
+    async runChecks(definitions, options) {
+        const now = new Date();
+        const checks = [];
+        const timings = [];
+        const maxParallel = options.maxParallel && options.maxParallel > 0 ? options.maxParallel : definitions.length;
+        const timeoutMs = options.checkTimeoutMs && options.checkTimeoutMs > 0 ? options.checkTimeoutMs : undefined;
+        const queue = [...definitions];
+        const running = [];
+        const startWall = performance.now();
+        const attachHints = (result, defId) => {
+            try {
+                const diag = this._analyzer.getDiagnostics();
+                if (!diag?.degraded)
+                    return;
+                const reasons = diag.degradationReasons || [];
+                const hints = [];
+                const stringReasons = reasons.filter(r => r.startsWith('strings-'));
+                const symbolReasons = reasons.filter(r => r.startsWith('symbols-'));
+                const depReasons = reasons.filter(r => r.startsWith('ldd'));
+                const stringChecks = [1, 2, 4, 5, 6, 8, 10, 11];
+                const symbolChecks = [1, 3, 4, 10];
+                if (stringChecks.includes(defId) && stringReasons.length) {
+                    if (stringReasons.includes('strings-fallback-truncated'))
+                        hints.push('string extraction truncated');
+                    if (stringReasons.includes('strings-missing'))
+                        hints.push('strings tool missing');
+                    if (stringReasons.includes('strings-error'))
+                        hints.push('strings invocation error');
+                    if (stringReasons.includes('strings-fallback-error'))
+                        hints.push('string fallback error');
+                }
+                if (symbolChecks.includes(defId) && symbolReasons.length)
+                    hints.push('symbol extraction degraded');
+                if (depReasons.length && false)
+                    hints.push('dependency resolution degraded'); // placeholder
+                if (!hints.length && diag.missingCoreTools?.length)
+                    hints.push('core analysis tools missing');
+                if (hints.length)
+                    result.degradedHints = Array.from(new Set(hints));
+            }
+            catch { /* ignore */ }
         };
+        const runOne = async (def) => {
+            const start = performance.now();
+            let timer;
+            const evalPromise = def.evaluate(this._analyzer, now);
+            const wrapped = timeoutMs ? Promise.race([
+                evalPromise,
+                new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('CHECK_TIMEOUT')), timeoutMs); })
+            ]) : evalPromise;
+            try {
+                const result = await wrapped;
+                const duration = performance.now() - start;
+                if (timer)
+                    clearTimeout(timer);
+                result.durationMs = duration;
+                attachHints(result, def.id);
+                checks.push(result);
+                timings.push({ id: result.id, durationMs: duration });
+            }
+            catch (e) {
+                if (timer)
+                    clearTimeout(timer);
+                const duration = performance.now() - start;
+                timings.push({ id: def.id, durationMs: duration });
+                checks.push({ id: def.id, name: def.name, description: def.description, passed: false, details: e && e.message === 'CHECK_TIMEOUT' ? '❌ Check timed out' : `❌ Check error: ${e?.message || e}`, severity: def.severity, durationMs: duration });
+            }
+        };
+        while (queue.length || running.length) {
+            while (queue.length && running.length < maxParallel) {
+                const def = queue.shift();
+                const p = runOne(def).finally(() => { const idx = running.indexOf(p); if (idx >= 0)
+                    running.splice(idx, 1); });
+                running.push(p);
+            }
+            if (running.length)
+                await Promise.race(running);
+        }
+        const wallMs = performance.now() - startWall;
+        checks.sort((a, b) => a.id - b.id);
+        return { checks, timings, wallMs };
+    }
+    assembleResult(binaryPath, checks, checkTimings, parallelDurationMs, options) {
+        const severityRank = { minor: 1, major: 2, critical: 3 };
+        const min = options.severityMin ? severityRank[options.severityMin] : 1;
+        const considered = checks.filter(c => severityRank[c.severity] >= min);
+        // Strict mode logic: by default treat heuristic passes as informational unless allowHeuristic OR not in strictMode
+        const strictMode = options.strictMode !== false; // default true if not specified
+        const allowHeuristic = !!options.allowHeuristic;
+        const normativePasses = considered.filter(c => c.passed && c.evidenceType && c.evidenceType !== 'heuristic');
+        const heuristicPasses = considered.filter(c => c.passed && (c.evidenceType === 'heuristic' || !c.evidenceType));
+        const passedChecks = (!strictMode || allowHeuristic) ? considered.filter(c => c.passed) : normativePasses;
+        const criticalChecks = considered.filter(c => c.severity === 'critical' && !c.passed);
+        const overallScore = considered.length === 0 ? 0 : Math.round((passedChecks.length / considered.length) * 100);
+        let passed = considered.length > 0 && passedChecks.length === considered.length && criticalChecks.length === 0;
+        // In strict mode if there are any heuristic-only passes counting toward compliance, force non-pass unless allowed
+        let heuristicContributionCount = 0;
+        if (strictMode && !allowHeuristic) {
+            heuristicContributionCount = heuristicPasses.length;
+            if (heuristicContributionCount > 0)
+                passed = false;
+        }
+        const diagnostics = (() => { const a = this.analyzer; if (a && typeof a.getDiagnostics === 'function') {
+            try {
+                return a.getDiagnostics();
+            }
+            catch {
+                return undefined;
+            }
+        } return undefined; })();
+        const implementedChecks = check_registry_1.CHECK_REGISTRY.filter(c => (0, constants_1.isVersionLE)(c.introducedIn, constants_1.SPEC_VERSION_PARTIAL)).length;
+        const specSummary = { baseline: constants_1.SPEC_VERSION_SUPPORTED_BASE, latestKnown: constants_1.SPEC_VERSION_PARTIAL, implementedChecks, totalChecks: check_registry_1.CHECK_REGISTRY.length, pendingIssues: constants_1.SPEC_11_PENDING_ISSUES };
+        const result = { binaryPath, timestamp: new Date().toISOString(), overallScore, passed, checks, summary: { total: considered.length, passed: passedChecks.length, failed: considered.length - passedChecks.length, critical: criticalChecks.length }, specSummary, diagnostics };
+        result.strictMode = strictMode;
+        result.allowHeuristic = allowHeuristic;
+        result.heuristicContributionCount = heuristicContributionCount;
+        // Phase 0 requirement: emit warning when heuristic passes present
+        const warnings = [];
+        if (heuristicContributionCount > 0 && strictMode && !allowHeuristic) {
+            warnings.push(`Heuristic-only evidence: ${heuristicContributionCount} check(s) passed with heuristic evidence and were excluded from compliance scoring. Add normative evidence or use --allow-heuristic to treat them as provisional.`);
+        }
+        else if (heuristicContributionCount > 0 && allowHeuristic) {
+            warnings.push(`Heuristic evidence counted: ${heuristicContributionCount} check(s) rely solely on heuristic signals. Consider providing structural/dynamic/artifact evidence for strict compliance.`);
+        }
+        if (warnings.length)
+            result.warnings = warnings;
+        result.parallelDurationMs = parallelDurationMs;
+        result.checkTimings = checkTimings;
+        if (process.env.BETANET_FAIL_ON_DEGRADED === '1' && result.diagnostics?.degraded)
+            result.passed = false;
         return result;
     }
-    async runCheck(checkId) {
-        switch (checkId) {
-            case 1:
-                return await this.checkHTXImplementation();
-            case 2:
-                return await this.checkAccessTickets();
-            case 3:
-                return await this.checkFrameEncryption();
-            case 4:
-                return await this.checkSCIONPaths();
-            case 5:
-                return await this.checkTransportEndpoints();
-            case 6:
-                return await this.checkDHTBootstrap();
-            case 7:
-                return await this.checkAliasLedger();
-            case 8:
-                return await this.checkPaymentSystem();
-            case 9:
-                return await this.checkBuildProvenance();
-            case 10:
-                return await this.checkPostQuantum();
-            default:
-                throw new Error(`Unknown check ID: ${checkId}`);
-        }
-    }
-    async checkHTXImplementation() {
-        const networkCaps = await this.analyzer.checkNetworkCapabilities();
-        const passed = networkCaps.hasTLS && networkCaps.hasQUIC &&
-            networkCaps.hasHTX && networkCaps.hasECH &&
-            networkCaps.port443;
-        return {
-            id: 1,
-            name: 'HTX over TCP-443 & QUIC-443',
-            description: 'Implements HTX over TCP-443 and QUIC-443 with TLS 1.3 mimic + ECH',
-            passed,
-            details: passed
-                ? '✅ Found HTX, QUIC, TLS, ECH, and port 443 support'
-                : `❌ Missing: ${[
-                    !networkCaps.hasTLS && 'TLS',
-                    !networkCaps.hasQUIC && 'QUIC',
-                    !networkCaps.hasHTX && 'HTX',
-                    !networkCaps.hasECH && 'ECH',
-                    !networkCaps.port443 && 'port 443'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'critical'
-        };
-    }
-    async checkAccessTickets() {
-        const analysis = await this.analyzer.analyze();
-        const strings = analysis.strings.join(' ').toLowerCase();
-        const symbols = analysis.symbols.join(' ').toLowerCase();
-        const hasTickets = strings.includes('ticket') || strings.includes('access') || symbols.includes('ticket');
-        const hasRotation = strings.includes('rotation') || strings.includes('rotate') || symbols.includes('rotate');
-        const passed = hasTickets && hasRotation;
-        return {
-            id: 2,
-            name: 'Rotating Access Tickets',
-            description: 'Uses rotating access tickets (§5.2)',
-            passed,
-            details: passed
-                ? '✅ Found access ticket and rotation support'
-                : `❌ Missing: ${[
-                    !hasTickets && 'access tickets',
-                    !hasRotation && 'ticket rotation'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'major'
-        };
-    }
-    async checkFrameEncryption() {
-        const cryptoCaps = await this.analyzer.checkCryptographicCapabilities();
-        const passed = cryptoCaps.hasChaCha20 && cryptoCaps.hasPoly1305;
-        return {
-            id: 3,
-            name: 'Inner Frame Encryption',
-            description: 'Encrypts inner frames with ChaCha20-Poly1305, 24-bit length, 96-bit nonce',
-            passed,
-            details: passed
-                ? '✅ Found ChaCha20-Poly1305 support'
-                : `❌ Missing: ${[
-                    !cryptoCaps.hasChaCha20 && 'ChaCha20',
-                    !cryptoCaps.hasPoly1305 && 'Poly1305'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'critical'
-        };
-    }
-    async checkSCIONPaths() {
-        const scionSupport = await this.analyzer.checkSCIONSupport();
-        const passed = scionSupport.hasSCION && (scionSupport.pathManagement || scionSupport.hasIPTransition);
-        return {
-            id: 4,
-            name: 'SCION Path Management',
-            description: 'Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header',
-            passed,
-            details: passed
-                ? '✅ Found SCION support with path management or IP-transition'
-                : `❌ Missing: ${[
-                    !scionSupport.hasSCION && 'SCION support',
-                    !scionSupport.pathManagement && 'path management',
-                    !scionSupport.hasIPTransition && 'IP-transition header'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'critical'
-        };
-    }
-    async checkTransportEndpoints() {
-        const analysis = await this.analyzer.analyze();
-        const strings = analysis.strings.join(' ');
-        // Accept either 1.1.0 (preferred) or legacy 1.0.0 endpoints
-        const hasHTXEndpoint = constants_1.TRANSPORT_ENDPOINT_VERSIONS.some(v => strings.includes(`/betanet/htx/${v}`));
-        const hasQUICEndpoint = constants_1.TRANSPORT_ENDPOINT_VERSIONS.some(v => strings.includes(`/betanet/htxquic/${v}`));
-        const optionalPresent = constants_1.OPTIONAL_TRANSPORTS.filter(t => strings.includes(t.path));
-        const passed = hasHTXEndpoint && hasQUICEndpoint;
-        return {
-            id: 5,
-            name: 'Transport Endpoints',
-            description: 'Offers Betanet HTX & HTX-QUIC transports (v1.1.0 preferred, 1.0.0 legacy supported)',
-            passed,
-            details: passed
-                ? `✅ Found HTX & QUIC transport endpoints${optionalPresent.length ? ' + optional: ' + optionalPresent.map(o => o.kind).join(', ') : ''}`
-                : `❌ Missing: ${[
-                    !hasHTXEndpoint && 'HTX endpoint (v1.1.0 or 1.0.0)',
-                    !hasQUICEndpoint && 'HTX-QUIC endpoint (v1.1.0 or 1.0.0)'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'major'
-        };
-    }
-    async checkDHTBootstrap() {
-        const dhtSupport = await this.analyzer.checkDHTSupport();
-        const passed = !!(dhtSupport.hasDHT && (dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation));
-        return {
-            id: 6,
-            name: 'DHT Seed Bootstrap',
-            description: 'Implements deterministic (1.0) or rotating rendezvous (1.1) DHT seed bootstrap',
-            passed,
-            details: passed
-                ? `✅ Found DHT with ${dhtSupport.rendezvousRotation ? 'rotating rendezvous' : 'deterministic'} bootstrap` +
-                    (dhtSupport.beaconSetIndicator ? ' (BeaconSet evidence)' : '')
-                : `❌ Missing: ${[
-                    !dhtSupport.hasDHT && 'DHT support',
-                    !(dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation) && 'deterministic or rendezvous bootstrap'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'major'
-        };
-    }
-    async checkAliasLedger() {
-        const ledgerSupport = await this.analyzer.checkLedgerSupport();
-        const passed = ledgerSupport.hasAliasLedger && ledgerSupport.hasConsensus && ledgerSupport.chainSupport;
-        return {
-            id: 7,
-            name: 'Alias Ledger Verification',
-            description: 'Verifies alias ledger with 2-of-3 chain consensus',
-            passed,
-            details: passed
-                ? '✅ Found alias ledger with consensus and chain support'
-                : `❌ Missing: ${[
-                    !ledgerSupport.hasAliasLedger && 'alias ledger',
-                    !ledgerSupport.hasConsensus && '2-of-3 consensus',
-                    !ledgerSupport.chainSupport && 'chain verification'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'major'
-        };
-    }
-    async checkPaymentSystem() {
-        const paymentSupport = await this.analyzer.checkPaymentSupport();
-        const passed = paymentSupport.hasCashu && paymentSupport.hasLightning && paymentSupport.hasFederation;
-        return {
-            id: 8,
-            name: 'Payment System',
-            description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)',
-            passed,
-            details: passed
-                ? '✅ Found Cashu, Lightning, and federation support' +
-                    (paymentSupport.hasVoucherFormat ? ' + voucher format' : '') +
-                    (paymentSupport.hasFROST ? ' + FROST group' : '') +
-                    (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '')
-                : `❌ Missing: ${[
-                    !paymentSupport.hasCashu && 'Cashu support',
-                    !paymentSupport.hasLightning && 'Lightning support',
-                    !paymentSupport.hasFederation && 'federation support'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'major'
-        };
-    }
-    async checkBuildProvenance() {
-        const buildInfo = await this.analyzer.checkBuildProvenance();
-        const passed = buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance;
-        return {
-            id: 9,
-            name: 'Build Provenance',
-            description: 'Builds reproducibly and publishes SLSA 3 provenance',
-            passed,
-            details: passed
-                ? '✅ Found SLSA, reproducible builds, and provenance'
-                : `❌ Missing: ${[
-                    !buildInfo.hasSLSA && 'SLSA support',
-                    !buildInfo.reproducible && 'reproducible builds',
-                    !buildInfo.provenance && 'build provenance'
-                ].filter(Boolean).join(', ')}`,
-            severity: 'minor'
-        };
-    }
-    async checkPostQuantum() {
-        const cryptoCaps = await this.analyzer.checkCryptographicCapabilities();
-        // Check if we're past the mandatory date (2027-01-01)
-        const currentDate = new Date();
-        const mandatoryDate = new Date('2027-01-01');
-        const isPastMandatoryDate = currentDate >= mandatoryDate;
-        let passed = true;
-        let details = '✅ Post-quantum requirements not yet mandatory';
-        if (isPastMandatoryDate) {
-            passed = cryptoCaps.hasX25519 && cryptoCaps.hasKyber768;
-            details = passed
-                ? '✅ Found X25519-Kyber768 hybrid cipher suite'
-                : `❌ Missing: ${[
-                    !cryptoCaps.hasX25519 && 'X25519',
-                    !cryptoCaps.hasKyber768 && 'Kyber768'
-                ].filter(Boolean).join(', ')} (mandatory after 2027-01-01)`;
-        }
-        return {
-            id: 10,
-            name: 'Post-Quantum Cipher Suites',
-            description: 'Presents X25519-Kyber768 suites once the mandatory date is reached',
-            passed,
-            details,
-            severity: isPastMandatoryDate ? 'critical' : 'minor'
-        };
-    }
+    // Legacy per-check methods removed (Plan 3 consolidation) in favor of registry-based evaluation
     async generateSBOM(binaryPath, format = 'cyclonedx', outputPath) {
+        // Ensure analyzer exists for consistency (even though SBOMGenerator operates independently)
         if (!this.analyzer) {
             this._analyzer = new analyzer_1.BinaryAnalyzer(binaryPath);
         }
-        const analysis = await this.analyzer.analyze();
-        const components = await this.extractComponents(analysis);
-        const defaultOutputPath = path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.${format === 'cyclonedx' ? 'xml' : 'spdx'}`);
+        const generator = new sbom_generator_1.SBOMGenerator();
+        const sbom = await generator.generate(binaryPath, format, this.analyzer);
+        const defaultOutputPath = (() => {
+            if (format === 'cyclonedx')
+                return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.xml`);
+            if (format === 'cyclonedx-json')
+                return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.cdx.json`);
+            if (format === 'spdx-json')
+                return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.spdx.json`);
+            return path.join(path.dirname(binaryPath), `${path.basename(binaryPath)}-sbom.spdx`);
+        })();
         const finalOutputPath = outputPath || defaultOutputPath;
         if (format === 'cyclonedx') {
-            await this.generateCycloneDXSBOM(components, finalOutputPath, binaryPath);
+            // Serialize a CycloneDX-style XML (backwards compatible with previous output path & extension)
+            const builder = new xml2js.Builder();
+            const metaComponent = sbom.data?.metadata?.component || {};
+            let components = sbom.data?.components || [];
+            // ISSUE-045: Ensure duplicate components (same name+version) are deduped before XML serialization
+            if (Array.isArray(components) && components.length > 1) {
+                const seen = new Map();
+                components.forEach((c) => {
+                    const key = `${(c.name || '').toLowerCase()}@${(c.version || '').toLowerCase()}`;
+                    if (!seen.has(key))
+                        seen.set(key, c);
+                    else {
+                        const existing = seen.get(key);
+                        if (!existing.hashes && c.hashes)
+                            existing.hashes = c.hashes;
+                    }
+                });
+                components = Array.from(seen.values());
+            }
+            // Streaming threshold (ISSUE-046)
+            const streamThreshold = (() => {
+                const v = process.env.BETANET_SBOM_STREAM_THRESHOLD;
+                const n = v ? parseInt(v, 10) : NaN;
+                return Number.isFinite(n) ? n : 1000; // default high threshold
+            })();
+            const componentCount = Array.isArray(components) ? components.length : 0;
+            if (componentCount >= streamThreshold) {
+                const ws = fs.createWriteStream(finalOutputPath, { encoding: 'utf8' });
+                ws.write('<bom xmlns="http://cyclonedx.org/schema/bom/1.4" version="1">\n');
+                ws.write('  <metadata>\n');
+                ws.write(`    <timestamp>${new Date().toISOString()}</timestamp>\n`);
+                ws.write('    <component>\n');
+                ws.write(`      <name>${metaComponent.name || path.basename(binaryPath)}</name>\n`);
+                ws.write(`      <version>${metaComponent.version || '1.0.0'}</version>\n`);
+                ws.write(`      <type>${metaComponent.type || 'application'}</type>\n`);
+                ws.write(`      <purl>${metaComponent.purl || `pkg:generic/${path.basename(binaryPath)}@1.0.0`}</purl>\n`);
+                if (metaComponent.hashes && metaComponent.hashes.length) {
+                    ws.write('      <hashes>\n');
+                    metaComponent.hashes.forEach((h) => { ws.write(`        <hash alg="${h.alg}">${h.content}</hash>\n`); });
+                    ws.write('      </hashes>\n');
+                }
+                ws.write('    </component>\n');
+                ws.write('  </metadata>\n');
+                if (componentCount) {
+                    ws.write('  <components>\n');
+                    components.forEach((c) => {
+                        ws.write('    <component>\n');
+                        ws.write(`      <name>${c.name || 'unknown'}</name>\n`);
+                        ws.write(`      <version>${c.version || 'unknown'}</version>\n`);
+                        ws.write(`      <type>${c.type || 'library'}</type>\n`);
+                        if (c.purl)
+                            ws.write(`      <purl>${c.purl}</purl>\n`);
+                        ws.write('    </component>\n');
+                    });
+                    ws.write('  </components>\n');
+                }
+                ws.write('</bom>');
+                await new Promise(res => ws.end(res));
+            }
+            else {
+                const xmlObj = {
+                    bom: {
+                        $: { xmlns: 'http://cyclonedx.org/schema/bom/1.4', version: '1' },
+                        metadata: {
+                            timestamp: new Date().toISOString(),
+                            component: {
+                                name: metaComponent.name || path.basename(binaryPath),
+                                version: metaComponent.version || '1.0.0',
+                                type: metaComponent.type || 'application',
+                                purl: metaComponent.purl || `pkg:generic/${path.basename(binaryPath)}@1.0.0`,
+                                hashes: metaComponent.hashes ? { hash: metaComponent.hashes.map((h) => ({ _: h.content, $: { alg: h.alg } })) } : undefined
+                            }
+                        },
+                        components: components.length ? {
+                            component: components.map((c) => ({
+                                name: c.name || 'unknown',
+                                version: c.version || 'unknown',
+                                type: c.type || 'library',
+                                purl: c.purl,
+                                properties: undefined
+                            }))
+                        } : undefined
+                    }
+                };
+                const xml = builder.buildObject(xmlObj);
+                await fs.writeFile(finalOutputPath, xml);
+            }
+        }
+        else if (format === 'cyclonedx-json') {
+            // Write raw JSON structure produced internally (data object)
+            await fs.writeFile(finalOutputPath, JSON.stringify(sbom.data, null, 2));
+        }
+        else if (format === 'spdx-json') {
+            await fs.writeFile(finalOutputPath, JSON.stringify(sbom.data, null, 2));
         }
         else {
-            await this.generateSPDXSBOM(components, finalOutputPath, binaryPath);
+            // SPDX already text from generator
+            await fs.writeFile(finalOutputPath, sbom.data);
         }
         return finalOutputPath;
-    }
-    async extractComponents(analysis) {
-        const components = [];
-        // Add detected dependencies
-        for (const dep of analysis.dependencies) {
-            const name = path.basename(dep);
-            const version = this.extractVersionFromPath(dep);
-            components.push({
-                name,
-                version: version || 'unknown',
-                type: 'library',
-                supplier: 'unknown'
-            });
-        }
-        // Add detected cryptographic libraries
-        const cryptoCaps = await this.analyzer.checkCryptographicCapabilities();
-        if (cryptoCaps.hasChaCha20) {
-            components.push({
-                name: 'ChaCha20-Poly1305',
-                version: '1.0',
-                type: 'library',
-                license: 'Public Domain'
-            });
-        }
-        if (cryptoCaps.hasEd25519) {
-            components.push({
-                name: 'Ed25519',
-                version: '1.0',
-                type: 'library',
-                license: 'BSD-3-Clause'
-            });
-        }
-        return components;
-    }
-    extractVersionFromPath(path) {
-        const versionMatch = path.match(/(\d+\.\d+\.\d+)/);
-        return versionMatch ? versionMatch[1] : null;
-    }
-    async generateCycloneDXSBOM(components, outputPath, binaryPath) {
-        const builder = new xml2js.Builder();
-        const sbom = {
-            'bom': {
-                '$': { 'xmlns': 'http://cyclonedx.org/schema/bom/1.4', 'version': '1' },
-                'metadata': {
-                    'timestamp': new Date().toISOString(),
-                    'component': {
-                        'name': path.basename(binaryPath),
-                        'version': '1.0.0',
-                        'type': 'application',
-                        'purl': `pkg:generic/${path.basename(binaryPath)}@1.0.0`
-                    }
-                },
-                'components': {
-                    'component': components.map(comp => ({
-                        'name': comp.name,
-                        'version': comp.version,
-                        'type': comp.type,
-                        'license': comp.license ? [{ 'name': comp.license }] : undefined
-                    }))
-                }
-            }
-        };
-        const xml = builder.buildObject(sbom);
-        await fs.writeFile(outputPath, xml);
-    }
-    async generateSPDXSBOM(components, outputPath, binaryPath) {
-        const spdxContent = `SPDXVersion: SPDX-2.3
-DataLicense: CC0-1.0
-PackageName: ${path.basename(binaryPath)}
-SPDXID: SPDXRef-PACKAGE
-PackageVersion: 1.0.0
-PackageLicenseDeclared: MIT
-
-${components.map((comp, index) => `
-PackageName: ${comp.name}
-SPDXID: SPDXRef-COMPONENT-${index}
-PackageVersion: ${comp.version}
-PackageLicenseDeclared: ${comp.license || 'NOASSERTION'}`).join('\n')}
-
-Relationship: SPDXRef-PACKAGE CONTAINS SPDXRef-COMPONENT-0
-${components.slice(1).map((_, index) => `Relationship: SPDXRef-PACKAGE CONTAINS SPDXRef-COMPONENT-${index + 1}`).join('\n')}
-`;
-        await fs.writeFile(outputPath, spdxContent);
     }
     displayResults(results, format = 'table') {
         console.log('\n' + '='.repeat(60));
@@ -439,6 +417,27 @@ ${components.slice(1).map((_, index) => `Relationship: SPDXRef-PACKAGE CONTAINS 
         console.log(`Overall Score: ${results.overallScore}%`);
         console.log(`Status: ${results.passed ? '✅ PASSED' : '❌ FAILED'}`);
         console.log('-'.repeat(60));
+        if (results.specSummary) {
+            const s = results.specSummary;
+            console.log(`Spec Coverage: baseline ${s.baseline} fully covered; latest known ${s.latestKnown} checks implemented ${s.implementedChecks}/${s.totalChecks}`);
+            if (s.pendingIssues && s.pendingIssues.length) {
+                console.log('Pending 1.1 refinements: ' + s.pendingIssues.map(p => p.id).join(', '));
+            }
+            console.log('-'.repeat(60));
+        }
+        if (results.warnings && results.warnings.length) {
+            console.log('⚠️  WARNINGS:');
+            results.warnings.forEach((w) => console.log(` - ${w}`));
+            console.log('-'.repeat(60));
+        }
+        if (results.diagnostics?.degraded) {
+            const reasons = results.diagnostics.degradationReasons?.join(', ') || 'unknown';
+            console.log(`⚠️  Degraded analysis: ${reasons}`);
+            if (results.diagnostics.missingCoreTools?.length) {
+                console.log(`Missing core tools: ${results.diagnostics.missingCoreTools.join(', ')}`);
+            }
+            console.log('-'.repeat(60));
+        }
         if (format === 'json') {
             console.log(JSON.stringify(results, null, 2));
             return;
@@ -452,11 +451,14 @@ ${components.slice(1).map((_, index) => `Relationship: SPDXRef-PACKAGE CONTAINS 
         console.log('─'.repeat(80));
         results.checks.forEach(check => {
             const status = check.passed ? '✅' : '❌';
-            const severity = check.severity === 'critical' ? '🔴' :
-                check.severity === 'major' ? '🟡' : '🟢';
-            console.log(`${status} ${severity} [${check.id}] ${check.name}`);
+            const severity = constants_2.SEVERITY_EMOJI[check.severity] || '';
+            const degradedMark = check.degradedHints && check.degradedHints.length ? ' (degraded)' : '';
+            console.log(`${status} ${severity} [${check.id}] ${check.name}${degradedMark}`);
             console.log(`   ${check.description}`);
             console.log(`   ${check.details}`);
+            if (check.degradedHints && check.degradedHints.length) {
+                console.log(`   Hints: ${check.degradedHints.join('; ')}`);
+            }
             console.log();
         });
         console.log('─'.repeat(80));

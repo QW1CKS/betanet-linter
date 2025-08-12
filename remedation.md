@@ -3,8 +3,8 @@ Betanet Linter Remediation Strategy (Reference)
 
 Progress Summary
 ----------------
-Completed so far: 4 tasks (Phase 0 core transparency items & Implementation Order step 1)  
-Pending: Remaining tasks across Phases 0–7 and supporting sections.  
+Completed so far: 5 tasks (Phase 0 transparency set + Implementation Order steps 1 & 2 + partial step 3 provenance validation)  
+Pending: Remaining tasks across Phases 1–7 and supporting sections.  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
 Purpose
@@ -41,7 +41,7 @@ Normative §11 Items → Current State Map
 10. Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Partial (Check 8)
 11. Governance anti‑concentration caps & partition safety → Missing
 12. Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Missing
-13. Reproducible builds & SLSA 3 provenance artifacts → Shallow (Check 9: keyword tokens; no artifact hash validation)
+13. Reproducible builds & SLSA 3 provenance artifacts → Partial (Check 9: supports external SLSA provenance ingestion w/ predicateType, builderId, binary digest validation; pending action pinning, signature & materials verification, reproducible rebuild enforcement in CI)
 
 Strategic Phases
 ----------------
@@ -160,7 +160,7 @@ Initial Implementation Order (Action Queue)
 ------------------------------------------
 1. [x] README matrix + strict/heuristic mode + check metadata.
 2. [x] Add evidence ingestion (JSON path via --evidence-file) wiring; adapt existing checks to accept external evidence.
-3. [~] Harden GitHub Action + provenance generation & reproducibility verify step. (Workflow scaffold added: provenance-repro.yml placeholder; pending full commit SHA pins, predicate parsing, signature validation.)
+3. [~] Harden GitHub Action + provenance generation & reproducibility verify step. (Workflow scaffold + provenance parsing + binary digest verification implemented: external SLSA or DSSE/JSON evidence upgrades check 9 to artifact. Pending: pin all action SHAs, signature & materials validation, reproducibility rebuild enforcement, SBOM/materials cross-check.)
 4. [ ] Static parsers (ClientHello template, Noise pattern, voucher struct).
 5. [ ] Dynamic harness skeleton (TLS capture + fallback simulation minimal prototype).
 6. [ ] Governance & ledger evidence validation logic.

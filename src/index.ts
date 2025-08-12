@@ -40,8 +40,64 @@ export class BetanetComplianceChecker {
     if (options.evidenceFile && fs.existsSync(options.evidenceFile)) {
       try {
         const raw = fs.readFileSync(options.evidenceFile, 'utf8');
-        const parsed: IngestedEvidence = JSON.parse(raw);
-        (this._analyzer as any).evidence = parsed; // attach for check evaluators
+        const parsed: any = JSON.parse(raw);
+        const evidence: IngestedEvidence = {};
+        // Accept either direct structured evidence JSON or raw SLSA provenance / DSSE envelope
+        // DSSE envelope detection
+        if (parsed.payloadType && parsed.payload && typeof parsed.payload === 'string') {
+          try {
+            const decoded = Buffer.from(parsed.payload, 'base64').toString('utf8');
+            const inner = JSON.parse(decoded);
+            // Map SLSA fields
+            if (inner.predicateType) {
+              evidence.provenance = evidence.provenance || {};
+              evidence.provenance.predicateType = inner.predicateType;
+              const pred = inner.predicate || {};
+              if (pred.builder?.id) evidence.provenance.builderId = pred.builder.id;
+              if (Array.isArray(inner.subject)) {
+                evidence.provenance.subjects = inner.subject as any;
+                // Attempt to locate primary subject digest
+                const first = inner.subject.find((s: any) => s?.digest?.sha256);
+                if (first?.digest?.sha256) evidence.provenance.binaryDigest = 'sha256:' + first.digest.sha256;
+              }
+              if (pred.materials) {
+                evidence.provenance.materials = pred.materials.map((m: any) => ({ uri: m.uri, digest: m.digest?.sha256 ? 'sha256:' + m.digest.sha256 : undefined }));
+              }
+              if (pred.metadata?.buildInvocation?.environment?.SOURCE_DATE_EPOCH) {
+                const sde = parseInt(pred.metadata.buildInvocation.environment.SOURCE_DATE_EPOCH, 10);
+                if (!isNaN(sde)) evidence.provenance.sourceDateEpoch = sde;
+              }
+            }
+          } catch {/* swallow decoding errors */}
+        } else if (parsed.predicateType && parsed.predicate) {
+          // Raw provenance JSON (unwrapped)
+            evidence.provenance = evidence.provenance || {};
+            evidence.provenance.predicateType = parsed.predicateType;
+            if (parsed.predicate?.builder?.id) evidence.provenance.builderId = parsed.predicate.builder.id;
+            if (Array.isArray(parsed.subject)) {
+              evidence.provenance.subjects = parsed.subject;
+              const first = parsed.subject.find((s: any) => s?.digest?.sha256);
+              if (first?.digest?.sha256) evidence.provenance.binaryDigest = 'sha256:' + first.digest.sha256;
+            }
+            if (parsed.predicate?.materials) {
+              evidence.provenance.materials = parsed.predicate.materials.map((m: any) => ({ uri: m.uri, digest: m.digest?.sha256 ? 'sha256:' + m.digest.sha256 : undefined }));
+            }
+        } else if (parsed.binaryDistDigest || parsed.provenance) {
+          // Fallback simple reference format (our earlier placeholder)
+          if (parsed.provenance && typeof parsed.provenance === 'object') {
+            evidence.provenance = { ...parsed.provenance } as any;
+          } else {
+            evidence.provenance = {
+              binaryDigest: parsed.binaryDistDigest,
+              predicateType: parsed.predicateType,
+              builderId: parsed.builderId
+            };
+          }
+        } else {
+          // Assume already shape of IngestedEvidence
+          Object.assign(evidence, parsed);
+        }
+        (this._analyzer as any).evidence = evidence; // attach for evaluators
       } catch (e: any) {
         console.warn(`⚠️  Failed to load evidence file ${options.evidenceFile}: ${e.message}`);
       }

@@ -33,8 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
+        # TODO: replace with exact commit SHA for actions/checkout v4.x
         uses: actions/checkout@v4
       - name: Setup Node
+        # TODO: pin setup-node with commit SHA
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -70,6 +72,7 @@ jobs:
           mkdir -p evidence
           cp provenance-reference.json evidence/provenance.json
       - name: Upload build artifacts
+        # TODO: pin upload-artifact with commit SHA
         uses: actions/upload-artifact@v4
         with:
           name: build-dist-${{ github.run_number }}
@@ -80,6 +83,7 @@ jobs:
           retention-days: 7
       - name: (Placeholder) Generate SLSA Provenance
         if: steps.hash.outputs.overall_sha256
+        # TODO: pin slsa-github-generator to commit SHA
         uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
         with:
           base64-subjects: |
@@ -108,6 +112,7 @@ jobs:
             sha256sum dist.sha256sum | cut -d' ' -f1 > overall.sha || true
           fi
       - name: Download original artifacts
+        # TODO: pin download-artifact with commit SHA
         uses: actions/download-artifact@v4
         with:
           name: build-dist-${{ github.run_number }}

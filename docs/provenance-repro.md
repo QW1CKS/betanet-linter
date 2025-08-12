@@ -24,10 +24,9 @@ Rebuild job steps:
 
 Next Steps
 ----------
-- Pin actions to exact commit SHAs
-- Add provenance predicate parsing & validation in check 9 (predicateType, builder ID, subjects/materials hash match)
-- Replace placeholder evidence file with full provenance JSON path
-- Add signature verification (future) and record verification status in report
+- Pin actions to exact commit SHAs (currently using major tags with TODO comments).
+- Signature / attestation verification (future) and record verification status in report.
+- Materials cross-check against package lock digests.
 
 Local Reproduction
 ------------------
@@ -39,5 +38,17 @@ sha256sum dist.sha256sum | cut -d' ' -f1
 betanet-lint check bin/cli.js --output json --evidence-file dist.sha256sum > compliance.json
 jq '.checks[] | select(.id==9) | {id,evidenceType,details}' compliance.json
 ```
+
+Evidence Parsing & Validation
+-----------------------------
+The linter now ingests three formats:
+1. DSSE envelope containing SLSA predicate (base64 payload) -> extracts predicateType, builderId, subjects[], materials[].
+2. Raw SLSA provenance JSON (unwrapped) -> same field extraction.
+3. Simple placeholder JSON with binaryDistDigest (legacy interim format).
+
+Normative upgrade (artifact evidence) is granted only if:
+- predicateType starts with https://slsa.dev/
+- builderId is present
+- A subject digest (sha256) matches the analyzed binary's computed sha256
 
 See `remedation.md` Implementation Order step 3 for progress tracking.

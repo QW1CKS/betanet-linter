@@ -5,22 +5,11 @@ export declare class BetanetComplianceChecker {
     constructor();
     get analyzer(): BinaryAnalyzer;
     checkCompliance(binaryPath: string, options?: CheckOptions): Promise<ComplianceResult>;
-    private runCheck;
-    private checkHTXImplementation;
-    private checkAccessTickets;
-    private checkFrameEncryption;
-    private checkSCIONPaths;
-    private checkTransportEndpoints;
-    private checkDHTBootstrap;
-    private checkAliasLedger;
-    private checkPaymentSystem;
-    private checkBuildProvenance;
-    private checkPostQuantum;
-    generateSBOM(binaryPath: string, format?: 'cyclonedx' | 'spdx', outputPath?: string): Promise<string>;
-    private extractComponents;
-    private extractVersionFromPath;
-    private generateCycloneDXSBOM;
-    private generateSPDXSBOM;
+    private ensureAnalyzer;
+    private resolveDefinitions;
+    private runChecks;
+    private assembleResult;
+    generateSBOM(binaryPath: string, format?: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json', outputPath?: string): Promise<string>;
     displayResults(results: ComplianceResult, format?: 'json' | 'table' | 'yaml'): void;
 }
 //# sourceMappingURL=index.d.ts.map

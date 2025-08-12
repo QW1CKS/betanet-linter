@@ -99,7 +99,10 @@ export interface IngestedEvidence {
     predicateType?: string;
     builderId?: string;
     binaryDigest?: string;
-    materials?: { uri?: string; digest?: string }[];
+  materials?: { uri?: string; digest?: string }[];
+  subjects?: { name?: string; digest?: { sha256?: string; [k: string]: string | undefined } }[]; // SLSA subjects array
+  verified?: boolean; // internal flag after validation
+  sourceDateEpoch?: number; // captured SOURCE_DATE_EPOCH if present
   };
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder

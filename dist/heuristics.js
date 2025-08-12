@@ -9,6 +9,7 @@ exports.detectDHT = detectDHT;
 exports.detectLedger = detectLedger;
 exports.detectPayment = detectPayment;
 exports.detectBuildProvenance = detectBuildProvenance;
+exports.evaluatePrivacyTokens = evaluatePrivacyTokens;
 const toJoinedLower = (arr) => arr.join(' ').toLowerCase();
 // Boundary helpers
 const wordBoundary = (term) => new RegExp(`(^|[^a-z0-9_])${term}([^a-z0-9_]|$)`, 'i');
@@ -39,23 +40,38 @@ function detectNetwork(src) {
     const hasECH = /encrypted[_-]?client[_-]?hello/.test(blob) || /\bech\b/.test(blob);
     // Port 443: require separator before & non-digit after
     const port443 = /[:\[\s]443([^0-9]|$)/.test(blob);
-    return { hasTLS, hasQUIC, hasHTX, hasECH, port443 };
+    const hasWebRTC = /\/betanet\/webrtc\//.test(blob) || /webrtc/.test(blob);
+    return { hasTLS, hasQUIC, hasHTX, hasECH, port443, hasWebRTC };
 }
 function detectSCION(src) {
     const blob = toJoinedLower(src.strings).concat(' ', toJoinedLower(src.symbols));
     const hasSCION = /\bscion\b/.test(blob);
     const pathManagement = hasSCION && /(path.*maintenance|path.*resolver|segcache)/.test(blob);
     const hasIPTransition = /(ip-?transition|ipv4.*ipv6|legacy.*ip.*bridge)/.test(blob);
-    return { hasSCION, pathManagement, hasIPTransition };
+    // Path diversity heuristic: detect multiple AS/path markers (as123, as-1234, pathid:, scion://)
+    const diversityMatches = blob.match(/\bas[-]?[0-9]{2,5}\b|pathid[:=][a-f0-9]+|scion:\/\//g) || [];
+    const uniqueDiversity = new Set(diversityMatches.map(m => m.toLowerCase()));
+    return { hasSCION, pathManagement, hasIPTransition, pathDiversityCount: uniqueDiversity.size };
 }
 function detectDHT(src) {
     const blob = toJoinedLower(src.strings).concat(' ', toJoinedLower(src.symbols));
     const hasDHT = /\bdht\b/.test(blob) || /(kademlia|kad table|rendezvous dht)/.test(blob);
     const deterministicBootstrap = hasDHT && /(deterministic.*bootstrap|stable.*seed)/.test(blob); // legacy 1.0 heuristic
-    const rendezvousRotation = /(rendezvous|bn-seed|beaconset|rotating rendezvous)/.test(blob);
-    const beaconSetIndicator = /beaconset\(/.test(blob) || /bn-seed/.test(blob);
+    const rotationTokens = /(rendezvous|beaconset|epoch|rotate|rotation|bn-seed|schedule)/g;
+    let match;
+    let rotationHits = 0;
+    const seen = new Set();
+    while ((match = rotationTokens.exec(blob)) !== null) {
+        const token = match[0];
+        if (!seen.has(token + match.index)) {
+            rotationHits++;
+            seen.add(token + match.index);
+        }
+    }
+    const rendezvousRotation = rotationHits >= 2; // require at least two distinct rotation-related indicators
+    const beaconSetIndicator = /beaconset\(/.test(blob) || /bn-seed/.test(blob) || /epoch/.test(blob);
     const seedManagement = /(seed.*(rotate|management)|bootstrap.*seed)/.test(blob);
-    return { hasDHT, deterministicBootstrap, rendezvousRotation, beaconSetIndicator, seedManagement };
+    return { hasDHT, deterministicBootstrap, rendezvousRotation, beaconSetIndicator, seedManagement, rotationHits };
 }
 function detectLedger(src) {
     const blob = toJoinedLower(src.strings).concat(' ', toJoinedLower(src.symbols));
@@ -70,9 +86,12 @@ function detectPayment(src) {
     // Avoid lone 'ln'; require explicit lightning tokens
     const hasLightning = /(lightning|lnurl|bolt\d|lnd)/.test(blob);
     const hasFederation = /(federation|federated|federation-mode)/.test(blob);
-    const hasVoucherFormat = /(keysetid32|voucher\s*\(128|aggregatedsig64|bn1=)/.test(blob);
+    // Voucher structural heuristic (128 bytes: keysetID32 + secret32 + aggregatedSig64) textual hints
+    const voucherRegex = /(keysetid32\s+secret32\s+aggregatedsig64)|(voucher\s*128\s*b)|((?:keysetid|secret|aggregatedsig)32)/;
+    const hasVoucherFormat = voucherRegex.test(blob) || /(bn1=)[A-Za-z0-9_-]{10,}/.test(blob);
     const hasFROST = /frost-?ed25519/.test(blob) || /frost group/.test(blob);
-    const hasPoW22 = /(22-?bit|pow.*22)/.test(blob);
+    // PoW difficulty context: match pow=22, pow 22-bit, 22-bit pow, difficulty:22 etc.
+    const hasPoW22 = /(pow\s*[=:]?\s*22\b|22-?bit\s+pow|pow[^a-z0-9]{0,5}22-?bit|difficulty\s*[:=]\s*22)/.test(blob);
     return { hasCashu, hasLightning, hasFederation, hasVoucherFormat, hasFROST, hasPoW22 };
 }
 function detectBuildProvenance(src) {
@@ -81,5 +100,20 @@ function detectBuildProvenance(src) {
     const reproducible = /(reproducible build|deterministic build|bit-for-bit)/.test(blob);
     const provenance = /(build.*provenance|attestation|slsa\.json)/.test(blob);
     return { hasSLSA, reproducible, provenance };
+}
+// Privacy hop weighting utility for check 11 refinement
+function evaluatePrivacyTokens(strings) {
+    const blob = toJoinedLower(strings);
+    const mixTokens = ['nym', 'mixnode', 'hop', 'hopset', 'relay'];
+    const beaconTokens = ['beaconset', 'epoch', 'drand'];
+    const diversityTokens = ['diversity', 'distinct', 'as-group', 'asgroup', 'vrf'];
+    const scoreCategory = (list) => list.reduce((acc, t) => acc + (new RegExp(`(^|[^a-z0-9])${t}([^a-z0-9]|$)`).test(blob) ? 1 : 0), 0);
+    const mixScore = scoreCategory(mixTokens);
+    const beaconScore = scoreCategory(beaconTokens);
+    const diversityScore = scoreCategory(diversityTokens);
+    const totalScore = mixScore * 2 + beaconScore * 2 + diversityScore * 3; // weight diversity highest
+    // Require stronger combined signal: either ≥2 mix + ≥1 beacon + ≥1 diversity, OR high diversity (≥2) plus any mix+beacon each
+    const passed = (mixScore >= 2 && beaconScore >= 1 && diversityScore >= 1) || (diversityScore >= 2 && mixScore >= 1 && beaconScore >= 1);
+    return { mixScore, beaconScore, diversityScore, totalScore, passed };
 }
 //# sourceMappingURL=heuristics.js.map
