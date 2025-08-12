@@ -58,7 +58,9 @@ export class BinaryAnalyzer {
     if (this.staticPatterns) return this.staticPatterns;
     const analysis = await this.analyze();
     try {
-      this.staticPatterns = extractStaticPatterns(analysis.strings);
+  let raw: Buffer | undefined;
+  try { raw = await fs.readFile((this as any).binaryPath); } catch {/* ignore */}
+  this.staticPatterns = extractStaticPatterns(analysis.strings, raw);
     } catch {
       this.staticPatterns = {} as StaticPatterns;
     }

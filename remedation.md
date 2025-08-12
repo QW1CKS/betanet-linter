@@ -161,7 +161,7 @@ Initial Implementation Order (Action Queue)
 1. [x] README matrix + strict/heuristic mode + check metadata.
 2. [x] Add evidence ingestion (JSON path via --evidence-file) wiring; adapt existing checks to accept external evidence.
 3. [x] Harden GitHub Action + provenance generation & reproducibility verify step. (Implemented: workflow scaffold, action SHAs pinned, provenance parsing, binary digest validation, rebuild mismatch enforcement, artifact evidence upgrade, SBOM ingestion + materials/SBOM cross-check, materials completeness flag, signature field placeholder. Future enhancement (outside Step 3 scope): real cryptographic signature verification & advanced materials policy.)
-4. [~] Static parsers (ClientHello template, Noise pattern, voucher struct) — implemented initial string-based extractors & checks (IDs 12–14); pending deeper binary section parsing & extension ordering fidelity.
+4. [x] Static parsers (ClientHello template, Noise pattern, voucher struct) — implemented enriched ALPN + TLS extension ordering hash, Noise pattern detection, voucher struct triad with proximity span; checks 12–14 produce static-structural evidence.
 5. [ ] Dynamic harness skeleton (TLS capture + fallback simulation minimal prototype).
 6. [ ] Governance & ledger evidence validation logic.
 7. [ ] Mix diversity sampling + privacy refinement.

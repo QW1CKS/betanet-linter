@@ -413,7 +413,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         name: 'TLS ClientHello Static Template',
         description: 'Extracts ALPN set/order & extension ordering hash (static approximation)',
         passed,
-        details: passed ? `✅ ALPN: ${ch!.alpn.join(', ')} hash=${ch!.extOrderSha256?.slice(0,12)}` : '❌ Insufficient ALPN evidence',
+  details: passed ? `✅ ALPN: ${ch!.alpn.join(', ')} extCount=${ch!.extensions?.length||0} hash=${ch!.extOrderSha256?.slice(0,12)}` : '❌ Insufficient ALPN evidence',
         severity: 'minor',
         evidenceType: 'static-structural'
       };
@@ -457,7 +457,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         name: 'Voucher Struct Heuristic',
         description: 'Detects presence of 128B voucher struct token triad',
         passed,
-        details: voucher ? (voucher.structLikely ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')}` : `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')}`) : '❌ No voucher struct tokens',
+  details: voucher ? (voucher.structLikely ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}`) : '❌ No voucher struct tokens',
         severity: 'minor',
         evidenceType: 'static-structural'
       };
