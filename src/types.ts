@@ -103,6 +103,7 @@ export interface IngestedEvidence {
   subjects?: { name?: string; digest?: { sha256?: string; [k: string]: string | undefined } }[]; // SLSA subjects array
   verified?: boolean; // internal flag after validation
   sourceDateEpoch?: number; // captured SOURCE_DATE_EPOCH if present
+  rebuildDigestMismatch?: boolean; // flag set when CI detects non-reproducible rebuild
   };
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder

@@ -84,6 +84,33 @@ describe('BetanetComplianceChecker', () => {
   expect(result.specSummary?.latestKnown).toBe('1.1');
   expect(result.specSummary?.implementedChecks).toBeGreaterThanOrEqual(11);
     });
+  
+    it('fails Build Provenance when rebuild mismatch flagged', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmpBin = path.join(__dirname, 'temp-existing-bin');
+      const fileBuf = await fs.readFile(tmpBin);
+      const actualDigest = require('crypto').createHash('sha256').update(fileBuf).digest('hex');
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: true, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true, rotationHits: 0 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: false, reproducible: false, provenance: false }),
+        getBinarySha256: () => Promise.resolve(actualDigest),
+        analyze: () => Promise.resolve({ strings: [], symbols: [], fileFormat: 'elf', architecture: 'x64', dependencies: [], size: 0 })
+      };
+      const evidencePath = path.join(__dirname, 'temp-evidence-mismatch.json');
+      const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest, rebuildDigestMismatch: true } };
+      await fs.writeFile(evidencePath, JSON.stringify(evidence));
+      const result = await checkerLocal.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
+      const buildProv = result.checks.find(c => c.id === 9);
+      expect(buildProv).toBeDefined();
+      expect(buildProv?.passed).toBe(false);
+      expect(buildProv?.details).toMatch(/Rebuild digest mismatch/);
+      await fs.remove(evidencePath);
+    });
 
     it('should ingest external evidence file and upgrade build provenance evidenceType', async () => {
       const checkerLocal = new BetanetComplianceChecker();

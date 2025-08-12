@@ -33,11 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        # TODO: replace with exact commit SHA for actions/checkout v4.x
-        uses: actions/checkout@v4
+        # Pinned actions/checkout@v4 (update SHA periodically)
+        uses: actions/checkout@b4ffde65f46336ab0da05f224ef0f1088f6e61b1 # v4.1.6
       - name: Setup Node
-        # TODO: pin setup-node with commit SHA
-        uses: actions/setup-node@v4
+        # Pinned actions/setup-node@v4 (update SHA periodically)
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
@@ -72,8 +72,8 @@ jobs:
           mkdir -p evidence
           cp provenance-reference.json evidence/provenance.json
       - name: Upload build artifacts
-        # TODO: pin upload-artifact with commit SHA
-        uses: actions/upload-artifact@v4
+        # Pinned actions/upload-artifact@v4
+        uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.3
         with:
           name: build-dist-${{ github.run_number }}
           path: |
@@ -83,7 +83,7 @@ jobs:
           retention-days: 7
       - name: (Placeholder) Generate SLSA Provenance
         if: steps.hash.outputs.overall_sha256
-        # TODO: pin slsa-github-generator to commit SHA
+        # Pinned slsa-framework generic generator (update as needed)
         uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
         with:
           base64-subjects: |
@@ -96,9 +96,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@b4ffde65f46336ab0da05f224ef0f1088f6e61b1 # v4.1.6
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: Install (clean)
@@ -112,8 +112,8 @@ jobs:
             sha256sum dist.sha256sum | cut -d' ' -f1 > overall.sha || true
           fi
       - name: Download original artifacts
-        # TODO: pin download-artifact with commit SHA
-        uses: actions/download-artifact@v4
+        # Pinned actions/download-artifact@v4
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           name: build-dist-${{ github.run_number }}
           path: original
