@@ -173,10 +173,13 @@ program
   .argument('<binary>', 'Path to the binary')
   .option('-o, --out <file>', 'Output evidence JSON file', 'harness-evidence.json')
   .option('-s, --scenarios <list>', 'Comma-separated scenario keys', v => v.split(',').map(x=>x.trim()).filter(Boolean))
+  .option('--probe-host <host>', 'Perform a TLS probe against host:443 (foundation for dynamic evidence)')
+  .option('--probe-port <port>', 'TLS probe port (default 443)', v => parseInt(v,10))
+  .option('--probe-timeout <ms>', 'TLS probe timeout ms (default 5000)', v => parseInt(v,10))
   .action(async (binaryPath, options) => {
     try {
       const { runHarness } = require('../src/harness');
-      const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios });
+      const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout });
       console.log(`✅ Harness evidence written to ${out}`);
     } catch (e) {
       console.error('❌ Harness error:', e.message);
