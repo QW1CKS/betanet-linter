@@ -2,7 +2,7 @@
 # Betanet Compliance Linter
 
 > **IMPORTANT – Transitional Compliance Notice (v1.0.0)**  
-> This release provides **heuristic static indicators** for all enumerated Betanet §11 requirements (1.0 baseline + emerging 1.1 deltas). It does **not** yet produce full normative (artifact / structural / dynamic) evidence. By default **strict mode** prevents a heuristic‑only pass from being treated as compliant unless you opt in with `--allow-heuristic`. The remediation roadmap (see `remedation`) tracks migration of each check toward stronger evidence classes.  
+> This release provides **heuristic static indicators** for all enumerated Betanet §11 requirements (1.0 baseline + emerging 1.1 deltas). It does **not** yet produce full normative (artifact / structural / dynamic) evidence. By default **strict mode** prevents a heuristic‑only pass from being treated as compliant unless you opt in with `--allow-heuristic`. The remediation roadmap (see [remedation.md](./remedation.md)) tracks migration of each check toward stronger evidence classes.  
 > A check currently reports `evidenceType: "heuristic"` unless explicitly upgraded (e.g. Build Provenance becomes `artifact` when external provenance JSON is supplied via `--evidence-file`).  
 > Treat PASS states as advisory; corroborate via integration / runtime testing.
 
@@ -29,7 +29,7 @@ A CLI tool that enumerates Betanet specification §11 requirement placeholders a
 This tool uses static heuristic analysis. It cannot guarantee runtime compliance or detect dynamic behaviors (e.g., live rotation, runtime-generated keys, or negotiated ciphers). See [plans.md](./plans.md) for roadmap and deferred features (e.g., dynamic probe plugins, confidence metrics).
 
 ### Strict Mode vs Heuristic Mode (Transitional)
-Current checks are classified as `heuristic` evidence. Strict mode (default) treats heuristic passes as informational only; they do not count toward an overall PASS unless you explicitly enable `--allow-heuristic`. This prevents overstating normative compliance while the remediation roadmap (see `remedation`) is in progress.
+Current checks are classified as `heuristic` evidence. Strict mode (default) treats heuristic passes as informational only; they do not count toward an overall PASS unless you explicitly enable `--allow-heuristic`. This prevents overstating normative compliance while the remediation roadmap (see [remedation.md](./remedation.md)) is in progress.
 
 CLI flags:
 ```
@@ -62,7 +62,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |12 Anti-correlation fallback behavior | (planned) | – | Missing | Not implemented |
 |13 Reproducible builds + SLSA3 provenance | 9 | heuristic | Partial | Keyword presence only |
 
-All “Partial” / “Shallow” rows will migrate to structural, dynamic, or artifact evidence per `remedation` roadmap.
+All “Partial” / “Shallow” rows will migrate to structural, dynamic, or artifact evidence per [remedation.md](./remedation.md) roadmap.
 
 ## License
 
@@ -225,7 +225,7 @@ Static binary analysis cannot fully confirm dynamic behaviors introduced in Beta
 | Dynamic runtime probe / plugin mode | Deferred | Future (ISSUE-059) |
 
 ### Spec Coverage Summary
-The tool enumerates Betanet 1.0 checks and provides heuristic indicators for each; emerging 1.1 deltas (transport versions, rendezvous rotation signals, privacy hop weighting, optional WebRTC) are likewise heuristic. Normative (non‑heuristic) evidence classes will incrementally land in upcoming minor releases (see `remedation`). Runtime output includes a spec coverage header, e.g.:
+The tool enumerates Betanet 1.0 checks and provides heuristic indicators for each; emerging 1.1 deltas (transport versions, rendezvous rotation signals, privacy hop weighting, optional WebRTC) are likewise heuristic. Normative (non‑heuristic) evidence classes will incrementally land in upcoming minor releases (see [remedation.md](./remedation.md)). Runtime output includes a spec coverage header, e.g.:
 
 ```
 Spec Coverage: baseline 1.0 enumerated (heuristic); latest known 1.1 heuristic signals present 11/11
