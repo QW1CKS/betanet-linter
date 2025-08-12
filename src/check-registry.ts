@@ -383,16 +383,30 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const analysis = await analyzer.analyze();
       const evaluation = evaluatePrivacyTokens(analysis.strings);
-      const passed = evaluation.passed;
+      const ev: any = (analyzer as any).evidence;
+      const mix = ev?.mix;
+      // If mix evidence present, treat as dynamic-protocol upgrade and enforce hop depth
+      let dynamicUpgrade = false;
+      let passed = evaluation.passed;
+      let detailParts: string[] = [];
+      if (mix && typeof mix === 'object') {
+        dynamicUpgrade = true;
+        const minLen = Math.min(...(mix.pathLengths || []));
+        const hopDepthOk = minLen >= 2; // strict future: require >=3 for strict mode
+        passed = passed && hopDepthOk && (mix.uniquenessRatio ? mix.uniquenessRatio >= 0.7 : true);
+        detailParts.push(`hopDepthMin=${minLen}`);
+        if (mix.uniquenessRatio !== undefined) detailParts.push(`uniqueness=${(mix.uniquenessRatio*100).toFixed(1)}%`);
+        if (mix.diversityIndex !== undefined) detailParts.push(`divIdx=${(mix.diversityIndex*100).toFixed(1)}%`);
+      }
+      detailParts.unshift(`mix=${evaluation.mixScore} beacon=${evaluation.beaconScore} diversity=${evaluation.diversityScore} total=${evaluation.totalScore}`);
       return {
         id: 11,
         name: 'Privacy Hop Enforcement',
         description: 'Enforces ≥2 (balanced) or ≥3 (strict) mixnet hops with BeaconSet-based diversity',
         passed,
-        details: passed ? `✅ Privacy weighting ok (mix=${evaluation.mixScore} beacon=${evaluation.beaconScore} diversity=${evaluation.diversityScore} total=${evaluation.totalScore})` :
-          `❌ Privacy indicators insufficient (mix=${evaluation.mixScore} beacon=${evaluation.beaconScore} diversity=${evaluation.diversityScore})`,
+        details: passed ? `✅ Privacy evidence ok (${detailParts.join(' | ')})` : `❌ Privacy insufficient (${detailParts.join(' | ')})`,
         severity: 'major',
-        evidenceType: 'heuristic'
+        evidenceType: dynamicUpgrade ? 'dynamic-protocol' : 'heuristic'
       };
     }
   }
@@ -550,14 +564,22 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       let passed = false;
       let details = '❌ No mix diversity evidence';
       if (mix && typeof mix === 'object') {
-        const samples = mix.samples || 0;
-        const unique = mix.uniqueHopSets || 0;
-        const uniquenessRatio = samples > 0 ? unique / samples : 0;
-        const balancedOk = mix.minHopsBalanced ? true : true; // placeholder acceptance (actual hop depth future validation)
-        // Policy: ≥8 samples OR uniqueness ratio ≥0.7 if fewer; target uniqueness ≥0.8 when samples≥10
-        const uniquenessOk = samples >= 10 ? uniquenessRatio >= 0.8 : uniquenessRatio >= 0.7;
-        passed = samples > 0 && uniquenessOk && balancedOk;
-        details = passed ? `✅ Mix diversity unique=${unique}/${samples} (${(uniquenessRatio*100).toFixed(1)}%)` : `❌ Mix diversity insufficient (unique=${unique}/${samples} ${(uniquenessRatio*100).toFixed(1)}%)`;
+        const samples: number = mix.samples || 0;
+        const unique: number = mix.uniqueHopSets || 0;
+        const ratio = samples ? unique / samples : 0;
+        const pathLengths: number[] = mix.pathLengths || [];
+        const minLen = pathLengths.length ? Math.min(...pathLengths) : 0;
+        const depthOk = minLen >= (mix.minHopsBalanced || 2);
+        // Uniqueness thresholds scale with sample size
+        let required = 0.8;
+        if (samples < 10) required = 0.7;
+        if (samples < 6) required = 0.6;
+        const uniquenessOk = ratio >= required;
+        const diversityIndex = mix.diversityIndex || 0; // require some baseline dispersion
+        const diversityOk = diversityIndex >= 0.4; // crude threshold
+        passed = samples >= 5 && depthOk && uniquenessOk && diversityOk;
+        details = passed ? `✅ unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}%` :
+          `❌ Mix diversity insufficient unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}%`;
       }
       return { id: 17, name: 'Mix Diversity Sampling', description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth policy', passed, details, severity: 'major', evidenceType: mix ? 'dynamic-protocol' : 'heuristic' };
     }

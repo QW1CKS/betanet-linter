@@ -182,10 +182,13 @@ program
   .option('--fallback-tcp-port <port>', 'TCP port for fallback simulation (default 443)', v => parseInt(v,10))
   .option('--fallback-udp-timeout <ms>', 'UDP wait before TCP retry (default 300)', v => parseInt(v,10))
   .option('--cover-connections <n>', 'Simulated cover TCP connections after main fallback', v => parseInt(v,10))
+  .option('--mix-samples <n>', 'Simulate mix path sampling (number of samples)', v => parseInt(v,10))
+  .option('--mix-hops-range <a,b>', 'Range of hops per path (e.g. 2,4)', v => v.split(',').map(x=>parseInt(x,10)).slice(0,2))
+  .option('--mix-deterministic', 'Deterministic pseudo-random mix sampling for reproducible CI')
   .action(async (binaryPath, options) => {
     try {
       const { runHarness } = require('../src/harness');
-  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections });
+  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections, mixSamples: options.mixSamples, mixHopsRange: options.mixHopsRange, mixDeterministic: options.mixDeterministic });
       console.log(`✅ Harness evidence written to ${out}`);
     } catch (e) {
       console.error('❌ Harness error:', e.message);

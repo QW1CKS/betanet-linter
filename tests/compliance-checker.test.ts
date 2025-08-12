@@ -1112,8 +1112,12 @@ describe('BetanetComplianceChecker', () => {
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
       };
       const evidencePath = path.join(__dirname, 'temp-evidence-mix.json');
-      const hopSets = [ ['A','B','C'], ['A','B','D'], ['B','C','E'], ['C','D','E'], ['D','E','F'], ['E','F','G'], ['F','G','H'], ['G','H','I'], ['H','I','J'], ['I','J','K'] ];
-      const evidence = { mix: { samples: hopSets.length, uniqueHopSets: hopSets.length, hopSets, minHopsBalanced: 2, minHopsStrict: 3 } };
+  const hopSets = [ ['A','B','C'], ['A','D','E'], ['B','F','G'], ['C','H','I'], ['D','J','K'], ['E','L','M'], ['F','N','O'], ['G','P','Q'], ['H','R','S'], ['I','T','U'] ];
+  // Compute diversity index for test (all nodes unique except overlaps in first position)
+  const flat = hopSets.flat();
+  const uniqueNodes = new Set(flat).size;
+  const diversityIndex = uniqueNodes / flat.length; // should be high
+  const evidence = { mix: { samples: hopSets.length, uniqueHopSets: hopSets.length, hopSets, minHopsBalanced: 2, minHopsStrict: 3, pathLengths: hopSets.map(h=>h.length), uniquenessRatio: 1.0, diversityIndex } };
       await fs.writeFile(evidencePath, JSON.stringify(evidence));
       const result = await checkerLocal.checkCompliance(tmp, { evidenceFile: evidencePath, allowHeuristic: true });
       const mixCheck = result.checks.find(c => c.id === 17);

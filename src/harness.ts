@@ -75,6 +75,7 @@ export interface HarnessOptions {
   coverConnections?: number; // simulated cover connection count
   mixSamples?: number; // number of simulated mix path samples to generate
   mixHopsRange?: [number, number]; // inclusive range of hops per path (e.g., [2,4])
+  mixDeterministic?: boolean; // if true, use seeded patterns for reproducibility
 }
 
 export interface HarnessEvidence {
@@ -180,26 +181,42 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
   if (opts.mixSamples && opts.mixSamples > 0) {
     const hopSets: string[][] = [];
     const range: [number, number] = opts.mixHopsRange || [2, 4];
+    const rng = (() => {
+      if (!opts.mixDeterministic) return Math.random;
+      // simple LCG for reproducibility
+      let seed = 1337;
+      return () => { seed = (seed * 1664525 + 1013904223) % 0xffffffff; return seed / 0xffffffff; };
+    })();
     for (let i = 0; i < opts.mixSamples; i++) {
-      const hopCount = Math.max(range[0], Math.min(range[1], range[0] + Math.floor(Math.random() * (range[1]-range[0]+1))));
-      const hops = [] as string[];
+      const hopCount = Math.max(range[0], Math.min(range[1], range[0] + Math.floor(rng() * (range[1]-range[0]+1))));
+      const hops: string[] = [];
       for (let h = 0; h < hopCount; h++) {
-        // Simulate AS/Org encoded hop identifier e.g., AS123-OrgA-nodeX
-        const asn = 100 + Math.floor(Math.random() * 10); // 10 AS variants
-        const org = String.fromCharCode(65 + (asn % 6)); // OrgA..OrgF
-        const node = 'n' + Math.floor(Math.random() * 50);
+        const asn = 100 + Math.floor(rng() * 10); // 10 AS variants
+        const org = String.fromCharCode(65 + (asn % 6));
+        const node = 'n' + Math.floor(rng() * 50);
         hops.push(`AS${asn}-${org}-${node}`);
       }
       hopSets.push(hops);
     }
-    const uniqueSet = new Set(hopSets.map(h => h.join('>')));
+    const joined = hopSets.map(h => h.join('>'));
+    const uniqueSet = new Set(joined);
+    const pathLengths = hopSets.map(h => h.length);
+    const duplicates = hopSets.length - uniqueSet.size;
+    const allHopsFlat = hopSets.flat();
+    const uniqueNodes = new Set(allHopsFlat).size;
+    const diversityIndex = allHopsFlat.length ? uniqueNodes / allHopsFlat.length : 0; // crude measure
     evidence.mix = {
       samples: hopSets.length,
       uniqueHopSets: uniqueSet.size,
       hopSets,
       minHopsBalanced: 2,
-      minHopsStrict: 3
-    };
+      minHopsStrict: 3,
+      // extra metrics (forward compatible; consumer may ignore)
+      pathLengths,
+      duplicateHopSets: duplicates,
+      uniquenessRatio: hopSets.length ? uniqueSet.size / hopSets.length : 0,
+      diversityIndex
+    } as any;
   }
   await fs.writeFile(outFile, JSON.stringify(evidence, null, 2));
   return outFile;
