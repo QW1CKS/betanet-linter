@@ -140,6 +140,14 @@ export class BetanetComplianceChecker {
     (result as any).strictMode = strictMode;
     (result as any).allowHeuristic = allowHeuristic;
     (result as any).heuristicContributionCount = heuristicContributionCount;
+    // Phase 0 requirement: emit warning when heuristic passes present
+    const warnings: string[] = [];
+    if (heuristicContributionCount > 0 && strictMode && !allowHeuristic) {
+      warnings.push(`Heuristic-only evidence: ${heuristicContributionCount} check(s) passed with heuristic evidence and were excluded from compliance scoring. Add normative evidence or use --allow-heuristic to treat them as provisional.`);
+    } else if (heuristicContributionCount > 0 && allowHeuristic) {
+      warnings.push(`Heuristic evidence counted: ${heuristicContributionCount} check(s) rely solely on heuristic signals. Consider providing structural/dynamic/artifact evidence for strict compliance.`);
+    }
+    if (warnings.length) (result as any).warnings = warnings;
     result.parallelDurationMs = parallelDurationMs; result.checkTimings = checkTimings; if (process.env.BETANET_FAIL_ON_DEGRADED === '1' && result.diagnostics?.degraded) result.passed = false; return result;
   }
 
@@ -273,6 +281,11 @@ export class BetanetComplianceChecker {
       if (s.pendingIssues && s.pendingIssues.length) {
         console.log('Pending 1.1 refinements: ' + s.pendingIssues.map(p => p.id).join(', '));
       }
+      console.log('-'.repeat(60));
+    }
+    if ((results as any).warnings && (results as any).warnings.length) {
+      console.log('⚠️  WARNINGS:');
+      (results as any).warnings.forEach((w: string) => console.log(` - ${w}`));
       console.log('-'.repeat(60));
     }
     if (results.diagnostics?.degraded) {
