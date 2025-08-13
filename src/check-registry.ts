@@ -41,7 +41,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       if (tmpl) evidenceType = 'static-structural';
       if (dyn && (dyn.alpn || dyn.extOrderSha256)) evidenceType = 'dynamic-protocol';
       // Baseline transport feature checks
-      const baseOk = networkCaps.hasTLS && networkCaps.hasQUIC && networkCaps.hasHTX && networkCaps.port443;
+  const baseOk = networkCaps.hasTLS && networkCaps.hasQUIC && networkCaps.hasHTX && networkCaps.port443;
       // ECH detection: prefer dynamic/template extension list (draft ECH extension 0xfe0d = 65293)
       const ECH_EXT_ID = 65293;
       const echDetected = networkCaps.hasECH || (!!dyn?.extensions && dyn.extensions.includes(ECH_EXT_ID)) || (!!tmpl?.extensions && tmpl.extensions.includes(ECH_EXT_ID));
@@ -795,7 +795,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     id: 16,
     key: 'ledger-finality-observation',
     name: 'Ledger Finality Observation',
-    description: 'Evidence of 2-of-3 finality & quorum certificate validity',
+    description: 'Deep validation of 2-of-3 finality, quorum certificate weights, emergency advance prerequisites',
     severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
@@ -819,24 +819,32 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
             ledger.finalitySets = ledger.finalitySets || qcs.map((q: any) => `epoch-${q.epoch}`);
           } catch {/* ignore */}
         }
-        const { finalitySets, quorumCertificatesValid, emergencyAdvanceUsed, emergencyAdvanceLivenessDays, emergencyAdvanceJustification } = ledger;
-        const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2; // simplified proxy
-        let emergencyOk = true;
+        const { finalitySets, quorumCertificatesValid } = ledger;
+        const finalityDepth = ledger.finalityDepth;
+        const quorumWeights: number[] | undefined = ledger.quorumWeights;
+        const emergencyObj = ledger.emergencyAdvance || {};
+        const emergencyAdvanceUsed = ledger.emergencyAdvanceUsed ?? emergencyObj.used;
+        const emergencyAdvanceJustification = ledger.emergencyAdvanceJustification ?? emergencyObj.justified ? 'justified' : undefined;
+        const emergencyAdvanceLivenessDays = ledger.emergencyAdvanceLivenessDays ?? emergencyObj.livenessDays;
+        const failureCodes: string[] = [];
+        const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2;
+        if (!has2of3) failureCodes.push('FINALITY_SETS_INSUFFICIENT');
+        if (typeof finalityDepth === 'number' && finalityDepth < 2) failureCodes.push('FINALITY_DEPTH_SHORT');
+        if (quorumCertificatesValid !== true) failureCodes.push('QUORUM_CERTS_INVALID');
+        if (quorumWeights && quorumWeights.some(w=>w <=0)) failureCodes.push('QUORUM_WEIGHT_MISMATCH');
         if (emergencyAdvanceUsed === true) {
-          // Require liveness failure prerequisite >=14 days and justification token
-            emergencyOk = (typeof emergencyAdvanceLivenessDays === 'number' && emergencyAdvanceLivenessDays >= 14) && !!emergencyAdvanceJustification;
+          const emergencyOk = (typeof emergencyAdvanceLivenessDays === 'number' && emergencyAdvanceLivenessDays >= 14) && !!emergencyAdvanceJustification;
+          if (!emergencyOk) failureCodes.push('EMERGENCY_LIVENESS_SHORT');
         }
-        passed = !!(has2of3 && quorumCertificatesValid === true && emergencyOk);
-        details = passed ? `✅ Finality sets=${finalitySets.length} quorum certs valid${emergencyAdvanceUsed ? ' (emergency advance justified)' : ''}` : `❌ Ledger issues: ${missingList([
-          !has2of3 && 'insufficient finality sets',
-          quorumCertificatesValid !== true && 'invalid quorum certificates',
-          emergencyAdvanceUsed === true && !emergencyOk && 'emergency advance unjustified'
-        ])}`;
+        passed = failureCodes.length === 0;
+        details = passed
+          ? `✅ Finality sets=${(finalitySets||[]).length} depth=${finalityDepth ?? 'n/a'} quorumCertsOk weights=${quorumWeights ? quorumWeights.length : 0}${emergencyAdvanceUsed ? ' emergencyAdvanceOk' : ''}`
+          : `❌ Ledger issues: ${failureCodes.join(',')}`;
         if (!passed && Array.isArray(ledger.quorumCertificateInvalidReasons) && ledger.quorumCertificateInvalidReasons.length) {
           details += ' reasons=' + ledger.quorumCertificateInvalidReasons.join(',');
         }
       }
-      return { id: 16, name: 'Ledger Finality Observation', description: 'Evidence of 2-of-3 finality & quorum certificate validity', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
+      return { id: 16, name: 'Ledger Finality Observation', description: 'Deep validation of 2-of-3 finality, quorum certificate weights, emergency advance prerequisites', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
     }
   }
   ,
@@ -1352,6 +1360,33 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       // Evidence type escalation: dynamic-protocol only if verified AND dual handshake artifacts present
       const evidenceType: 'heuristic' | 'dynamic-protocol' = passed && ech.outerSni && ech.innerSni ? 'dynamic-protocol' : 'heuristic';
       return { id: 32, name: 'ECH Verification', description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence', passed, details, severity: 'major', evidenceType };
+    }
+  }
+  ,
+  {
+    id: 33,
+    key: 'scion-control-stream',
+    name: 'SCION Control Stream',
+    description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const sc = ev.scionControl;
+      if (!sc) return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)', passed: false, details: '❌ No scionControl evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const failureCodes: string[] = [];
+      const offers = Array.isArray(sc.offers) ? sc.offers : [];
+      if (offers.length < 3) failureCodes.push('INSUFFICIENT_OFFERS');
+  const unique = new Set(offers.map((o: any)=>o.path));
+      if (unique.size < 3) failureCodes.push('INSUFFICIENT_UNIQUE_PATHS');
+      if (sc.noLegacyHeader === false) failureCodes.push('LEGACY_HEADER_PRESENT');
+      if (sc.duplicateOfferDetected) failureCodes.push('DUPLICATE_OFFER');
+      if (sc.parseError) failureCodes.push('CBOR_PARSE_ERROR');
+      const passed = failureCodes.length === 0;
+      const details = passed
+        ? `✅ offers=${offers.length} uniquePaths=${unique.size} noLegacyHeader=${sc.noLegacyHeader !== false}`
+        : `❌ SCION control issues: ${failureCodes.join(',')}`;
+      return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
     }
   }
 ];

@@ -237,10 +237,100 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 5: SCION Gateway Control-Stream & CBOR Validation
-  test.todo('Task 5: Implement tests feeding scionControl CBOR (≥3 offers, ≥3 uniquePaths, noLegacyHeader) + malformed & duplicate path negative cases.');
+  describe('Task 5: SCION Gateway Control-Stream & CBOR Validation (Check 33)', () => {
+    function analyzerForScion(sc: any) {
+      return {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['scion','gateway','cbor','offer'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        evidence: { scionControl: sc }
+      } as any;
+    }
+
+    it('passes with ≥3 offers & unique paths and no legacy header', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', latencyMs: 10 }, { path: '1-ff00:0:111', latencyMs: 12 }, { path: '1-ff00:0:112', latencyMs: 14 } ], uniquePaths: 3, noLegacyHeader: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(true);
+    });
+
+    it('fails with insufficient offers', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' } ], uniquePaths: 2, noLegacyHeader: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/INSUFFICIENT_OFFERS/);
+    });
+
+    it('fails with duplicate offer paths', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' } ], uniquePaths: 2, noLegacyHeader: true, duplicateOfferDetected: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/DUPLICATE_OFFER/);
+    });
+
+    it('fails when legacy header present', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' }, { path: '1-ff00:0:112' } ], uniquePaths: 3, noLegacyHeader: false };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/LEGACY_HEADER_PRESENT/);
+    });
+  });
 
   // Task 6: Chain Finality & Emergency Advance Deep Validation
-  test.todo('Task 6: Implement tests for finalityDepth >= required, quorumWeights sum match, emergencyAdvance livenessDays ≥14 + justification; failure codes FINALITY_DEPTH_SHORT / EMERGENCY_LIVENESS_SHORT / QUORUM_WEIGHT_MISMATCH.');
+  describe('Task 6: Chain Finality & Emergency Advance Deep Validation (Check 16 enhanced)', () => {
+    function analyzerForLedger(ledger: any) {
+      return {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['ledger','finality','quorum'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        evidence: { ledger }
+      } as any;
+    }
+
+    it('passes with sufficient finality sets, depth, quorum certs valid, justified emergency advance', async () => {
+      const ledger = { finalitySets: ['epoch-1','epoch-2','epoch-3'], finalityDepth: 3, quorumCertificatesValid: true, quorumWeights: [10,11,12], emergencyAdvanceUsed: true, emergencyAdvanceLivenessDays: 20, emergencyAdvanceJustification: 'justified' };
+      const result = await runWithAnalyzer(analyzerForLedger(ledger));
+      const check16 = result.checks.find(c => c.id === 16)!;
+      expect(check16.passed).toBe(true);
+    });
+
+    it('fails with FINALITY_DEPTH_SHORT', async () => {
+      const ledger = { finalitySets: ['epoch-1','epoch-2'], finalityDepth: 1, quorumCertificatesValid: true };
+      const result = await runWithAnalyzer(analyzerForLedger(ledger));
+      const check16 = result.checks.find(c => c.id === 16)!;
+      expect(check16.passed).toBe(false);
+      expect(check16.details).toMatch(/FINALITY_DEPTH_SHORT/);
+    });
+
+    it('fails with EMERGENCY_LIVENESS_SHORT when emergency advance unjustified', async () => {
+      const ledger = { finalitySets: ['epoch-1','epoch-2'], finalityDepth: 2, quorumCertificatesValid: true, emergencyAdvanceUsed: true, emergencyAdvanceLivenessDays: 5 };
+      const result = await runWithAnalyzer(analyzerForLedger(ledger));
+      const check16 = result.checks.find(c => c.id === 16)!;
+      expect(check16.passed).toBe(false);
+      expect(check16.details).toMatch(/EMERGENCY_LIVENESS_SHORT/);
+    });
+
+    it('fails with QUORUM_WEIGHT_MISMATCH when a weight is non-positive', async () => {
+      const ledger = { finalitySets: ['epoch-1','epoch-2'], finalityDepth: 2, quorumCertificatesValid: true, quorumWeights: [10,0,12] };
+      const result = await runWithAnalyzer(analyzerForLedger(ledger));
+      const check16 = result.checks.find(c => c.id === 16)!;
+      expect(check16.passed).toBe(false);
+      expect(check16.details).toMatch(/QUORUM_WEIGHT_MISMATCH/);
+    });
+  });
 
   // Task 7: Governance ACK Span & Partition Safety Dataset
   test.todo('Task 7: Implement tests for 7*24 point historical diversity dataset with volatility/maxWindowShare/maxDeltaShare thresholds; degrade scenario triggers PARTITION_DEGRADATION.');

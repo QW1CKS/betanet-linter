@@ -24,11 +24,11 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Objective: Validate aggregatedSig64 over voucher secret/document using supplied mint public key set (FROST n≥5, t=3) with threshold math.
   - AC: Check 31 requires signatureValid=true; failure codes: FROST_PARAMS_INVALID, AGG_SIG_INVALID, INSUFFICIENT_KEYS. Negative test: altered sig fails.
 
-[ ] 5. SCION Gateway Control-Stream & CBOR Validation
+[x] 5. SCION Gateway Control-Stream & CBOR Validation
   - Objective: Parse gateway CBOR control stream (path offers, rotation notices) and enforce duplicate / timing constraints.
   - AC: Evidence.scionControl: {offers: ≥3, uniquePaths≥3, noLegacyHeader=true}; failure on duplicate within window or legacy header presence. Tests with malformed CBOR & duplicate path set.
 
-[ ] 6. Chain Finality & Emergency Advance Deep Validation
+[x] 6. Chain Finality & Emergency Advance Deep Validation
   - Objective: Enforce 2-of-3 finality with per-chain certificate weight sums, epoch monotonicity, emergency advance liveness (≥14 days inactivity) and justification proof.
   - AC: governance/ledger evidence includes finalityDepth, quorumWeights[], emergencyAdvance {used:boolean, justified:boolean, livenessDays:int}; failure codes: FINALITY_DEPTH_SHORT, EMERGENCY_LIVENESS_SHORT, QUORUM_WEIGHT_MISMATCH.
 

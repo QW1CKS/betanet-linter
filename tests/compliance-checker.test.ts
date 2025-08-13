@@ -993,7 +993,7 @@ describe('BetanetComplianceChecker', () => {
     expect(govCheck?.passed).toBe(true);
     expect(govCheck?.details).toMatch(/Caps enforced/);
     expect(ledgerCheck?.passed).toBe(true);
-    expect(ledgerCheck?.details).toMatch(/quorum certs valid/);
+  expect(ledgerCheck?.details).toMatch(/Finality sets=2/);
     await fs.remove(govFile); await fs.remove(tmp);
   });
 

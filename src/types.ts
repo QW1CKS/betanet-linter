@@ -27,6 +27,15 @@ export interface Evidence {
     pqDateOk?: boolean;
     withinPolicy?: boolean;
   };
+  scionControl?: {
+    offers?: { path: string; latencyMs?: number; expiresAt?: string }[];
+    rawCborB64?: string; // original CBOR for auditing
+    uniquePaths?: number;
+    noLegacyHeader?: boolean;
+    duplicateOfferDetected?: boolean;
+    duplicateWindowSec?: number;
+    parseError?: string;
+  };
 }
 export interface ComplianceCheck {
   id: number;
@@ -228,7 +237,18 @@ export interface IngestedEvidence {
     withinPolicy?: boolean;
   };
   governance?: any; // Phase 6 governance snapshot evidence
-  ledger?: any; // Phase 6 ledger observation evidence
+  ledger?: {
+    finalitySets?: string[];
+    quorumCertificatesValid?: boolean;
+    quorumCertificatesCbor?: string[]; // base64 encoded CBOR blobs
+    quorumCertificateInvalidReasons?: string[];
+    finalityDepth?: number; // observed confirmation depth
+    quorumWeights?: number[]; // weight sums per epoch/chain
+    emergencyAdvanceUsed?: boolean;
+    emergencyAdvanceJustification?: string;
+    emergencyAdvanceLivenessDays?: number;
+    emergencyAdvance?: { used?: boolean; justified?: boolean; livenessDays?: number };
+  };
   governanceHistoricalDiversity?: {
     // Time-series of AS share distributions: array of { timestamp, asShares: { [as: string]: number } }
     series?: { timestamp: string; asShares: Record<string, number> }[];
