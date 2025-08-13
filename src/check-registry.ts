@@ -32,14 +32,52 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const networkCaps = await analyzer.checkNetworkCapabilities();
-      const passed = networkCaps.hasTLS && networkCaps.hasQUIC && networkCaps.hasHTX && networkCaps.hasECH && networkCaps.port443;
-      const details = passed ? '✅ HTX over TCP+QUIC with TLS1.3 mimic & ECH present' : `❌ Missing: ${missingList([
-        !networkCaps.hasTLS && 'TLS',
-        !networkCaps.hasQUIC && 'QUIC',
-        !networkCaps.hasHTX && 'HTX',
-        !networkCaps.hasECH && 'ECH',
-        !networkCaps.port443 && 'port 443'
-      ])}`;
+  const ev: any = (analyzer as any).evidence || {};
+  const tmpl = ev.clientHelloTemplate; // static template evidence
+  const dyn = ev.dynamicClientHelloCapture; // dynamic calibration evidence
+      // Determine evidence type escalation
+      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
+      if (tmpl) evidenceType = 'static-structural';
+      if (dyn && (dyn.alpn || dyn.extOrderSha256)) evidenceType = 'dynamic-protocol';
+      // Baseline transport feature checks
+      const baseOk = networkCaps.hasTLS && networkCaps.hasQUIC && networkCaps.hasHTX && networkCaps.port443;
+      // ECH detection: prefer dynamic/template extension list (draft ECH extension 0xfe0d = 65293)
+      const ECH_EXT_ID = 65293;
+      const echDetected = networkCaps.hasECH || (!!dyn?.extensions && dyn.extensions.includes(ECH_EXT_ID)) || (!!tmpl?.extensions && tmpl.extensions.includes(ECH_EXT_ID));
+      // Calibration requirement when dynamic present: dynamic must match static template (if template exists) and have matching ext hash / ALPN
+      let calibrationOk = true;
+      let calibrationNote = '';
+      if (evidenceType === 'dynamic-protocol') {
+        // If we have both static & dynamic require match
+        if (tmpl && dyn) {
+          const alpnMatch = Array.isArray(tmpl.alpn) && Array.isArray(dyn.alpn) && tmpl.alpn.join(',') === dyn.alpn.join(',');
+          const extHashMatch = tmpl.extOrderSha256 && dyn.extOrderSha256 && tmpl.extOrderSha256 === dyn.extOrderSha256;
+          calibrationOk = alpnMatch && extHashMatch && dyn.matchStaticTemplate !== false; // dyn.matchStaticTemplate should be true/undefined
+          if (!calibrationOk) {
+            calibrationNote = dyn.note ? ` mismatch:${dyn.note}` : ' mismatch:calibration';
+          }
+        }
+      } else if (evidenceType === 'static-structural') {
+        // Static structural requires minimally complete template
+        calibrationOk = tmpl && Array.isArray(tmpl.alpn) && tmpl.alpn.length >= 2 && !!tmpl.extOrderSha256;
+        if (!calibrationOk) calibrationNote = ' incomplete-static-template';
+      }
+      const passed = baseOk && echDetected && calibrationOk;
+      const missingParts: string[] = [];
+      if (!networkCaps.hasTLS) missingParts.push('TLS');
+      if (!networkCaps.hasQUIC) missingParts.push('QUIC');
+      if (!networkCaps.hasHTX) missingParts.push('HTX');
+      if (!networkCaps.port443) missingParts.push('port 443');
+      if (!echDetected) missingParts.push('ECH');
+      if (!calibrationOk) missingParts.push('calibration');
+      let details: string;
+      if (passed) {
+        const mode = evidenceType === 'dynamic-protocol' ? 'dynamic-calibrated' : (evidenceType === 'static-structural' ? 'static-template' : 'heuristic');
+        const ja3h = dyn?.ja3Hash ? dyn.ja3Hash.slice(0,12) : (dyn?.ja3 ? dyn.ja3.slice(0,16) : undefined);
+        details = `✅ HTX TCP+QUIC + TLS1.3 mimic & ECH (${mode}${ja3h ? ' ja3='+ja3h : ''}${calibrationNote})`;
+      } else {
+        details = `❌ Missing: ${missingList(missingParts)}${calibrationNote}`;
+      }
       return {
         id: 1,
         name: 'HTX over TCP-443 & QUIC-443',
@@ -47,7 +85,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         passed,
         details,
         severity: 'critical',
-        evidenceType: 'heuristic'
+        evidenceType
       };
     }
   },

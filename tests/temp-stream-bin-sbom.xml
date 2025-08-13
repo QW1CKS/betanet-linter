@@ -1,14 +1,10 @@
 <bom xmlns="http://cyclonedx.org/schema/bom/1.4" version="1">
   <metadata>
-    <timestamp>2025-08-13T11:36:34.528Z</timestamp>
+    <timestamp>2025-08-13T11:56:03.430Z</timestamp>
     <component>
       <name>temp-stream-bin</name>
       <version>1.0.0</version>
       <type>application</type>
-      <purl>pkg:generic/temp-stream-bin@1.0.0</purl>
-      <hashes>
-        <hash alg="SHA-256"></hash>
-      </hashes>
     </component>
   </metadata>
 </bom>

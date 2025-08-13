@@ -22,6 +22,8 @@ export interface ComplianceResult {
     failed: number;
     critical: number;
   };
+  // Normative §11 spec item aggregation (13 canonical items)
+  specItems?: SpecItemResult[]; // synthesized from underlying checks & evidence
   multiSignal?: {
     passedHeuristic: number;
     passedStatic: number;
@@ -42,6 +44,18 @@ export interface ComplianceResult {
   diagnostics?: AnalyzerDiagnostics;
   checkTimings?: { id: number; durationMs: number }[];
   parallelDurationMs?: number; // total wall-clock duration of parallel evaluation phase
+}
+
+// Aggregated normative spec item status
+export interface SpecItemResult {
+  id: number; // 1..13 canonical ordering of §11 items
+  key: string; // stable key (e.g., transport-calibration, access-tickets, noise-rekey, http-adaptive, scion-bridging ...)
+  name: string; // human readable title
+  status: 'full' | 'partial' | 'missing'; // full = all required normative signals satisfied; partial = some evidence present; missing = none
+  passed: boolean; // convenience (true only when status === 'full')
+  reasons: string[]; // unmet requirement notes when partial/missing
+  evidenceTypes: string[]; // distinct evidence categories contributing (heuristic/static-structural/dynamic-protocol/artifact)
+  checks: number[]; // underlying check IDs contributing to evaluation
 }
 
 export interface SBOMComponent {
