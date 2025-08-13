@@ -107,7 +107,7 @@ export interface HarnessEvidence {
   dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; ja3Hash?: string; ja3Canonical?: string; ja4?: string; rawClientHelloB64?: string; rawClientHelloCanonicalB64?: string; rawClientHelloCanonicalHash?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
   // (Phase 7 extension) ja3Hash added to dynamicClientHelloCapture; keep interface loose via index signature if needed
   calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
-  quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number; scil?: number; tokenLength?: number; odcil?: number }; rawInitialB64?: string };
+  quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number; scil?: number; tokenLength?: number; lengthField?: number; versionNegotiation?: boolean; retry?: boolean; versionsOffered?: string[]; odcil?: number }; rawInitialB64?: string; responseRawB64?: string };
   statisticalJitter?: { meanMs: number; p95Ms: number; stdDevMs: number; samples: number; withinTarget?: boolean };
   meta: { generated: string; scenarios: string[] };
 }
@@ -556,12 +556,14 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       0x00, // token length varint (0)
       0x00  // length varint (0)
     ]);
-    await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve) => {
       try {
         socket.on('message', (msg) => {
           if (!settled) {
             initial.responseBytes = msg.length;
             initial.responseWithinMs = Date.now() - start;
+      // Capture raw response for future deeper parsing
+      initial.responseRawB64 = msg.toString('base64');
             settled = true;
             try { socket.close(); } catch { /* ignore */ }
             resolve();
@@ -593,7 +595,20 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
         resolve();
       }
     });
-    // Basic parse: derive version from bytes 1-4
+    // Basic parse (sent packet + potential response classification)
+    function decodeVarInt(buf: Buffer, offset: number): { value: number; bytes: number } | null {
+      if (offset >= buf.length) return null;
+      const first = buf[offset];
+      const prefix = first >> 6; // 2 bits
+      let length = 1 << prefix; // 1,2,4,8
+      if (offset + length > buf.length) return null;
+      let value = first & (prefix === 0 ? 0x3f : prefix === 1 ? 0x3f : prefix === 2 ? 0x3f : 0x3f);
+      // Simplified: for >1 byte lengths, accumulate remaining bytes
+      for (let i = 1; i < length; i++) {
+        value = (value << 8) | buf[offset + i];
+      }
+      return { value, bytes: length };
+    }
     if (!initial.error && initial.udpSent) {
       try {
         const raw = quicProbe; // what we sent
@@ -603,13 +618,52 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
           const scilIndex = 6 + dcil; // after DCID len + DCID
           const scil = raw[scilIndex];
           const tokenLenIndex = scilIndex + 1 + scil; // after SCID len + SCID
-          const tokenLength = raw[tokenLenIndex];
-          initial.parsed = { version, dcil, scil, tokenLength, odcil: dcil };
+          let tokenLength = raw[tokenLenIndex];
+          let cursor = tokenLenIndex + 1;
+          let lengthField: number | undefined;
+          const lenDecoded = decodeVarInt(raw, cursor);
+          if (lenDecoded) {
+            lengthField = lenDecoded.value;
+            cursor += lenDecoded.bytes;
+          }
+          initial.parsed = { version, dcil, scil, tokenLength, lengthField, odcil: dcil };
         } else {
           initial.parsed = { version: '0x00000001' };
         }
       } catch {
         initial.parsed = { version: '0x00000001' };
+      }
+      // Attempt to classify response if present
+      if (initial.responseRawB64) {
+        try {
+          const resp = Buffer.from(initial.responseRawB64, 'base64');
+          if (resp.length >= 7) {
+            const first = resp[0];
+            const isLong = (first & 0x80) !== 0;
+            if (isLong) {
+              const respVersion = '0x' + resp.slice(1,5).toString('hex');
+              if (respVersion === '0x00000000') {
+                // Version Negotiation packet: list of versions follows DCID/SCID
+                // Heuristic parse: skip DCID/SCID using lengths at bytes 5/x
+                const dcil = resp[5];
+                let idx = 6 + dcil; // after DCID len+DCID
+                const scil = resp[idx];
+                idx += 1 + scil;
+                const versions: string[] = [];
+                while (idx + 4 <= resp.length) {
+                  versions.push('0x' + resp.slice(idx, idx + 4).toString('hex'));
+                  idx += 4;
+                }
+                initial.parsed = { ...(initial.parsed||{}), versionNegotiation: true, versionsOffered: versions };
+              }
+              // Retry detection heuristic: Initial type bits 0xC (first byte high 4 bits contain type)
+              const packetType = (first & 0x30) >> 4;
+              if (packetType === 0x3) { // Heuristic placeholder for Retry (not protocol accurate)
+                initial.parsed = { ...(initial.parsed||{}), retry: true };
+              }
+            }
+          }
+        } catch { /* ignore response parse */ }
       }
     }
     (evidence as any).quicInitial = initial;

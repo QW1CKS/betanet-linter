@@ -108,6 +108,8 @@ export interface CheckOptions {
   evidencePublicKeyFile?: string; // Phase 7: public key file (base64 raw 32B ed25519 or PEM) for signature verify
   failOnSignatureInvalid?: boolean; // Phase 7: treat invalid evidence signature as failure exit
   dssePublicKeysFile?: string; // Phase 7: map of DSSE key ids to public keys for envelope verification
+  dsseRequiredKeys?: string; // comma separated list provided via CLI
+  dsseThreshold?: number; // required verified signer threshold
   evidenceBundleFile?: string; // Phase 7: multi-signer evidence bundle JSON path
 }
 
@@ -135,6 +137,11 @@ export interface IngestedEvidence {
   signatureError?: string; // capture signature verification error reason
   dsseEnvelopeVerified?: boolean; // Phase 7: DSSE envelope signature(s) verified
   dsseSignerCount?: number; // Phase 7: number of DSSE signers validated
+  dsseVerifiedSignerCount?: number; // Count of signatures that cryptographically verified
+  dsseThresholdMet?: boolean; // Policy: required threshold satisfied
+  dsseRequiredKeysPresent?: boolean; // All required key ids present
+  dsseSignerDetails?: { keyid?: string; verified: boolean; reason?: string }[]; // Per-signer diagnostics
+  dssePolicyReasons?: string[]; // Aggregate failure reasons if policy not met
   };
   // Phase 7: multi-signer evidence bundle (canonical hash chain) placeholder
   signedEvidenceBundle?: {

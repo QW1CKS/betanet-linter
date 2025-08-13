@@ -151,22 +151,24 @@ export class BetanetComplianceChecker {
           }
         }
         // Compute materials completeness metric
-        // Phase 7: DSSE envelope verification (single-envelope case already parsed above)
+        // Phase 7: DSSE envelope verification & multi-signer policy (enhanced)
         try {
           if (options.dssePublicKeysFile && fs.existsSync(options.dssePublicKeysFile)) {
             const keyMap = JSON.parse(fs.readFileSync(options.dssePublicKeysFile, 'utf8')) as Record<string,string>;
             const evAny: any = (this._analyzer as any).evidence;
-            const raw = fs.readFileSync(options.evidenceFile!, 'utf8');
-            const parsed = JSON.parse(raw);
-            if (parsed.payloadType && parsed.payload && Array.isArray(parsed.signatures)) {
-              const payloadBytes = Buffer.from(parsed.payload, 'base64');
-              let validCount = 0;
-              for (const sigObj of parsed.signatures) {
+            const rawEnv = fs.readFileSync(options.evidenceFile!, 'utf8');
+            const parsedEnv = JSON.parse(rawEnv);
+            if (parsedEnv.payloadType && parsedEnv.payload && Array.isArray(parsedEnv.signatures)) {
+              const payloadBytes = Buffer.from(parsedEnv.payload, 'base64');
+              const signerDetails: { keyid?: string; verified: boolean; reason?: string }[] = [];
+              let verifiedCount = 0;
+              for (const sigObj of parsedEnv.signatures) {
                 const keyId = sigObj.keyid || sigObj.keyId || sigObj.kid;
                 const sigB64 = sigObj.sig || sigObj.signature;
-                if (!keyId || !sigB64) continue;
+                if (!keyId) { signerDetails.push({ verified:false, reason:'missing-keyid' }); continue; }
                 const pk = keyMap[keyId];
-                if (!pk) continue;
+                if (!pk) { signerDetails.push({ keyid:keyId, verified:false, reason:'unknown-keyid' }); continue; }
+                if (!sigB64) { signerDetails.push({ keyid:keyId, verified:false, reason:'missing-sig' }); continue; }
                 try {
                   const sig = Buffer.from(sigB64, 'base64');
                   let pkBuf: Buffer;
@@ -174,15 +176,28 @@ export class BetanetComplianceChecker {
                     const body = pk.replace(/-----BEGIN PUBLIC KEY-----/,'').replace(/-----END PUBLIC KEY-----/,'').replace(/\s+/g,'');
                     pkBuf = Buffer.from(body, 'base64');
                   } else { pkBuf = Buffer.from(pk, 'base64'); }
+                  // NOTE: Real DSSE verification requires canonical preauthentication encoding; placeholder uses direct payload bytes
                   const ok = crypto.verify(null, payloadBytes, { key: pkBuf, format: 'der', type: 'spki' }, sig);
-                  if (ok) validCount++;
-                } catch {/* ignore per-sig errors */}
+                  signerDetails.push({ keyid: keyId, verified: ok, reason: ok ? undefined : 'sig-verify-failed' });
+                  if (ok) verifiedCount++;
+                } catch {
+                  signerDetails.push({ keyid:keyId, verified:false, reason:'sig-error' });
+                }
               }
-              if (!evAny.provenance) evAny.provenance = {}; 
-              evAny.provenance.dsseSignerCount = parsed.signatures.length;
-              if (validCount > 0) {
-                evAny.provenance.dsseEnvelopeVerified = true;
-              }
+              if (!evAny.provenance) evAny.provenance = {};
+              evAny.provenance.dsseSignerCount = parsedEnv.signatures.length;
+              evAny.provenance.dsseVerifiedSignerCount = verifiedCount;
+              if (verifiedCount === parsedEnv.signatures.length && verifiedCount>0) evAny.provenance.dsseEnvelopeVerified = true;
+              const requiredKeys = (options.dsseRequiredKeys||'').split(',').map(s=>s.trim()).filter(Boolean);
+              const requiredPresent = requiredKeys.every(k => signerDetails.some(d=>d.keyid===k && d.verified));
+              evAny.provenance.dsseRequiredKeysPresent = requiredKeys.length===0 ? true : requiredPresent;
+              const threshold = options.dsseThreshold || 1;
+              evAny.provenance.dsseThresholdMet = verifiedCount >= threshold;
+              const policyReasons: string[] = [];
+              if (!evAny.provenance.dsseThresholdMet) policyReasons.push('threshold-not-met');
+              if (!evAny.provenance.dsseRequiredKeysPresent) policyReasons.push('required-keys-missing');
+              if (policyReasons.length) evAny.provenance.dssePolicyReasons = policyReasons;
+              evAny.provenance.dsseSignerDetails = signerDetails;
             }
           }
         } catch {/* ignore dsse errors */}

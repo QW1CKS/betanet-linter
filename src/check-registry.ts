@@ -303,6 +303,9 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   const signatureVerified = prov.signatureVerified === true;
   const dsseSigners = prov.dsseSignerCount || 0;
   const dsseEnvelopeVerified = prov.dsseEnvelopeVerified === true;
+  const dsseThresholdMet = prov.dsseThresholdMet === true;
+  const dsseRequiredKeysPresent = prov.dsseRequiredKeysPresent === true;
+  const dssePolicyReasons: string[] = prov.dssePolicyReasons || [];
       // Validate normative provenance
       let normativeDetails: string[] = [];
       let hasNormative = false;
@@ -368,7 +371,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         name: 'Build Provenance',
         description: 'Builds reproducibly and publishes SLSA 3 provenance',
         passed,
-  details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; detached signature verified' : ''}${dsseEnvelopeVerified ? '; dsse envelope verified' : (dsseSigners ? `; dsse signers=${dsseSigners}` : '')})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (
+  details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; detached signature verified' : ''}${dsseEnvelopeVerified ? '; dsse envelope verified' : (dsseSigners ? `; dsse signers=${dsseSigners}` : '')}${dsseThresholdMet ? '; dsse threshold met' : ''}${dsseRequiredKeysPresent ? '' : '; missing required dsse keys'}${dssePolicyReasons.length ? '; policy issues: '+dssePolicyReasons.join(',') : ''})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (
           rebuildMismatch ? '❌ Rebuild digest mismatch (non-reproducible)' : (materialsMismatchCount ? `❌ Materials/SBOM mismatch (${materialsMismatchCount} unmatched)` : `❌ Missing: ${missing}`)
         ),
         severity: 'minor',
@@ -1018,6 +1021,56 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
         !thresholdOk && 'threshold n>=5 t>=3 not satisfied'
       ])}`;
       return { id: 29, name: 'Voucher/FROST Struct Validation', description: 'Validates voucher cryptographic struct base64 components & FROST threshold hints', passed, details, severity: 'minor', evidenceType: 'static-structural' };
+    }
+  }
+  ,
+  {
+    id: 30,
+    key: 'access-ticket-rotation-policy',
+    name: 'Access Ticket Rotation Policy',
+    description: 'Validates structural access ticket evidence (fields, hex IDs) & rotation token presence',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      await analyzer.getStaticPatterns?.();
+      const ev = analyzer.evidence || {};
+      const at = ev.accessTicket;
+      if (!at) return { id: 30, name: 'Access Ticket Rotation Policy', description: 'Validates structural access ticket evidence (fields, hex IDs) & rotation token presence', passed: false, details: '❌ No accessTicket evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const fieldsOk = Array.isArray(at.fieldsPresent) && at.fieldsPresent.includes('ticket') && at.fieldsPresent.includes('nonce') && at.fieldsPresent.includes('exp') && at.fieldsPresent.includes('sig');
+      const hexOk = (at.hex16Count || 0) + (at.hex32Count || 0) >= 1; // at least one identifier
+      const rotationOk = at.rotationTokenPresent === true;
+      const confidenceOk = (at.structConfidence || 0) >= 0.4; // heuristic threshold
+      const passed = fieldsOk && hexOk && rotationOk && confidenceOk;
+      const details = passed ? `✅ accessTicket fields=${at.fieldsPresent.length} conf=${at.structConfidence} rotation=${rotationOk}` : `❌ Access ticket issues: ${missingList([
+        !fieldsOk && 'core fields',
+        !hexOk && 'hex IDs',
+        !rotationOk && 'rotation token',
+        !confidenceOk && 'confidence<0.4'
+      ])}`;
+      return { id: 30, name: 'Access Ticket Rotation Policy', description: 'Validates structural access ticket evidence (fields, hex IDs) & rotation token presence', passed, details, severity: 'minor', evidenceType: 'static-structural' };
+    }
+  }
+  ,
+  {
+    id: 31,
+    key: 'voucher-aggregated-signature',
+    name: 'Voucher Aggregated Signature',
+    description: 'Verifies voucher aggregated signature structure (synthetic hash prefix match)',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      await analyzer.getStaticPatterns?.();
+      const ev = analyzer.evidence || {};
+      const vc = ev.voucherCrypto;
+      if (!vc) return { id: 31, name: 'Voucher Aggregated Signature', description: 'Verifies voucher aggregated signature structure (synthetic hash prefix match)', passed: false, details: '❌ No voucherCrypto evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const sigOk = vc.signatureValid === true;
+      const thresholdOk = vc.frostThreshold ? ((vc.frostThreshold.n||0) >=5 && (vc.frostThreshold.t||0) >=3) : false;
+      const passed = sigOk && thresholdOk;
+      const details = passed ? `✅ aggregatedSig valid n=${vc.frostThreshold?.n} t=${vc.frostThreshold?.t}` : `❌ Aggregated signature invalid: ${missingList([
+        !sigOk && 'signature structure',
+        !thresholdOk && 'threshold'
+      ])}`;
+      return { id: 31, name: 'Voucher Aggregated Signature', description: 'Verifies voucher aggregated signature structure (synthetic hash prefix match)', passed, details, severity: 'minor', evidenceType: 'static-structural' };
     }
   }
 ];

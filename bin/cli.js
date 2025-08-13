@@ -55,6 +55,8 @@ program
   .option('--evidence-signature <path>', 'Detached evidence JSON signature file (Phase 7)')
   .option('--evidence-public-key <path>', 'Evidence signing public key file (ed25519)')
   .option('--dsse-public-keys <path>', 'JSON map of keyid->public key (PEM or base64) for DSSE envelope verification')
+  .option('--dsse-required-keys <csv>', 'Comma-separated list of required DSSE key ids (policy)')
+  .option('--dsse-threshold <n>', 'Numeric threshold of distinct verified signers required (default 1)')
   .option('--evidence-bundle <path>', 'Multi-signer evidence bundle JSON (array of {evidence,signature,publicKey,signer})')
   .option('--fail-on-sig-invalid', 'Exit non-zero if evidence signature invalid')
   .option('-v, --verbose', 'Verbose output')
@@ -95,6 +97,8 @@ program
   evidenceSignatureFile: options.evidenceSignature,
   evidencePublicKeyFile: options.evidencePublicKey,
   dssePublicKeysFile: options.dssePublicKeys,
+  dsseRequiredKeys: options.dsseRequiredKeys,
+  dsseThreshold: options.dsseThreshold ? parseInt(options.dsseThreshold,10) : undefined,
   evidenceBundleFile: options.evidenceBundle,
   failOnSignatureInvalid: options.failOnSigInvalid
       });

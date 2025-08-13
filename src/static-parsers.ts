@@ -38,6 +38,7 @@ export interface AccessTicketStatic {
   hex16Count?: number;
   hex32Count?: number;
   structConfidence?: number; // 0..1 heuristic confidence
+  rotationTokenPresent?: boolean; // presence of rotation related token for policy check
 }
 
 export interface VoucherCryptoStatic {
@@ -150,7 +151,8 @@ export function extractStaticPatterns(strings: string[], binary?: Buffer): Stati
     const hex16 = strings.filter(s => /^[0-9a-fA-F]{16}$/.test(s)).length;
     const hex32 = strings.filter(s => /^[0-9a-fA-F]{32}$/.test(s)).length;
     const confidence = Math.min(1, (fieldsPresent.length / 7) * 0.6 + Math.min(1, (hex16+hex32)/4) * 0.4);
-    result.accessTicket = { detected: true, fieldsPresent, hex16Count: hex16, hex32Count: hex32, structConfidence: Number(confidence.toFixed(2)) };
+  const rotationTokenPresent = lower.some(s => s.includes('rotation') || s.includes('rotate'));
+  result.accessTicket = { detected: true, fieldsPresent, hex16Count: hex16, hex32Count: hex32, structConfidence: Number(confidence.toFixed(2)), rotationTokenPresent };
   }
   // Voucher crypto extraction (base64 components near voucher tokens)
   if (voucher) {
@@ -167,12 +169,18 @@ export function extractStaticPatterns(strings: string[], binary?: Buffer): Stati
       if (keysetIdB64 && secretB64 && aggregatedSigB64) break;
     }
     let signatureValid = false;
+    let aggregatedSigComputedValid = false;
     try {
       if (keysetIdB64 && secretB64 && aggregatedSigB64) {
         const k = Buffer.from(keysetIdB64, 'base64');
         const sec = Buffer.from(secretB64, 'base64');
         const sig = Buffer.from(aggregatedSigB64, 'base64');
         signatureValid = k.length === 32 && sec.length === 32 && sig.length === 64;
+        if (signatureValid) {
+          // Placeholder aggregated signature check: require first 16 bytes of sig == first 16 bytes of sha256(keysetId||secret)
+          const h = crypto.createHash('sha256').update(Buffer.concat([k, sec])).digest();
+          aggregatedSigComputedValid = sig.slice(0,16).equals(h.slice(0,16));
+        }
       }
     } catch { /* ignore */ }
     // FROST threshold heuristic
@@ -183,7 +191,7 @@ export function extractStaticPatterns(strings: string[], binary?: Buffer): Stati
       const tMatch = frostLine.match(/t=(\d+)/i);
       frost = { n: nMatch ? parseInt(nMatch[1],10) : undefined, t: tMatch ? parseInt(tMatch[1],10) : undefined };
     }
-    result.voucherCrypto = { structLikely: voucher.structLikely, keysetIdB64, secretB64, aggregatedSigB64, signatureValid, frostThreshold: frost };
+  result.voucherCrypto = { structLikely: voucher.structLikely, keysetIdB64, secretB64, aggregatedSigB64, signatureValid: signatureValid && aggregatedSigComputedValid, frostThreshold: frost };
   }
   return result;
 }

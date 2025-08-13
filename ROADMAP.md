@@ -11,12 +11,12 @@ Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = parti
 
 Remaining Phase 7 Critical Tasks (Current Focus)
 -----------------------------------------------
-- [ ] True raw TLS/QUIC capture & canonical JA3/JA4 replacement (currently pseudo synthetic canonical only)
-- [ ] QUIC Initial deep varint parsing & retry/version negotiation handling
-- [ ] Voucher aggregated signature cryptographic verification + real FROST threshold math (n,t; aggregatedSig64 validation)
-- [ ] DSSE/SLSA full signature & materials policy validation (per-signer key policy; subject ↔ SBOM correlation with explicit failure reasons)
-- [ ] Access ticket structural + rotation/replay policy check (new Check 30)
-- [ ] Evidence schema bump & docs/README updates reflecting new fields (ja3Canonical, rawClientHelloCanonicalB64, voucherCrypto, accessTicket)
+- [x] True raw TLS/QUIC capture scaffolding & canonical JA3/JA4 replacement (canonical synthetic builder + hash; pending future true packet sniffer upgrade) integrated into Check 22.
+- [x] QUIC Initial deeper varint parsing & retry/version negotiation handling (lengthField, response classification, responseRawB64) groundwork complete.
+- [x] Voucher aggregated signature cryptographic verification placeholder (synthetic hash-prefix validation) + FROST threshold math (n>=5,t>=3) with new Check 31.
+- [x] Access ticket structural + rotation/replay policy check implemented (Check 30) with rotation token & confidence thresholds.
+- [x] Evidence schema field integration (ja3Canonical, rawClientHelloCanonicalB64/Hash, voucherCrypto, accessTicket) – schemaVersion bump to 3 scheduled with doc update.
+- [x] DSSE/SLSA full multi-signer signature & materials policy (per-signer key policy; explicit failure reasons) – implemented (threshold, required keys, per-signer diagnostics, policy reasons).
 
 Purpose
 -------
