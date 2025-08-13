@@ -11,7 +11,7 @@ The following tasks constitute the definitive completion list. Implementing all 
     * Unit tests with synthetic captures covering each failure code. (Implemented in tls-calibration.test.ts)
   * Integration test demonstrating pass on golden fixture and fail on perturbed traces. (Implemented in tls-calibration-integration.test.ts)
 
-[ ] 2. Encrypted ClientHello (ECH) Verification
+[x] 2. Encrypted ClientHello (ECH) Verification
   - Objective: Confirm real ECH acceptance not just extension token presence.
   - Scope: Perform dual handshake (outer SNI vs encrypted); verify expected certificate difference or GREASE absence metrics.
   - AC: Check produces echVerified=true only after differential handshake proof; negative test where extension present but no behavioral change.
