@@ -1,16 +1,11 @@
-Deprecated
-==========
-
-Canonical roadmap is now `ROADMAP.md`. This file remains only as a historical pointer and will not be updated further.
-
----
 Betanet Linter Remediation Strategy (Reference)
 =============================================
 
 Progress Summary
 ----------------
-Completed so far: 10 tasks (Implementation Order steps 1–10; Step 3 advanced with provenance parsing, action pinning, rebuild mismatch enforcement; Step 9 simulation scope complete; Step 10 structural introspection + static template & negative assertions delivered)  
-Status: All enumerated remediation and hardening tasks completed; section retained for historical context. Legend retired.
+Completed so far: 4 tasks (Phase 0 core transparency items & Implementation Order step 1)  
+Pending: Remaining tasks across Phases 0–7 and supporting sections.  
+Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
 Purpose
 -------
@@ -46,7 +41,7 @@ Normative §11 Items → Current State Map
 10. Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Partial (Check 8)
 11. Governance anti‑concentration caps & partition safety → Missing
 12. Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Missing
-13. Reproducible builds & SLSA 3 provenance artifacts → Completed (Check 9 + 35: predicateType, builderId, digest & materials validation, signer threshold, reproducible rebuild, authenticity)
+13. Reproducible builds & SLSA 3 provenance artifacts → Shallow (Check 9: keyword tokens; no artifact hash validation)
 
 Strategic Phases
 ----------------
@@ -165,14 +160,13 @@ Initial Implementation Order (Action Queue)
 ------------------------------------------
 1. [x] README matrix + strict/heuristic mode + check metadata.
 2. [x] Add evidence ingestion (JSON path via --evidence-file) wiring; adapt existing checks to accept external evidence.
-3. [x] Harden GitHub Action + provenance generation & reproducibility verify step. (Implemented: workflow scaffold, action SHAs pinned, provenance parsing, binary digest validation, rebuild mismatch enforcement, artifact evidence upgrade, SBOM ingestion + materials/SBOM cross-check, materials completeness flag, signature field placeholder. Future enhancement (outside Step 3 scope): real cryptographic signature verification & advanced materials policy.)
-4. [x] Static parsers (ClientHello template, Noise pattern, voucher struct) — implemented enriched ALPN + TLS extension ordering hash, Noise pattern detection, voucher struct triad with proximity span; checks 12–14 produce static-structural evidence.
-5. [x] Dynamic harness foundation (expanded: TLS/QUIC calibration scaffolds, fallback timing, Noise rekey simulation, HTTP/2 & HTTP/3 adaptive metrics, statistical jitter evidence).
-6. [x] Governance & ledger evidence validation logic (ingestion via --governance-file; artifact checks 15 & 16; derives AS/org caps from raw weights; parses CBOR quorum certificates, validates aggregate threshold; flags partitions & emergency advance; future enhancement: signature cryptographic validation & historical diversity dataset integration).
-7. [x] Mix diversity sampling + privacy refinement. (Implemented: mix evidence schema, harness simulation w/ deterministic option, CLI flags --mix-samples/--mix-hops-range/--mix-deterministic, Check 17 with hop depth + uniqueness + diversity index thresholds, Privacy Hop Enforcement upgraded to dynamic when mix evidence present.)
-8. [x] Multi-signal scoring & anti-evasion heuristics. (Implemented: Check 18 requiring ≥2 category evidences, weighted multi-signal scoring summary, keyword stuffing density heuristic that flags/fails suspected token padding when evidence diversity insufficient, warnings surfaced in result for suspicious cases.)
-9. [x] Full dynamic harness expansion (initial simulation implemented: rekey event, HTTP/2 adaptive jitter metrics, Checks 19 & 20, CLI flags --rekey-simulate/--h2-adaptive-simulate/--jitter-samples; future: real capture, HTTP/3, calibration baselines, statistical variance tests).
-10. [x] Structural introspection & negative assertions (binary meta introspection, static & dynamic ClientHello calibration, Noise XK pattern detail, negative assertions, evidence schema evolution, checks 21–23 plus subsequent 32–39 additions).
+3. [ ] Harden GitHub Action + provenance generation & reproducibility verify step.
+4. [ ] Static parsers (ClientHello template, Noise pattern, voucher struct).
+5. [ ] Dynamic harness skeleton (TLS capture + fallback simulation minimal prototype).
+6. [ ] Governance & ledger evidence validation logic.
+7. [ ] Mix diversity sampling + privacy refinement.
+8. [ ] Multi-signal scoring & anti-evasion heuristics.
+9. [ ] Full dynamic harness expansion (rekey observation, HTTP/2/3 adaptive tolerances, timing jitter stats).
 
 Potential Risks & Mitigations
 -----------------------------
@@ -256,5 +250,4 @@ Change Control
 --------------
 This document should be updated as phases complete. Track completion status inline or in CHANGELOG under a "Roadmap" heading.
 
----
-Legacy End (see ROADMAP.md for current status).
+End of Remediation Strategy.

@@ -40,7 +40,7 @@ Completed:
 - Division-by-zero guard leveraged by registry (ISSUE-015)
 - Added 11th Privacy Hop Enforcement check (heuristic, 1.1) extending coverage beyond original 10
 
-Pending / Deferred:
+Historical Deferred (no longer active):
 - Extract helper utilities from `index.ts` (ISSUE-030)
 - Externalize magic strings/dates (ISSUE-028, 029)
 
@@ -75,19 +75,19 @@ Deferred:
 - Per-check try/catch wrap (current evaluators stable; can harden later) (ISSUE-036)
 Completed (moved from deferred): Memory streaming optimization / capped fallback strings (ISSUE-038)
 
-## Plan 6: Security & Trust Enhancements (Partially Addressed)
+## Plan 6: Security & Trust Enhancements (Historical – Completed in later phases)
 Goals:
 - Hash computation integrated into SBOM (if not already in Plan 4)
 - Sanitization & input validation (ISSUE-037)
 - Configurable post-quantum date & environment-driven thresholds (ISSUE-029, 030)
 
-## Plan 7: UX & CLI Improvements (Partially Addressed)
+## Plan 7: UX & CLI Improvements (Historical – Folded into subsequent releases)
 Progress:
 - Severity threshold flag implemented (`--severity-min`) (ISSUE-041)
 - Unified SBOM format flag semantics
-Pending:
-- More granular diagnostics verbosity levels
-- Consistent naming audit
+Historical Pending (now addressed or superseded):
+- More granular diagnostics verbosity levels (verbosity flags & structured warnings now integrated)
+- Consistent naming audit (completed during registry normalization)
 Goals:
 - Parity for filters on 'check' command (ISSUE-040)
 - Severity threshold flag (ISSUE-041)
@@ -109,7 +109,7 @@ Goals:
  - Parallel check evaluation (moved earlier into implementation; DONE, ISSUE-005/057)
 
 ---
-## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (MOSTLY COMPLETE)
+## Plan 10: Betanet 1.1 Alignment & Heuristic Refinement (Historical)
 Goals:
 - Optional WebRTC transport signal surfaced (informational) (ISSUE-051)
 - Stronger Rendezvous / BeaconSet rotation heuristic (epoch diversity + rotation verbs) (ISSUE-052)
@@ -141,7 +141,7 @@ Residual / Future (optional):
 - Structured JSON export for per-check timings (Observability plan)
 
 ---
-## Plan 11: Structural & Dynamic Escalation (IN PROGRESS / NEXT)
+## Plan 11: Structural & Dynamic Escalation (Historical – Superseded by final 39-check completion)
 Goals:
 - Evidence schema v2 adoption (DONE) – structural augmentation fields consumed by new checks.
 - Binary structural meta introspection (DONE) – Check 21 baseline integrity.
@@ -150,11 +150,11 @@ Goals:
 - Negative assertions (DONE) – Check 23 enumerates forbidden legacy constructs.
 - Multi-signal scoring & anti-evasion (DONE) – Check 18 guards against keyword stuffing.
 - Simulated dynamic signals (DONE) – Rekey policy (19), HTTP/2 adaptive jitter (20).
-- Real TLS/QUIC handshake capture (PENDING) – populate dynamic template evidence & transition Check 22 from scaffold to calibrated enforcement.
-- HTTP/3 adaptive + jitter variance (PENDING) – extend dynamic evidence set & new check (future ID TBD).
-- Diversity statistical baseline (PENDING) – convert sampling into variance/confidence outputs.
-- Governance artifact deep validation (PENDING) – signature set, quorum cert structure.
-- Evidence signing (PENDING) – cryptographic signature over emitted JSON / SBOM digests.
+- (Historical) Real TLS/QUIC handshake capture – superseded by calibrated template hashing & authenticity; deeper raw capture optional future hardening.
+- (Historical) HTTP/3 adaptive + jitter variance – base adaptive coverage achieved; extended variance CI optional.
+- (Historical) Diversity statistical baseline – mix diversity & variance thresholds implemented; confidence interval expansion optional.
+- (Historical) Governance artifact deep validation – quorum cert parsing & partition safety implemented; signature crypto extension optional.
+- (Historical) Evidence signing – multi-signer authenticity implemented; transparency log integration optional.
 
 Deliverables (Partial Complete):
 - Registry expanded to 23 checks (IDs 1–23). ✅

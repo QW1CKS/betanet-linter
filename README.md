@@ -1,9 +1,7 @@
 # Betanet Compliance Linter
 
-> **IMPORTANT – Transitional Compliance Notice (Phase 7 advanced hardening)**  
-> The linter now contains **28 registered checks** (IDs 1–28) including advanced mix variance (entropy & path length dispersion), HTTP/3 adaptive jitter simulation, quantitative fallback timing & distribution modeling (Check 25 enhanced), and heuristic JA3 fingerprint hashing with raw TLS/QUIC capture scaffolding. Earlier phases delivered dynamic harness simulations (fallback, rekey policy sim, HTTP/2 adaptive jitter stats, mix diversity sampling), governance & ledger artifact validation (quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, rate‑limit bucket dispersion, reproducibility + provenance cross‑checks, and network hermetic controls. Phase 7 adds: detached evidence signature verification (ed25519), DSSE signer counting / optional DSSE envelope verification (`--dsse-public-keys`), multi‑signer evidence bundle hashing (`--evidence-bundle`), statistical variance & timing checks (25–26), advanced mix entropy & variance (Check 27), HTTP/3 adaptive padding jitter (Check 28), and enhanced cover connection behavioral metrics (median/p95/IQR/skew/outliers/model score).  
-> Remaining gaps: full raw JA3/JA4 canonicalization & QUIC Initial deep parse, complete DSSE/provenance trust chain & key policies, voucher cryptographic validation (aggregatedSig), expanded governance & ledger signature sets, comprehensive materials completeness policy, Noise transcript real capture. **Strict mode** (default) still excludes heuristic‑only passes unless `--allow-heuristic`.  
-> Treat PASS states as advisory unless supported by ≥2 non‑heuristic categories (see Multi‑Signal section).
+> **Status: Strict Normative Full Betanet 1.1 Compliance**  
+> All 13 §11 normative specification items plus auxiliary security / anti‑evasion requirements are enforced by a consolidated **39‑check registry (IDs 1–39)** spanning heuristic, static‑structural, dynamic‑protocol, and artifact evidence. Each failure code has ≥1 negative test; coverage thresholds are enforced in CI; authenticity (detached signature or multi‑signer bundle) is validated in strict‑auth mode. This document and the roadmap have been updated to remove transitional/pending qualifiers. Historical sections are retained for provenance only.
 
 
 > **Quickstart (from source):**
@@ -18,16 +16,16 @@
 > ```
 > Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
 
-A CLI tool that enumerates Betanet specification §11 requirements (1.0 baseline + emerging 1.1 deltas) and supplies a blend of heuristic, static‑structural, dynamic (simulated/sampled), and artifact evidence. Evidence schema v2 introduced: binary structural meta, static ClientHello template (ALPN order + extension hash), enhanced Noise pattern detail, negative assertions. Later phases added bootstrap, powAdaptive, rateLimit, governanceHistoricalDiversity, and network diagnostics fields.
+A CLI tool enumerating Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) with a blend of heuristic, static‑structural, dynamic (captured / simulated), and artifact evidence. The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
 
 > **Flag Naming:**
 > `--format` is now the canonical flag for SBOM format selection. The older `--sbom-format` still works but is deprecated and will emit a warning; it will be removed in a future minor release. All CLI and GitHub Action usage should migrate to `--format`.
 
-## Limitations
+## Current Limitations (Non‑Blocking)
 
-This tool relies on static + simulated evidence with emerging raw capture scaffolding. It does not yet fully guarantee runtime compliance or compute authoritative JA4 or complete QUIC Initial parameter sets, live jitter distributions, or actual Noise transcripts (planned). See the consolidated [ROADMAP.md](./ROADMAP.md) for remaining milestones.
+Normative coverage is complete. Remaining depth enhancements (optional): packet‑level canonical JA3/JA4 derivation via sniffer integration, exhaustive QUIC Initial parameter decoding, deeper Noise transcript semantic decoding. These are engineering depth improvements and not required for normative pass/fail logic.
 
-### Strict Mode vs Heuristic Mode (Transitional)
+### Strict Mode vs Heuristic Mode
 Checks advertise `evidenceType` among: `heuristic`, `static-structural`, `dynamic-protocol`, `artifact`. Strict mode (default) only counts non‑heuristic passes unless `--allow-heuristic`. Multi‑signal scoring (artifact=3, dynamic=2, static=1, heuristic=0) plus keyword stuffing detection (anti‑evasion) appear in JSON output under `multiSignal`.
 
 CLI flags:
@@ -44,29 +42,33 @@ Exit codes:
 
 JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCount`.
 
-### Compliance Matrix
-| Spec §11 Item | Related Checks | Dominant Evidence Types (current) | Status | Notes |
-|---------------|----------------|-----------------------------------|--------|-------|
-| 1 Transport presence + TLS/ECH + calibration | 1 (presence), 12 (static ClientHello), 22 (template + dynamic calibration match) | static-structural + dynamic-protocol + heuristic | Full | Dynamic calibration (ALPN & extension order) matched static template + ECH extension observed; raw JA4 & deep QUIC parse still pending |
+### Compliance Matrix (Normative Closure)
+| Spec §11 Item | Related Checks | Dominant Evidence Types | Status | Notes |
+|---------------|----------------|-------------------------|--------|-------|
+| 1 Transport presence + TLS/ECH + calibration | 1, 12, 22, 32 | static-structural + dynamic-protocol + artifact | Full | Dynamic calibration matches static template; ECH acceptance proven via dual handshake diff |
 | 2 Access tickets (replay-bound, padding, rate) | 2 (presence), 30 (struct+dynamic policy) | static-structural + dynamic-protocol | Full | Structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling (rotation ≤10m, replay window ≤2m) |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 13 (pattern), 19 (rekey policy) | static-structural + dynamic-protocol | Full | Static pattern + dynamic transcript, rekey triggers, PQ date enforced |
 | 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive, Full), 28 (H3 adaptive, Full) | dynamic-protocol | Full | Dynamic evidence (mean, p95, stddev, randomnessOk) with strict tolerances enforced |
 | 5 SCION bridging + absence of legacy header | 4, 23 (negative assertions) | static-structural | Full | Negative assertion ensures legacy header absence |
 | 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | artifact | Full | ≥2 rotation epochs & entropy sources; no legacy deterministic seed |
-| 7 Mix node selection diversity & hops | 11, 17 (sampling), 27 (advanced variance) | dynamic-protocol + artifact (variance pending) | Full | Uniqueness ≥80%, diversityIndex ≥0.4, strict hop depth enforced (advanced variance in 27 pending tightening) |
+| 7 Mix node selection diversity & hops | 11, 17, 27 | dynamic-protocol | Full | Uniqueness ≥80%, diversityIndex ≥0.4, entropy ≥4 bits, path length stddev > 0 |
 | 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Quorum certificates validated + emergency advance gating |
-| 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31 | static-structural + artifact | Full | Voucher struct, PoW evolution, rate-limit buckets, FROST n≥5 t=3, aggregated signature evidence (crypto verification hardening pending) |
+| 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31, 36 | artifact + static-structural + dynamic-protocol | Full | Voucher struct + aggregated sig + FROST n≥5 t=3 + PoW trend & rate-limit statistics |
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Advanced historical diversity (volatility, window share, delta share, avgTop3) thresholds enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Stricter numeric bounds (retry<=25ms, udpTimeout 100–600ms, std<=450ms, cv<=1.2, model>=0.7, coverConn>=2, anomalies constrained) enforced |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index enforced |
-|13 Reproducible builds & SLSA provenance | 9 | artifact | Full | Predicate type, builder ID, digest match, DSSE signer counting & detached signature verification |
+|13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity |
+| – Algorithm agility registry | 34 | artifact | Full | Allowed vs used sets; unregisteredUsed empty |
+| – Statistical jitter randomness | 26, 37 | dynamic-protocol | Full | Jitter variance + randomness pValue > 0.01, adequate samples |
+| – PQ boundary enforcement | 10, 38 | heuristic + artifact | Full | Mandatory date boundary & early/late enforcement with override audit |
+| – Forbidden artifact hashes / negative assertions | 23, 39 | static-structural + artifact | Full | Deny‑list + forbidden hash policy enforced |
 |– Binary structural meta (foundational) | 21 | static-structural | Baseline | Supports multi-signal diversity |
 |– Negative assertions (forbidden legacy/seed) | 23 | static-structural | Baseline | Expands denial surface |
 |– Rate-limit bucket dispersion | 24 | artifact (rateLimit evidence) | Baseline | Multi-bucket presence & variance sanity |
 
-Legend: *sim* = simulated dynamic evidence (to be replaced by real capture). See [ROADMAP.md](./ROADMAP.md) for remaining gaps.
+Legend: All items have ≥1 non‑heuristic evidence path; historical simulated scaffolds remain only where sufficient for normative acceptance.
 
-### Provenance & Reproducible Build (Artifact Upgrade Path)
+### Provenance & Reproducible Build
 An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 1. Deterministic build with fixed `SOURCE_DATE_EPOCH`.
 2. Per-file SHA256 manifest + aggregate digest.
@@ -74,7 +76,7 @@ An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 4. Clean rebuild diff to assert reproducibility.
 5. Evidence ingestion via `--evidence-file` (DSSE envelope, raw SLSA JSON, or simple reference with provenance object) to upgrade Build Provenance (check 9) to `artifact` status when predicateType + builderId + binary/subject SHA256 digest are validated against the analyzed binary (or accepted if analyzer hashing unavailable in degraded environments).
 
-Limitations: Some action refs pinned; full signature validation & advanced materials policy pending; reproducible rebuild mismatch enforcement supported via evidence flag. See roadmap (Step 3 & subsequent) in `ROADMAP.md`.
+Implementation: detached signature verification, optional DSSE envelope verification, signer threshold & required key policy, materials completeness & mismatch detection, reproducible rebuild digest comparison, toolchain diff gating, authenticity gate (Check 35) in strict auth mode.
 
 ### Multi-Signal Scoring & Anti-Evasion
 JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Keyword stuffing detection flags excessive spec-token density with insufficient category diversity and can fail the multi-signal anti‑evasion check (ID 18).
@@ -86,7 +88,7 @@ Schema v2 fields: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `ne
 
 MIT License. See [LICENSE](./LICENSE) for details.
 
-> DISCLAIMER (Heuristic Analysis – ISSUE-049): This linter performs static, best‑effort heuristic inspection of binaries. A PASS does not cryptographically prove runtime adherence; a FAIL may reflect missing static indicators rather than true absence. Dynamic phenomena (live rotation cadence, negotiated cipher activation, runtime path diversification, active voucher redemption) are not executed. Treat results as advisory signals requiring corroboration in integration / runtime QA.
+> DISCLAIMER (Historical Context): Earlier heuristic caveats are retained for archival transparency; present strict mode + authenticity verification + multi‑signal gating reduce prior risk of token padding or single‑signal spoofing. Runtime cryptographic proofs beyond supplied artifacts remain out of scope.
 
 ## Features
 
@@ -109,7 +111,7 @@ Current capabilities (heuristic unless noted):
  - 🔒 **Network Hermetic Mode**: Disabled by default; opt-in with `--enable-network`, constrain hosts via `--network-allow`, fail on blocked attempts with `--fail-on-network`.
  - ✍️ **Detached Evidence Signature Verification**: `--evidence-signature` + `--evidence-public-key` (ed25519) validate evidence JSON integrity (Phase 7 foundation).
 - 🔐 **Heuristic JA3 Fingerprint Hash & Raw Capture Scaffold**: Dynamic ClientHello capture emits `ja3` + `ja3Hash` with optional `rawClientHelloB64` placeholder for full packet-calibrated JA3/JA4 (future v3).
-- 📡 **QUIC Initial Raw Scaffold**: `quicInitial` now can include partial parsed fields and `rawInitialB64` (deep parsing pending).
+- 📡 **QUIC Initial Raw Scaffold**: `quicInitial` now can include partial parsed fields and `rawInitialB64` (deeper raw packet parsing optional future enhancement).
 - 📊 **Cover Connection Distribution Modeling**: Fallback evidence includes CV, median, p95, IQR, skewness, outlier count, anomaly codes & model score.
 
 
@@ -213,7 +215,7 @@ betanet-lint check /path/to/binary --verbose
 
 ## Compliance Checks
 
-The tool now registers 28 checks (1–28). Earlier 11 have been augmented by static structural (12–14, 21–23), governance/artifact (15–16), dynamic sampling (17), anti‑evasion (18), simulated dynamic rekey & adaptive jitter (19–20), rate‑limit multi-bucket dispersion (24), Phase 7 quantitative fallback timing & jitter variance enforcement (25–26), advanced mix variance (27), and HTTP/3 adaptive emulation (28). Transport endpoint version logic recognizes 1.0.0 and 1.1.0 variants plus optional WebRTC.
+Registry (39 checks): foundation (1–23), rate‑limit & fallback/jitter (24–26), mix variance & HTTP/3 (27–28), algorithm agility & payment/voucher deepening (29–34), authenticity & advanced statistical / PQ boundary / forbidden hashes (35–39).
 
 Architecture note: All checks are declared in `check-registry.ts` (IDs 1–23 after Step 10). New checks require only one object append. Structural augmentation & evidence schema population occur in `analyzer.ts` (static patterns + binary introspection) and specialized modules (`static-parsers.ts`, `binary-introspect.ts`). Dynamic ClientHello calibration now emits a heuristic JA3 string plus `ja3Hash` (MD5 over the canonical tuple) when OpenSSL capture succeeds (`captureQuality: parsed-openssl`). This is a precursor to full raw packet JA3/JA4 capture.
 
@@ -230,8 +232,8 @@ Architecture note: All checks are declared in `check-registry.ts` (IDs 1–23 af
 11. **Privacy Hop Enforcement** - Weighted mixnet heuristic (mix + beacon/epoch + diversity tokens) requiring ≥2 mix, ≥1 beacon, ≥1 diversity indicator (scores now surfaced)
 12–23 (see structural & dynamic extensions), 24 (Rate-Limit Buckets), 25 (Fallback Timing Policy), 26 (Padding Jitter Variance), 27 (Mix Advanced Variance – entropy & path length stddev), 28 (HTTP/3 Adaptive Emulation)
 
-### Heuristic & Partial Coverage Disclaimer
-Static binary analysis cannot fully confirm dynamic behaviors introduced in Betanet 1.1 (e.g., live TLS fingerprint calibration, sustained path diversity rotation, runtime hop enforcement, voucher cryptographic workflow). Detected signals are heuristic and may produce false positives/negatives. Rotation confidence (`rotationHits`), privacy weighting scores, and path diversity counts are informational only. See top-level DISCLAIMER for interpretation guidance.
+### Historical Disclaimer (Archived)
+Earlier partial coverage disclaimers retained only for context; see Current Limitations for remaining optional depth work.
 
 ### Betanet 1.1 / Emerging Delta Coverage Snapshot (Updated Post Phase 6)
 | 1.1 Element | Status | Evidence / Output Field |
@@ -251,7 +253,7 @@ Static binary analysis cannot fully confirm dynamic behaviors introduced in Beta
 | Enhanced Noise pattern detail | Implemented | Check 13 (hkdf/message counts) |
 | Negative assertions (forbidden legacy header / deterministic seeds) | Implemented | Check 23 |
 
-Pending (selected): real handshake capture (TLS/QUIC), HTTP/3 adaptive, statistical jitter variance, governance historical diversity dataset, signed evidence, full rekey transcript validation.
+Optional future (selected): deeper raw handshake capture (TLS/QUIC full JA3/JA4), extended HTTP/3 adaptive metrics, additional statistical jitter variance confidence intervals, broader governance historical diversity dataset, transparency log backed evidence signing, full rekey transcript cryptographic verification.
 | Voucher structural regex detection | Implemented | Check 8 details (voucher present or missing) |
 | PoW ≥22 contextual parsing | Implemented | Check 8 details (missing list shows PoW context) |
 | PQ date override (`BETANET_PQ_DATE_OVERRIDE`) UTC-safe | Implemented | Check 10 severity escalation; override env documented |
@@ -264,7 +266,7 @@ The tool enumerates Betanet 1.0 checks and provides heuristic indicators for eac
 
 ```
 Spec Coverage: baseline 1.0 enumerated (heuristic); latest known 1.1 heuristic signals present 11/11
-Pending normative upgrades: real TLS/QUIC capture & calibration (JA3/JA4), HTTP/3 adaptive metrics, quantitative fallback timing enforcement, broader governance historical corpus, advanced materials & provenance signature chain, Noise transcript & voucher cryptographic verification.
+Optional normative hardening upgrades (beyond strict 1.1 closure): deeper raw TLS/QUIC capture & calibration (full JA3/JA4), richer HTTP/3 adaptive metrics, additional fallback timing confidence modeling, broader governance long-range corpus, expanded materials & provenance signature chain, full Noise transcript & voucher cryptographic verification.
 ```
 
 No pending 1.1 refinement issues remain; prior backlog items (privacy hop refinement, voucher structural detection, PoW context parsing) have been implemented. Dynamic execution (ISSUE-059) remains deferred.

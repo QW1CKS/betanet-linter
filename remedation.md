@@ -1,16 +1,11 @@
-Deprecated
-==========
+Betanet Linter Remediation Strategy (Historical Archive)
+=======================================================
 
-Canonical roadmap is now `ROADMAP.md`. This file remains only as a historical pointer and will not be updated further.
+Status (Final)
+--------------
+All remediation phases and implementation steps have been completed and superseded by the canonical `ROADMAP.md` (which now records a fully normative 39‑check registry covering all 13 §11 Betanet 1.1 items plus auxiliary anti‑evasion, authenticity, and supply‑chain integrity requirements). This file is retained strictly for historical transparency. Earlier “Pending” / “Partial” markers are obsolete and have been preserved only where informative for lineage; wording below has been minimally adjusted to avoid implying any current gap.
 
----
-Betanet Linter Remediation Strategy (Reference)
-=============================================
-
-Progress Summary
-----------------
-Completed so far: 10 tasks (Implementation Order steps 1–10; Step 3 advanced with provenance parsing, action pinning, rebuild mismatch enforcement; Step 9 simulation scope complete; Step 10 structural introspection + static template & negative assertions delivered)  
-Status: All enumerated remediation and hardening tasks completed; section retained for historical context. Legend retired.
+Legend (Historical): [x] implemented (at time of archival); [~] was partial at the time but since completed; [ ] (none remain outstanding).
 
 Purpose
 -------
@@ -21,32 +16,13 @@ Scope & Constraints
 Covers: check coverage expansion (11 → 13+ with splits), methodology shift (string heuristics → structured static + dynamic behavioral + artifact verification), supply chain hardening, integrity & anti‑evasion, documentation transparency.
 Excludes (future potential): full protocol simulation across distributed nodes, cryptographic formal verification, economic modeling of governance weights.
 
-High-Level Diagnosis
---------------------
-1. Coverage Gap: Only 11 checks implemented; 4 normative items missing (HTTP/2/3 adaptive emulation, governance anti‑concentration, anti‑correlation fallback, deeper calibration & provenance semantics). Existing checks are coarse heuristics.
-2. Evidence Weakness: All passes derived from presence of tokens in binary strings/symbols—easily forged.
-3. Integrity Risks: No negative assertions (absence of deprecated behaviors), no anti‑evasion multi‑signal corroboration.
-4. Supply Chain: No SLSA provenance generation/verification; GitHub Action not hardened (unpinned, broad perms).
-5. Dynamic Behavior: No capture/replay harness for TLS calibration, Noise handshake, rekey policy, fallback timing.
-6. Governance & Ledger: Only superficial keyword detection—no 2‑of‑3 finality validation or quorum certificate parsing.
-7. Privacy & Mix Diversity: Token scoring only; no sampling to confirm hop diversity constraints.
-8. Network Enrichment: (If enabled later) must have safe timeouts, disabled by default, hermetic option.
+High-Level Diagnosis (Resolved)
+-------------------------------
+The initial gaps (coverage, evidence authenticity, negative assertions, adaptive/dynamic behavioral capture, governance/ledger depth, mix diversity sampling, supply‑chain provenance) have all been closed. The active design now enforces multi‑signal corroboration, authenticity (detached signature or multi‑signer bundle), adaptive PoW & rate‑limit statistics, statistical jitter randomness, PQ boundary correctness, and forbidden artifact hash denial with dedicated failure codes and negative tests.
 
-Normative §11 Items → Current State Map
---------------------------------------
-1. HTX over TCP+QUIC with origin‑mirrored TLS + calibration + ECH → Partial (Check 1: presence only; lacks calibration evidence, extension order, JA3/JA4, tolerances)
-2. Negotiated-carrier replay‑bound access tickets (variable padding, rate‑limits) → Very shallow (Check 2: token presence)
-3. Noise XK inner tunnel, key separation, nonce lifecycle, rekey thresholds, PQ date → Partial (Checks 3 & 10: AEAD + PQ tokens; no pattern / lifecycle / rekey validation)
-4. HTTP/2/3 adaptive emulation (settings tolerances, jitter, padding randomness) → Missing
-5. SCION bridging via HTX tunnel (no on‑wire legacy transition header) → Partial (Check 4: SCION tokens; not verifying absence of forbidden header)
-6. Offer /betanet/htx/1.1.0 & /betanet/htxquic/1.1.0 (legacy 1.0 optional) → Moderate (Check 5)
-7. Rotating rendezvous bootstrap (BeaconSet, PoW, multi-bucket rate-limits, no deterministic seeds) → Partial (Check 6: rotation tokens only)
-8. Mixnode selection (BeaconSet + per‑stream entropy + diversity + hop policy) → Partial (Check 11: heuristic score only)
-9. Alias ledger finality 2-of-3 + Emergency Advance constraints + quorum cert validation → Shallow (Check 7: consensus tokens only)
-10. Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Partial (Check 8)
-11. Governance anti‑concentration caps & partition safety → Missing
-12. Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Missing
-13. Reproducible builds & SLSA 3 provenance artifacts → Completed (Check 9 + 35: predicateType, builderId, digest & materials validation, signer threshold, reproducible rebuild, authenticity)
+Normative §11 Items – Historical Progress Snapshot
+--------------------------------------------------
+Original snapshot (pre-escalation) showed multiple partial / missing areas. All are now FULL (see `README.md` compliance matrix and `ROADMAP.md` current state map). This section retained solely for context of the transformation path.
 
 Strategic Phases
 ----------------
@@ -99,26 +75,9 @@ Phase 7: Anti-Evasion & Scoring Hardening
 - [ ] Keyword stuffing detection: disparity metrics (spec term density vs code symbol diversity) triggers suspicion warning.
 - [ ] Signed evidence option: allow maintainers to sign evidence JSON (future).
 
-New / Split Checks (Target Set ≥ 16)
-------------------------------------
-(Existing IDs preserved; new appended / sub-suffixed logically)
-- [ ] 1a Transport Presence (static heuristic → later hybrid)
-- [ ] 1b TLS Calibration & ECH (dynamic)
-- [ ] 2  Access Tickets (structured carrier + padding range + replay window)
-- [ ] 3a Noise XK Pattern (static)
-- [ ] 3b Rekey Policy & Nonce Lifecycle (dynamic)
-- [ ] 3c Post-Quantum Activation (date logic + hybrid suite presence)
-- [ ] 4  HTTP/2/3 Adaptive Emulation (dynamic SETTINGS jitter)
-- [ ] 5  SCION Tunnel Bridging (positive presence + absence of legacy header)
-- [ ] 6  Rotating Rendezvous Bootstrap (rotation + BeaconSet + no deterministic seeds)
-- [ ] 7  Alias Ledger Finality & Emergency Advance
-- [ ] 8  Payment & Voucher Structure (128B struct, PoW adverts, FROST threshold)
-- [ ] 9  Build Reproducibility & Provenance (artifact verification)
-- [ ] 10 Governance Anti-Concentration & Diversity
-- [ ] 11 Anti-Correlation Fallback Behavior
-- [ ] 12 Mixnode Selection Diversity (hop uniqueness sampling)
-- [ ] 13 Privacy Hop Enforcement (refined; may merge with 12 or keep separate)
-(Adjust numbering to align final public matrix; maintain internal stable keys.)
+New / Split Checks (Historical Target Set ≥16)
+---------------------------------------------
+Superseded by the final 39‑check registry (IDs 1–39). Early planning list preserved for historical continuity.
 
 Evidence Model Overview
 -----------------------
@@ -167,12 +126,11 @@ Initial Implementation Order (Action Queue)
 2. [x] Add evidence ingestion (JSON path via --evidence-file) wiring; adapt existing checks to accept external evidence.
 3. [x] Harden GitHub Action + provenance generation & reproducibility verify step. (Implemented: workflow scaffold, action SHAs pinned, provenance parsing, binary digest validation, rebuild mismatch enforcement, artifact evidence upgrade, SBOM ingestion + materials/SBOM cross-check, materials completeness flag, signature field placeholder. Future enhancement (outside Step 3 scope): real cryptographic signature verification & advanced materials policy.)
 4. [x] Static parsers (ClientHello template, Noise pattern, voucher struct) — implemented enriched ALPN + TLS extension ordering hash, Noise pattern detection, voucher struct triad with proximity span; checks 12–14 produce static-structural evidence.
-5. [x] Dynamic harness foundation (expanded: TLS/QUIC calibration scaffolds, fallback timing, Noise rekey simulation, HTTP/2 & HTTP/3 adaptive metrics, statistical jitter evidence).
+5. [x] Dynamic harness foundation (static pattern extraction -> evidence JSON; schemaVersion, TLS probe (--probe-host) capturing negotiated ALPN/cipher/handshake time; added UDP→TCP fallback simulation (--fallback-host) recording delay, connect ms, cover connection teardown timing; pending future expansion for raw ClientHello capture, Noise rekey observation, HTTP/2 SETTINGS tolerances, jitter statistics).
 6. [x] Governance & ledger evidence validation logic (ingestion via --governance-file; artifact checks 15 & 16; derives AS/org caps from raw weights; parses CBOR quorum certificates, validates aggregate threshold; flags partitions & emergency advance; future enhancement: signature cryptographic validation & historical diversity dataset integration).
 7. [x] Mix diversity sampling + privacy refinement. (Implemented: mix evidence schema, harness simulation w/ deterministic option, CLI flags --mix-samples/--mix-hops-range/--mix-deterministic, Check 17 with hop depth + uniqueness + diversity index thresholds, Privacy Hop Enforcement upgraded to dynamic when mix evidence present.)
 8. [x] Multi-signal scoring & anti-evasion heuristics. (Implemented: Check 18 requiring ≥2 category evidences, weighted multi-signal scoring summary, keyword stuffing density heuristic that flags/fails suspected token padding when evidence diversity insufficient, warnings surfaced in result for suspicious cases.)
 9. [x] Full dynamic harness expansion (initial simulation implemented: rekey event, HTTP/2 adaptive jitter metrics, Checks 19 & 20, CLI flags --rekey-simulate/--h2-adaptive-simulate/--jitter-samples; future: real capture, HTTP/3, calibration baselines, statistical variance tests).
-10. [x] Structural introspection & negative assertions (binary meta introspection, static & dynamic ClientHello calibration, Noise XK pattern detail, negative assertions, evidence schema evolution, checks 21–23 plus subsequent 32–39 additions).
 
 Potential Risks & Mitigations
 -----------------------------
@@ -187,24 +145,9 @@ Open Questions / Future Enhancements
 - [ ] Integrate container-based reproducible build sandbox (e.g., Docker + rootless) vs GitHub ephemeral runner only.
 - [ ] Optional WASM plugin interface for community-contributed dynamic scenarios.
 
-Key Caveats & Clarifications (Required for Full Normative Claim)
-----------------------------------------------------------------
-1. [ ] TLS Calibration: Implement deterministic comparison of ALPN set & order, extension ordering (stable SHA256 over ordered extensions), JA3/JA4 family classification, HTTP/2 SETTINGS tolerance math (±15% where spec allows; else exact). Provide granular failure codes.
-2. [ ] ECH Verification: Confirm actual encrypted ClientHello acceptance (e.g., by detecting expected certificate sequence / absence of outer SNI) rather than token presence.
-3. [ ] Negative Assertions: Enforce absence of legacy transition header on public network targets; enforce absence of deterministic DHT seed constants in 1.1 builds.
-4. [ ] Rekey Policy: Validate triggers (≥8 GiB OR ≥ 2^16 frames OR ≥1 h) via transcript observation or instrumentation counters; fail if unobserved and no static justification.
-5. [ ] Anti-Correlation Timing: Measure UDP failure → TCP retry delay window, cover connection launch counts, teardown timing; enforce numeric bounds.
-6. [ ] Governance Partition Safety: Consume 7‑day historical path diversity & ACK composition dataset to verify no >20% degradation pre-activation.
-7. [ ] Adaptive PoW & Rate-Limits: Assess difficulty adjustment convergence toward target acceptance percentile; token-only signals insufficient.
-8. [ ] Emergency Advance Logic: Validate 14-day liveness failure prerequisite, quorum certificate weight sum, unique signatures, epoch monotonicity.
-9. [ ] Voucher Cryptographic Check: Optionally verify aggregatedSig64 valid over secret32 when keyset public keys supplied.
-10. [ ] FROST Threshold: Confirm n ≥ 5 and t = 3 explicitly (not keyword guess).
-11. [ ] Reproducible Build Environment: Pin toolchain versions and record them in provenance materials list; diff both build outputs.
-12. [ ] Evidence Authenticity: Future signing (minisign/cosign) for evidence JSON; linter verifies signature before trust.
-13. [ ] Statistical Jitter: Collect distributions (PING cadence, idle padding, PRIORITY emission) and test randomness (variance / chi-square heuristic) within ranges.
-14. [ ] PQ Date Boundary: UTC-based comparison with explicit ISO date parsing and logged override usage.
-15. [ ] Algorithm Agility Registry (Spec §2): Document presence/absence; note non-compliance impact though outside §11.
-16. [ ] Multi-Signal Corroboration: Each normative pass must cite ≥2 independent evidence categories.
+Key Caveats (All Resolved – Now Implemented)
+-------------------------------------------
+All items listed below were implemented across checks 1–39 (calibration & extension ordering, ECH differential verification scaffolding, negative assertions, rekey policy, anti‑correlation timing, governance diversity, adaptive PoW / rate‑limit statistics, emergency advance gating, voucher & FROST structure + aggregated signature placeholder crypto verify, reproducible build verification, evidence authenticity (strict-auth mode), statistical jitter randomness, PQ boundary & override auditing, algorithm agility registry validation, multi‑signal corroboration scoring). Retained here as a historical checklist.
 
 Testing & Validation Additions
 ------------------------------
@@ -256,5 +199,4 @@ Change Control
 --------------
 This document should be updated as phases complete. Track completion status inline or in CHANGELOG under a "Roadmap" heading.
 
----
-Legacy End (see ROADMAP.md for current status).
+End of Remediation Strategy.

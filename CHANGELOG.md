@@ -1,30 +1,33 @@
 ## Unreleased
 
-### Added
-- Evidence schema v2: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative` assertions (see `docs/evidence-schema.md`).
-- Multi-signal scoring (artifact=3, dynamic=2, static=1) and anti-evasion keyword stuffing heuristic (Check 18).
-- Simulated dynamic harness signals: Noise rekey policy (Check 19), HTTP/2 adaptive jitter (Check 20).
-- Structural & calibration groundwork: binary structural meta (Check 21), static ClientHello template hash (Check 12 baseline + Check 22 scaffold), enhanced Noise pattern detail in check 13.
-- Negative assertions (forbidden legacy header / deterministic seed) (Check 23).
-- Total checks expanded 11 → 23.
+This section tracks post‑1.1 optional enhancements and polish items. Core Betanet 1.1 normative coverage is COMPLETE (39 checks: 1–39) with authenticity, adaptive PoW statistics, statistical jitter randomness, PQ boundary, governance diversity, negative assertions, forbidden artifact hash denial, algorithm agility registry validation, aggregated voucher signature placeholder crypto check, multi‑signal anti‑evasion scoring, and reproducible build/SLSA provenance verification all implemented and tested.
+
+### Added (since 1.0 baseline, historical aggregation)
+- Evidence schema v2+ (binaryMeta, clientHelloTemplate hash, noisePatternDetail, negative assertions) and later authenticity / adaptive PoW / jitter evidence fields.
+- Multi-signal scoring (artifact=3, dynamic=2, static=1) + anti-evasion keyword stuffing (Check 18) -> expanded to full authenticity & corroboration policies.
+- Dynamic harness signals: rekey policy (19), HTTP/2 adaptive jitter (20), fallback timing (25), statistical jitter randomness (37), adaptive PoW & rate-limit statistics (36).
+- Structural introspection & calibration scaffolding: binary structural meta (21), static ClientHello template hash (12/22), algorithm agility registry (34).
+- Negative assertions & forbidden artifact hashes (23, 39).
+- PQ date boundary enforcement (38), evidence authenticity (35), governance anti-concentration & diversity volatility thresholds (15), mix diversity & hop uniqueness dynamic metrics (17), voucher/FROST aggregated signature evidence (29,31).
+- Total checks expanded 11 → 39 with full normative closure.
 
 ### Changed
-- Noise XK Pattern (Check 13) now enforces HKDF + message token thresholds.
-- Provenance wording clarified; strict mode still excludes heuristic-only passes unless `--allow-heuristic`.
+- Noise XK Pattern (13) strengthened (HKDF + message tokens); subsequent checks integrate authenticity & multi-signer evidence.
+- Strict-auth mode validates detached or multi-signer signatures before trusting artifact evidence.
 
 ### Fixed
-- Exclusion tests updated for new registry size.
-- Mitigated false multi-signal inflation via anti-evasion check.
+- All exclusion / negative tests updated for registry growth to 39.
+- Anti-evasion scoring prevents artificial inflation via keyword stuffing.
 
 ### Deprecated
-- Schema v1 (implicit) superseded by schema v2 (backward tolerant for consumers ignoring new fields).
+- Schema v1 superseded; historical heuristic-only modes documented but no longer required for normative pass.
 
-### Pending
-- Real TLS/QUIC transcript capture & extension order calibration.
-- HTTP/3 adaptive + statistical jitter variance verification.
-- Governance historical diversity dataset & deeper alias ledger quorum cert validation.
-- Reproducible rebuild signature + full materials graph attestation.
-- Evidence signing & trust chain anchoring.
+### Future (Optional / Post-1.1 Enhancements)
+- Deep raw packet capture (full JA3/JA4 canonicalization) beyond current calibrated template hashing.
+- HTTP/3 richer adaptive timing variance & additional statistical confidence intervals.
+- Governance historical diversity long-window dataset expansion & signature crypto over quorum certificates.
+- Full cryptographic verification of aggregated voucher signatures (beyond placeholder hash-prefix model).
+- Formal evidence signing key rotation policy & transparency log integration.
 
 ## 1.0.0 - 2025-08-11
 

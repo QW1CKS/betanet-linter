@@ -31,6 +31,9 @@ jobs:
   build:
     name: Build & Hash
     runs-on: ubuntu-latest
+    outputs:
+      base64_subjects: ${{ steps.subjects.outputs.encoded }}
+      overall_sha256: ${{ steps.hash.outputs.overall_sha256 }}
     steps:
       - name: Checkout
         # Pinned actions/checkout@v4 (update SHA periodically)
@@ -71,6 +74,21 @@ jobs:
           EOF
           mkdir -p evidence
           cp provenance-reference.json evidence/provenance.json
+      - name: Encode SLSA subjects (base64)
+        id: subjects
+        if: steps.hash.outputs.overall_sha256
+        run: |
+          set -e
+          line="betanet-linter:sha256:${{ steps.hash.outputs.overall_sha256 }}"
+          echo "Subject line: $line"
+          # Cross-platform base64 (GNU vs BSD)
+          if base64 --help 2>&1 | grep -qi -- '-w'; then
+            encoded=$(printf '%s' "$line" | base64 -w0)
+          else
+            encoded=$(printf '%s' "$line" | base64)
+          fi
+          echo "encoded=$encoded" >> "$GITHUB_OUTPUT"
+          echo "Base64 subjects: $encoded"
       - name: Upload build artifacts
         # Pinned actions/upload-artifact@v4
         uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.3
@@ -81,18 +99,22 @@ jobs:
             dist.sha256sum
             evidence/provenance.json
           retention-days: 7
-      - name: (Placeholder) Generate SLSA Provenance
-        if: steps.hash.outputs.overall_sha256
-        # Pinned slsa-framework generic generator (update as needed)
-        uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
-        with:
-          base64-subjects: |
-            betanet-linter:sha256:${{ steps.hash.outputs.overall_sha256 }}
-        secrets: inherit
+
+  provenance:
+    name: Generate SLSA Provenance
+    needs: build
+    if: needs.build.outputs.base64_subjects != ''
+    uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
+    with:
+      base64-subjects: ${{ needs.build.outputs.base64_subjects }}
+    permissions:
+      contents: read
+      id-token: write
+    secrets: inherit
 
   rebuild:
     name: Rebuild & Verify
-    needs: build
+    needs: [build, provenance]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -140,7 +162,8 @@ jobs:
             echo 'No provenance evidence available.'
           fi
       - name: Upload verification outputs
-        uses: actions/upload-artifact@v4
+        # Pinned actions/upload-artifact@v4 (same pin as build job)
+        uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.3
         with:
           name: reproducibility-verification-${{ github.run_number }}
           path: |
