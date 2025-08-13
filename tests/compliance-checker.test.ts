@@ -1011,11 +1011,10 @@ describe('BetanetComplianceChecker', () => {
       checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
       checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
     };
-    const histSeries = [
-      { timestamp: '2025-08-01T00:00:00Z', asShares: { AS1: 0.12, AS2: 0.11, AS3: 0.10 } },
-      { timestamp: '2025-08-02T00:00:00Z', asShares: { AS1: 0.13, AS2: 0.09, AS3: 0.08 } },
-      { timestamp: '2025-08-03T00:00:00Z', asShares: { AS1: 0.14, AS2: 0.10, AS3: 0.07 } }
-    ];
+    const histSeries: any[] = [];
+    for (let i=0;i<7*24;i++) {
+      histSeries.push({ timestamp: new Date(Date.now()-i*3600*1000).toISOString(), asShares: { AS1: 0.12+(i%5)*0.001, AS2: 0.11, AS3: 0.10 } });
+    }
     const govFile = path.join(__dirname, 'gov-evidence3.json');
     const weights = [
       { validator: 'val1', as: 'AS1', org: 'OrgA', weight: 20 },
@@ -1024,7 +1023,7 @@ describe('BetanetComplianceChecker', () => {
       { validator: 'val4', as: 'AS4', org: 'OrgD', weight: 20 },
       { validator: 'val5', as: 'AS5', org: 'OrgE', weight: 20 }
     ];
-    const govEvidence = { governance: { weights, partitionsDetected: false }, governanceHistoricalDiversity: { series: histSeries } };
+  const govEvidence = { governance: { weights, partitionsDetected: false }, governanceHistoricalDiversity: { series: histSeries, stable: true, advancedStable: true, volatility: 0.02, maxWindowShare: 0.19, maxDeltaShare: 0.03, avgTop3: 0.18, degradationPct: 0.1 } };
     await fs.writeFile(govFile, JSON.stringify(govEvidence));
     const result = await checker.checkCompliance(tmp, { governanceFile: govFile, allowHeuristic: true });
     const govCheck = result.checks.find(c => c.id === 15);

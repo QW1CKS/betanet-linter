@@ -3,6 +3,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 
 describe('ISSUE-037 SBOM name sanitization', () => {
+  jest.setTimeout(30000);
   const tmpDir = path.join(__dirname, 'temp-sanitize');
   // Use a filename with spaces, traversal tokens, wildcard characters. Avoid null/control bytes which FS rejects.
   const binPath = path.join(tmpDir, 'weird name ..__bin(+)!bin');

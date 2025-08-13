@@ -254,6 +254,12 @@ export interface IngestedEvidence {
     series?: { timestamp: string; asShares: Record<string, number> }[];
     maxASShareDropPct?: number; // computed metric of largest single AS share drop (partition safety)
     stable?: boolean; // flag after verification thresholds
+  volatility?: number; // stddev or mean absolute change metric
+  maxWindowShare?: number; // maximum share for any AS in sliding window
+  maxDeltaShare?: number; // max change between consecutive windows
+  avgTop3?: number; // average of top 3 AS shares across period
+  degradationPct?: number; // observed degradation (>0.2 triggers PARTITION_DEGRADATION)
+  advancedStable?: boolean; // previously referenced advanced stability flag
   };
   mix?: {
     samples?: number; // number of path construction samples observed

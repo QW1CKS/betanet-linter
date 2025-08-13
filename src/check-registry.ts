@@ -769,7 +769,9 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           const windowOk = hist.maxWindowShare === undefined || hist.maxWindowShare <= 0.2;
           const deltaOk = hist.maxDeltaShare === undefined || hist.maxDeltaShare <= 0.05;
           const avgTop3Ok = hist.avgTop3 === undefined || hist.avgTop3 <= 0.24; // 20% cap * 1.2 = 0.24
-          diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok;
+          const pointsOk = !hist.series || hist.series.length >= (7*24); // require ≥7*24 points if series provided
+          const degradationOk = hist.degradationPct === undefined || hist.degradationPct <= 0.20; // Task 7 threshold
+          diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok && pointsOk && degradationOk;
           if (!stableBasic) diversityReasons.push('historical basic instability');
           if (!adv) diversityReasons.push('advancedStable=false');
           if (!volatilityOk) diversityReasons.push(`volatility=${hist.volatility}`);
@@ -777,6 +779,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           if (!deltaOk) diversityReasons.push(`maxDeltaShare=${hist.maxDeltaShare}`);
           if (!avgTop3Ok) diversityReasons.push(`avgTop3=${hist.avgTop3}`);
           if (!hasAdvMetrics) diversityReasons.push('adv-metrics-missing');
+          if (!pointsOk) diversityReasons.push('insufficient-points');
+          if (!degradationOk) diversityReasons.push('PARTITION_DEGRADATION');
         }
         passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && diversityOk);
         details = passed ? `✅ Caps enforced (AS=${(maxASShare??0).toFixed(3)} org=${(maxOrgShare??0).toFixed(3)}) partitions=none diversity=stable` : `❌ Governance issues: ${missingList([

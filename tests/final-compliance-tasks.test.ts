@@ -333,7 +333,50 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 7: Governance ACK Span & Partition Safety Dataset
-  test.todo('Task 7: Implement tests for 7*24 point historical diversity dataset with volatility/maxWindowShare/maxDeltaShare thresholds; degrade scenario triggers PARTITION_DEGRADATION.');
+  describe('Task 7: Governance Historical Diversity & Partition Safety (Check 15 extension)', () => {
+    function analyzerForGov(hist: any, gov: any = {}) {
+      return {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['governance','weights'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        evidence: { governance: { asCapApplied: true, orgCapApplied: true, maxASShare: 0.18, maxOrgShare: 0.20, partitionsDetected: false, ...gov }, governanceHistoricalDiversity: hist }
+      } as any;
+    }
+
+    function makeSeries(points: number) {
+      const arr = [] as any[];
+      for (let i=0;i<points;i++) arr.push({ timestamp: new Date(Date.now()-i*3600*1000).toISOString(), asShares: { AS1: 0.18, AS2: 0.17, AS3: 0.16 } });
+      return arr;
+    }
+
+    it('passes with sufficient points and metrics within thresholds', async () => {
+      const hist = { series: makeSeries(7*24), stable: true, advancedStable: true, volatility: 0.02, maxWindowShare: 0.19, maxDeltaShare: 0.03, avgTop3: 0.18, degradationPct: 0.1 };
+      const result = await runWithAnalyzer(analyzerForGov(hist));
+      const check15 = result.checks.find(c => c.id === 15)!;
+      expect(check15.passed).toBe(true);
+    });
+
+    it('fails with PARTITION_DEGRADATION when degradationPct > 0.2', async () => {
+      const hist = { series: makeSeries(7*24), stable: true, advancedStable: true, volatility: 0.02, maxWindowShare: 0.19, maxDeltaShare: 0.03, avgTop3: 0.18, degradationPct: 0.25 };
+      const result = await runWithAnalyzer(analyzerForGov(hist));
+      const check15 = result.checks.find(c => c.id === 15)!;
+      expect(check15.passed).toBe(false);
+      expect(check15.details).toMatch(/PARTITION_DEGRADATION/);
+    });
+
+    it('fails when insufficient points (<7*24)', async () => {
+      const hist = { series: makeSeries(50), stable: true, advancedStable: true, volatility: 0.02, maxWindowShare: 0.19, maxDeltaShare: 0.03, avgTop3: 0.18, degradationPct: 0.1 };
+      const result = await runWithAnalyzer(analyzerForGov(hist));
+      const check15 = result.checks.find(c => c.id === 15)!;
+      expect(check15.passed).toBe(false);
+      expect(check15.details).toMatch(/insufficient-points/);
+    });
+  });
 
   // Task 8: Cover Connection Provenance & Timing Enforcement
   test.todo('Task 8: Implement tests for provenance classification, coverStartDelayMs range, teardownIqrMs, outlierPct, failure codes COVER_INSUFFICIENT / COVER_DELAY_OUT_OF_RANGE / TEARDOWN_VARIANCE_EXCESS.');

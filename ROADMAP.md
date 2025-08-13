@@ -32,7 +32,7 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Objective: Enforce 2-of-3 finality with per-chain certificate weight sums, epoch monotonicity, emergency advance liveness (≥14 days inactivity) and justification proof.
   - AC: governance/ledger evidence includes finalityDepth, quorumWeights[], emergencyAdvance {used:boolean, justified:boolean, livenessDays:int}; failure codes: FINALITY_DEPTH_SHORT, EMERGENCY_LIVENESS_SHORT, QUORUM_WEIGHT_MISMATCH.
 
-[ ] 7. Governance ACK Span & Partition Safety Dataset
+[x] 7. Governance ACK Span & Partition Safety Dataset
   - Objective: Incorporate 7-day historical ACK diversity (AS / ISD counts & shares) ensuring ≤20% degradation pre-activation.
   - AC: Evidence.governanceHistoricalDiversity includes series with ≥7*24 points; computed volatility, maxWindowShare, maxDeltaShare thresholds satisfied; failure code PARTITION_DEGRADATION when degradation >20%. Fixture with induced degradation triggers fail.
 
