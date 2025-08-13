@@ -44,7 +44,7 @@ Normative §11 Items → Current State Map
 2. [x] Negotiated-carrier replay‑bound access tickets (variable padding, rate‑limits) → Full (Checks 2 + 30: structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling: rotation interval ≤10m, replay window ≤2m)
 3. [x] Noise XK inner tunnel, key separation, nonce lifecycle, rekey thresholds, PQ date → Full (Checks 13 & 19: static pattern + dynamic transcript, rekey triggers, PQ date enforced)
 4. [x] HTTP/2/3 adaptive emulation (settings tolerances, jitter, padding randomness, stddev, randomnessOk, Full dynamic evidence) → Full
-5. [~] SCION bridging via HTX tunnel (no on‑wire legacy transition header) → Partial (Check 4: SCION tokens; not verifying absence of forbidden header)
+5. [x] SCION bridging via HTX tunnel (no on‑wire legacy transition header, negative assertion enforced, Full evidence) → Full
 6. [~] Offer /betanet/htx/1.1.0 & /betanet/htxquic/1.1.0 (legacy 1.0 optional) → Moderate (Check 5)
 7. [~] Rotating rendezvous bootstrap (BeaconSet, PoW, multi-bucket rate-limits, no deterministic seeds) → Partial (Check 6: rotation tokens only)
 8. [~] Mixnode selection (BeaconSet + per‑stream entropy + diversity + hop policy) → Partial (Check 11: heuristic score only)

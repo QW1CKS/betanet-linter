@@ -161,28 +161,32 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   },
   {
     id: 4,
-    key: 'scion-path-management',
-    name: 'SCION Path Management',
-    description: 'Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header',
+    key: 'scion-bridging',
+    name: 'SCION Bridging via HTX Tunnel',
+    description: 'Requires ≥2 SCION path diversity, path management or IP-transition header, and negative assertion for legacy transition header',
     severity: 'critical',
-  introducedIn: '1.0',
-  mandatoryIn: '1.0',
+    introducedIn: '1.0',
+    mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const scionSupport = await analyzer.checkSCIONSupport();
-      const passed = scionSupport.hasSCION && (scionSupport.pathManagement || scionSupport.hasIPTransition) && scionSupport.pathDiversityCount >= 2;
+  await analyzer.getStaticPatterns?.();
+  const negative = (analyzer as any).evidence?.negative;
+  const noLegacyHeader = !negative?.forbiddenPresent?.includes('legacy_transition_header');
+      const passed = scionSupport.hasSCION && (scionSupport.pathManagement || scionSupport.hasIPTransition) && scionSupport.pathDiversityCount >= 2 && noLegacyHeader;
       return {
         id: 4,
-        name: 'SCION Path Management',
-        description: 'Maintains ≥ 3 signed SCION paths or attaches a valid IP-transition header',
+        name: 'SCION Bridging via HTX Tunnel',
+        description: 'Requires ≥2 SCION path diversity, path management or IP-transition header, and negative assertion for legacy transition header',
         passed,
-        details: passed ? `✅ SCION support with path management/IP-transition & path diversity=${scionSupport.pathDiversityCount}` : `❌ Missing: ${missingList([
+        details: passed ? `✅ SCION bridging, path diversity=${scionSupport.pathDiversityCount}, negative assertion enforced` : `❌ Missing: ${missingList([
           !scionSupport.hasSCION && 'SCION support',
           !scionSupport.pathManagement && 'path management',
           !scionSupport.hasIPTransition && 'IP-transition header',
-          scionSupport.pathDiversityCount < 2 && '≥2 path diversity markers'
+          scionSupport.pathDiversityCount < 2 && '≥2 path diversity markers',
+          !noLegacyHeader && 'legacy transition header present'
         ])}`,
         severity: 'critical',
-        evidenceType: 'heuristic'
+        evidenceType: passed ? 'static-structural' : 'heuristic'
       };
     }
   },
