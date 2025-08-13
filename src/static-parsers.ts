@@ -28,6 +28,25 @@ export interface StaticPatterns {
   clientHello?: ClientHelloStatic;
   noise?: NoiseStatic;
   voucher?: VoucherStatic;
+  accessTicket?: AccessTicketStatic;
+  voucherCrypto?: VoucherCryptoStatic;
+}
+
+export interface AccessTicketStatic {
+  detected: boolean;
+  fieldsPresent: string[]; // e.g., nonce, exp, sig, pad
+  hex16Count?: number;
+  hex32Count?: number;
+  structConfidence?: number; // 0..1 heuristic confidence
+}
+
+export interface VoucherCryptoStatic {
+  structLikely: boolean; // from voucher struct
+  keysetIdB64?: string; // 44 char base64 (32 bytes)
+  secretB64?: string;   // 44 char base64 (32 bytes)
+  aggregatedSigB64?: string; // 88 char base64 (64 bytes)
+  signatureValid?: boolean; // true if base64 decodes to expected sizes
+  frostThreshold?: { n?: number; t?: number };
 }
 
 // Naive ALPN extraction: search for well-known ALPN strings and preserve first-seen order.
@@ -122,5 +141,49 @@ export function extractStaticPatterns(strings: string[], binary?: Buffer): Stati
   if (noise) result.noise = noise;
   const voucher = detectVoucherStruct(strings, binary as any);
   if (voucher) result.voucher = voucher;
+  // Access ticket structural signals
+  const lower = strings.map(s => s.toLowerCase());
+  const ticketTokens = ['ticket','access','nonce','exp','sig','pad','padding','replay'];
+  const fieldsPresent = ticketTokens.filter(t => lower.some(s => s.includes(t)));
+  if (fieldsPresent.includes('ticket') && fieldsPresent.includes('nonce')) {
+    // Count likely hex tokens of length 16/32 (IDs, nonces)
+    const hex16 = strings.filter(s => /^[0-9a-fA-F]{16}$/.test(s)).length;
+    const hex32 = strings.filter(s => /^[0-9a-fA-F]{32}$/.test(s)).length;
+    const confidence = Math.min(1, (fieldsPresent.length / 7) * 0.6 + Math.min(1, (hex16+hex32)/4) * 0.4);
+    result.accessTicket = { detected: true, fieldsPresent, hex16Count: hex16, hex32Count: hex32, structConfidence: Number(confidence.toFixed(2)) };
+  }
+  // Voucher crypto extraction (base64 components near voucher tokens)
+  if (voucher) {
+    const b64Candidates = strings.filter(s => /^[A-Za-z0-9+/=]{44}$/.test(s) || /^[A-Za-z0-9+/=]{88}$/.test(s));
+    let keysetIdB64: string | undefined;
+    let secretB64: string | undefined;
+    let aggregatedSigB64: string | undefined;
+    for (const s of b64Candidates) {
+      if (s.length === 44) {
+        if (!keysetIdB64) keysetIdB64 = s; else if (!secretB64 && s !== keysetIdB64) secretB64 = s;
+      } else if (s.length === 88 && !aggregatedSigB64) {
+        aggregatedSigB64 = s;
+      }
+      if (keysetIdB64 && secretB64 && aggregatedSigB64) break;
+    }
+    let signatureValid = false;
+    try {
+      if (keysetIdB64 && secretB64 && aggregatedSigB64) {
+        const k = Buffer.from(keysetIdB64, 'base64');
+        const sec = Buffer.from(secretB64, 'base64');
+        const sig = Buffer.from(aggregatedSigB64, 'base64');
+        signatureValid = k.length === 32 && sec.length === 32 && sig.length === 64;
+      }
+    } catch { /* ignore */ }
+    // FROST threshold heuristic
+    let frost: { n?: number; t?: number } | undefined;
+    const frostLine = lower.find(l => l.includes('frost') && (l.includes('n=') || l.includes('t=')));
+    if (frostLine) {
+      const nMatch = frostLine.match(/n=(\d+)/i);
+      const tMatch = frostLine.match(/t=(\d+)/i);
+      frost = { n: nMatch ? parseInt(nMatch[1],10) : undefined, t: tMatch ? parseInt(tMatch[1],10) : undefined };
+    }
+    result.voucherCrypto = { structLikely: voucher.structLikely, keysetIdB64, secretB64, aggregatedSigB64, signatureValid, frostThreshold: frost };
+  }
   return result;
 }

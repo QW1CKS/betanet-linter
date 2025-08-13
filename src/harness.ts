@@ -5,6 +5,7 @@ import * as net from 'net';
 import * as dgram from 'dgram';
 import { spawn } from 'child_process';
 import * as crypto from 'crypto';
+import { buildCanonicalClientHello } from './tls-capture';
 
 // Lightweight TLS probe (scaffold) – Phase 2 foundation
 // Captures negotiated ALPN, cipher, protocol version and basic timing.
@@ -103,7 +104,7 @@ export interface HarnessEvidence {
   mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
   h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
-  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; ja3Hash?: string; ja4?: string; rawClientHelloB64?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
+  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; ja3Hash?: string; ja3Canonical?: string; ja4?: string; rawClientHelloB64?: string; rawClientHelloCanonicalB64?: string; rawClientHelloCanonicalHash?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
   // (Phase 7 extension) ja3Hash added to dynamicClientHelloCapture; keep interface loose via index signature if needed
   calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
   quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number; scil?: number; tokenLength?: number; odcil?: number }; rawInitialB64?: string };
@@ -391,6 +392,8 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       const ecPoints: number[] = []; // rarely exposed; leave empty
       const ja3 = `771,${ciphers.join('-')},${extIds.join('-')},${curves.join('-')},${ecPoints.join('-')}`;
       const ja3Hash = crypto.createHash('md5').update(ja3).digest('hex');
+  // Build canonical textual representation (future: real packet capture to replace extIds/ciphers ordering)
+  const canonical = buildCanonicalClientHello({ extensions: extIds, ciphers, curves, alpn, host });
       const matchStatic = !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256);
       let mismatchReason: string | undefined;
       if (!matchStatic && evidence.clientHello) {
@@ -408,6 +411,7 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       // Construct a pseudo raw ClientHello byte sequence (best-effort) for integrity / future parsing upgrades.
       // We DO NOT have the authentic raw bytes without deeper packet capture; encode structural elements deterministically.
       let rawStruct: Buffer | undefined;
+      let canonicalRaw: Buffer | undefined;
       try {
         const parts: number[] = [];
         // Legacy Version 0x0303 (TLS 1.2) per TLS1.3 ClientHello; record length placeholders
@@ -423,6 +427,81 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
           parts.push(eId & 0xff);
         }
         rawStruct = Buffer.from(parts);
+        // Attempt a more protocol-faithful ClientHello construction (canonicalRaw)
+        // This is still synthetic but respects handshake record framing & extension TLVs so downstream tooling can parse ordering reliably.
+        const buildCanonical = () => {
+          // Helper to push 16-bit
+          const out: number[] = [];
+          const push16 = (n: number) => { out.push((n>>8)&0xff, n & 0xff); };
+          // Handshake record header will be constructed after body length known.
+          const body: number[] = [];
+          // client_version TLS 1.2 (for TLS1.3 ClientHello)
+          body.push(0x03,0x03);
+          // Random (32 bytes) deterministic hash of extOrderSha256 for reproducibility
+          const rand = crypto.createHash('sha256').update(extOrderSha256).digest().subarray(0,32);
+          body.push(...rand);
+          // session id length 0
+          body.push(0x00);
+          // Cipher suites list: use captured pseudo ciphers or fallback to a standard minimal offering set
+          const defaultCiphers = [0x1301,0x1302,0x1303,0xC02F,0xC02B];
+          const offer = ciphers.length ? ciphers : defaultCiphers;
+          push16.call({out: body} as any, offer.length * 2); // length
+          for (const cs of offer) { body.push((cs>>8)&0xff, cs & 0xff); }
+          // compression methods: length 1, null
+          body.push(0x01,0x00);
+          // Extensions block
+          const extBlock: number[] = [];
+          const putExt = (type: number, data: number[]) => { extBlock.push((type>>8)&0xff, type & 0xff, (data.length>>8)&0xff, data.length & 0xff, ...data); };
+          // Preserve observed extension ordering; supply trivial data payloads where required
+          for (const e of extIds) {
+            switch(e) {
+              case 0x0000: // server_name
+                // host name list: list length + name type + name length + name
+                {
+                  const hostBytes = Buffer.from(host);
+                  const nameList: number[] = [0x00, hostBytes.length>>8, hostBytes.length & 0xff, ...hostBytes];
+                  const listLen = nameList.length;
+                  const data = [(listLen>>8)&0xff, listLen & 0xff, ...nameList];
+                  putExt(e, data);
+                }
+                break;
+              case 0x0010: // ALPN
+                if (alpn && alpn.length) {
+                  const protos: number[] = [];
+                  for (const p of alpn) { const b = Buffer.from(p); protos.push(b.length, ...b); }
+                  const protoBytes = [ (protos.length>>8)&0xff, protos.length & 0xff, ...protos ];
+                  putExt(e, protoBytes);
+                } else putExt(e, []);
+                break;
+              case 0x000b: // ec_point_formats
+                putExt(e, [1,0]); // length 1, uncompressed
+                break;
+              case 0x000a: // supported_groups
+                {
+                  const groups = curves.length ? curves : [29,23,24]; // x25519, secp256r1, secp384r1 (pseudo IDs if hashed earlier)
+                  const grpBytes: number[] = [];
+                  for (const g of groups) grpBytes.push((g>>8)&0xff, g & 0xff);
+                  const len = grpBytes.length;
+                  putExt(e, [(len>>8)&0xff, len & 0xff, ...grpBytes]);
+                }
+                break;
+              default:
+                putExt(e, []);
+            }
+          }
+          // Append a padding extension if none present (id 21) to stabilize length (optional)
+          if (!extIds.includes(21)) {
+            putExt(21, [0x00]);
+          }
+          const extLen = extBlock.length;
+          body.push((extLen>>8)&0xff, extLen & 0xff, ...extBlock);
+          // Now wrap in handshake (type=1 ClientHello) and record (type=22)
+          const hsLen = body.length;
+          const handshake: number[] = [0x01, (hsLen>>16)&0xff, (hsLen>>8)&0xff, hsLen & 0xff, ...body];
+          const record: number[] = [0x16, 0x03, 0x01, (handshake.length>>8)&0xff, handshake.length & 0xff, ...handshake];
+          return Buffer.from(record);
+        };
+        try { canonicalRaw = buildCanonical(); } catch { /* ignore canonical build errors */ }
       } catch { /* ignore */ }
       // JA4 placeholder classification: Construct coarse taxonomy string.
       // JA4 (true) has defined sections; here we approximate to flag future upgrade path.
@@ -432,6 +511,7 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
         extOrderSha256,
         ja3,
         ja3Hash,
+  ja3Canonical: canonical.ja3Canonical,
         ja4,
         capturedAt: new Date().toISOString(),
         matchStaticTemplate: matchStatic,
@@ -442,6 +522,8 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
         ecPointFormats: ecPoints,
         captureQuality: 'parsed-openssl',
         rawClientHelloB64: rawStruct ? rawStruct.toString('base64') : undefined
+  , rawClientHelloCanonicalB64: canonicalRaw ? canonicalRaw.toString('base64') : undefined
+  , rawClientHelloCanonicalHash: canonicalRaw ? crypto.createHash('sha256').update(canonicalRaw).digest('hex') : undefined
       };
       if (!evidence.calibrationBaseline && evidence.clientHello) {
         evidence.calibrationBaseline = { alpn: evidence.clientHello.alpn, extOrderSha256: evidence.clientHello.extOrderSha256, source: 'static-template', capturedAt: new Date().toISOString() };

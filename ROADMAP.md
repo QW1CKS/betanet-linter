@@ -9,6 +9,15 @@ Completed so far: Phases 0–6 plus Phase 7 hardening slices (detached evidence 
 Pending: Remaining Phase 7 tasks (full DSSE attestation chain trust & key selection policies, real raw TLS/QUIC capture (true JA3/JA4) & QUIC Initial parse, expanded ledger/gov signature sets, voucher cryptographic validation, provenance chain & materials strict policy, deeper quantitative cover/anomaly modeling).  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
+Remaining Phase 7 Critical Tasks (Current Focus)
+-----------------------------------------------
+- [ ] True raw TLS/QUIC capture & canonical JA3/JA4 replacement (currently pseudo synthetic canonical only)
+- [ ] QUIC Initial deep varint parsing & retry/version negotiation handling
+- [ ] Voucher aggregated signature cryptographic verification + real FROST threshold math (n,t; aggregatedSig64 validation)
+- [ ] DSSE/SLSA full signature & materials policy validation (per-signer key policy; subject ↔ SBOM correlation with explicit failure reasons)
+- [ ] Access ticket structural + rotation/replay policy check (new Check 30)
+- [ ] Evidence schema bump & docs/README updates reflecting new fields (ja3Canonical, rawClientHelloCanonicalB64, voucherCrypto, accessTicket)
+
 Purpose
 -------
 Authoritative internal roadmap to evolve current heuristic-focused Betanet compliance linter into a normative, evidence‑driven, CI‑trustworthy tool satisfying all 13 §11 items of the Betanet 1.1 specification.

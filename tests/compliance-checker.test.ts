@@ -1,4 +1,5 @@
 import { BetanetComplianceChecker } from '../src/index';
+import { ALL_CHECKS } from '../src/check-registry';
 import { validateCycloneDXShape, validateSPDXTagValue, validateCycloneDXStrict, validateSPDXTagValueStrict } from '../src/sbom/sbom-validators';
 import { BinaryAnalyzer } from '../src/analyzer';
 import * as fs from 'fs-extra';
@@ -16,7 +17,9 @@ describe('BetanetComplianceChecker', () => {
   });
 
   describe('checkCompliance', () => {
-    it('should return a compliance result with all checks', async () => {
+  const TOTAL_CHECKS = ALL_CHECKS.length; // dynamic to avoid brittle literals
+
+  it('should return a compliance result with all checks', async () => {
       // Inject mock analyzer directly (private field access via casting)
       (checker as any)._analyzer = {
         checkNetworkCapabilities: () => Promise.resolve({
@@ -74,9 +77,9 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-  // Total checks increased to 28 after Phase 7 continuation (mix advanced variance + HTTP/3 adaptive)
-  expect(result.checks).toHaveLength(28);
-  expect(result.summary.total).toBe(28);
+  // Total checks dynamic (Phase 7 continuation + subsequent additions)
+  expect(result.checks).toHaveLength(TOTAL_CHECKS);
+  expect(result.summary.total).toBe(TOTAL_CHECKS);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
   // Spec summary should be present
@@ -255,8 +258,8 @@ describe('BetanetComplianceChecker', () => {
         checkFilters: { exclude: [10] }
       });
 
-  // With 28 total, excluding id 10 should yield 27
-  expect(result.checks).toHaveLength(27); // 28 total minus excluded 10
+  // Excluding one id should reduce count by 1
+  expect(result.checks).toHaveLength(TOTAL_CHECKS - 1);
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 

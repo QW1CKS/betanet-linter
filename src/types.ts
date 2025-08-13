@@ -207,6 +207,7 @@ export interface IngestedEvidence {
     extOrderSha256?: string; // hash of observed extension ordering
     ja3?: string; // optional JA3/JA4 style fingerprint string (simulated until real capture integrated)
   ja3Hash?: string; // md5 hash of JA3 canonical string
+  ja3Canonical?: string; // canonical form when full raw capture available
     capturedAt?: string; // ISO timestamp of capture
     matchStaticTemplate?: boolean; // analyzer/harness comparison result against static template
   note?: string; // free-form note / simulation marker
@@ -215,6 +216,25 @@ export interface IngestedEvidence {
   curves?: number[]; // supported groups IDs
   ecPointFormats?: number[]; // EC point formats
   captureQuality?: 'simulated' | 'parsed-openssl';
+  rawClientHelloB64?: string; // existing pseudo/raw capture
+  rawClientHelloCanonicalB64?: string; // improved canonical synthetic struct
+  rawClientHelloCanonicalHash?: string; // sha256 hash of canonical raw ClientHello bytes (base64 decoded)
+  };
+  // New static structural evidence: access ticket & voucher cryptographic struct
+  accessTicket?: {
+    detected: boolean;
+    fieldsPresent: string[];
+    hex16Count?: number;
+    hex32Count?: number;
+    structConfidence?: number;
+  };
+  voucherCrypto?: {
+    structLikely: boolean;
+    keysetIdB64?: string;
+    secretB64?: string;
+    aggregatedSigB64?: string;
+    signatureValid?: boolean;
+    frostThreshold?: { n?: number; t?: number };
   };
   calibrationBaseline?: {
     alpn?: string[];

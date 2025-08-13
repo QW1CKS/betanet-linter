@@ -1,6 +1,6 @@
 <bom xmlns="http://cyclonedx.org/schema/bom/1.4" version="1">
   <metadata>
-    <timestamp>2025-08-13T11:07:06.716Z</timestamp>
+    <timestamp>2025-08-13T11:22:42.099Z</timestamp>
     <component>
       <name>temp-stream-bin</name>
       <version>1.0.0</version>

@@ -997,6 +997,29 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter & QPACK settings', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
     }
   }
+  ,
+  {
+    id: 29,
+    key: 'voucher-frost-struct-validation',
+    name: 'Voucher/FROST Struct Validation',
+    description: 'Validates voucher cryptographic struct base64 components & FROST threshold hints',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      await analyzer.getStaticPatterns?.();
+      const ev = analyzer.evidence || {};
+      const vc = ev.voucherCrypto;
+      if (!vc) return { id: 29, name: 'Voucher/FROST Struct Validation', description: 'Validates voucher cryptographic struct base64 components & FROST threshold hints', passed: false, details: '❌ No voucherCrypto evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const baseOk = vc.signatureValid === true;
+      const thresholdOk = vc.frostThreshold ? ((vc.frostThreshold.n || 0) >= 5 && (vc.frostThreshold.t || 0) >= 3 && (vc.frostThreshold.t || 0) <= (vc.frostThreshold.n || 0)) : false;
+      const passed = baseOk && thresholdOk;
+      const details = passed ? `✅ struct base64 sizes ok n=${vc.frostThreshold?.n} t=${vc.frostThreshold?.t}` : `❌ Voucher struct issues: ${missingList([
+        !baseOk && 'invalid base64 component sizes',
+        !thresholdOk && 'threshold n>=5 t>=3 not satisfied'
+      ])}`;
+      return { id: 29, name: 'Voucher/FROST Struct Validation', description: 'Validates voucher cryptographic struct base64 components & FROST threshold hints', passed, details, severity: 'minor', evidenceType: 'static-structural' };
+    }
+  }
 ];
 
 export const ALL_CHECKS: CheckDefinitionMeta[] = [...CHECK_REGISTRY, ...STEP_10_CHECKS as CheckDefinitionMeta[], ...PHASE_4_CHECKS, ...PHASE_7_CONT_CHECKS];

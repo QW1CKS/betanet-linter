@@ -156,6 +156,12 @@ export class BinaryAnalyzer {
             messageTokensFound
           };
         }
+        if (this.staticPatterns?.accessTicket) {
+          anySelf.evidence.accessTicket = this.staticPatterns.accessTicket;
+        }
+        if (this.staticPatterns?.voucherCrypto) {
+          anySelf.evidence.voucherCrypto = this.staticPatterns.voucherCrypto;
+        }
         // Negative assertions: forbidden tokens
         const forbidden = ['deterministic_seed','legacy_transition_header'];
         const present: string[] = [];
