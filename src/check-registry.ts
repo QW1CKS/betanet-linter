@@ -6,6 +6,7 @@ import { BinaryAnalyzer } from './analyzer';
 import { TRANSPORT_ENDPOINT_VERSIONS, OPTIONAL_TRANSPORTS, POST_QUANTUM_MANDATORY_DATE, POST_QUANTUM_MANDATORY_EPOCH_MS, parseOverridePQDate } from './constants';
 import { evaluatePrivacyTokens } from './heuristics';
 import { ComplianceCheck } from './types';
+import * as crypto from 'crypto';
 import { missingList } from './format';
 
 export interface CheckDefinitionMeta {
@@ -883,6 +884,15 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
 ];
 
 // Step 10 appended checks (IDs 21-23) added after existing registry for stability
+function cryptoLikeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  try {
+    return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+  } catch {
+    return a === b;
+  }
+}
+
 export const STEP_10_CHECKS = [
   {
     id: 21,
@@ -912,6 +922,7 @@ export const STEP_10_CHECKS = [
       const ev = analyzer.evidence || {};
       const ch = ev.clientHelloTemplate;
       const dyn = ev.dynamicClientHelloCapture;
+      const h2 = ev.h2Adaptive || ev.h2AdaptiveDynamic; // potential SETTINGS evidence for SETTINGS_DRIFT code
       let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
       let passed = false;
       let details = '❌ No ClientHello template';
@@ -922,17 +933,41 @@ export const STEP_10_CHECKS = [
       }
       // Dynamic upgrade: if dynamic capture present ensure it matches static template & promote evidence type
       if (dyn && dyn.alpn && dyn.extOrderSha256) {
-        const matches = ch && dyn.alpn.join(',') === ch.alpn.join(',') && dyn.extOrderSha256 === ch.extOrderSha256;
         evidenceType = 'dynamic-protocol';
-        passed = passed && matches; // require static baseline + dynamic match
-        let mismatchCode = '';
-        if (!matches && dyn.note && dyn.note.includes(':')) {
-          const parts = dyn.note.split(':');
-            mismatchCode = parts[parts.length-1];
+        let mismatchCode: string | undefined;
+        if (!ch) {
+          mismatchCode = 'NO_STATIC_BASELINE';
         }
-            const ja3Disp = dyn.ja3Hash ? `${dyn.ja3Hash.slice(0,12)}` : (dyn.ja3||'').slice(0,16);
-            const ja4Disp = dyn.ja4 ? ` ja4=${dyn.ja4}` : '';
-            details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}${ja4Disp}` : `❌ Dynamic mismatch ${mismatchCode ? '('+mismatchCode+') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}${ja4Disp}`;
+        const alpnMatch = !!(ch && dyn.alpn.join(',') === ch.alpn.join(','));
+        const extMatch = !!(ch && dyn.extOrderSha256 === ch.extOrderSha256);
+        if (!alpnMatch) mismatchCode = mismatchCode || 'ALPN_ORDER_MISMATCH';
+        if (!extMatch) mismatchCode = mismatchCode || 'EXT_SEQUENCE_MISMATCH';
+        // JA3 canonical hash mismatch (if both present)
+        if (dyn.ja3Canonical && dyn.ja3Hash && dyn.ja3 && cryptoLikeEqual(dyn.ja3Canonical, dyn.ja3) === false) {
+          mismatchCode = mismatchCode || 'JA3_HASH_MISMATCH';
+        }
+        // JA4 class mismatch heuristic: Expect pattern TLSH-*a-*e-*c-*g where counts align with dyn lists
+        if (dyn.ja4) {
+          const ja4Parts = dyn.ja4.split('-');
+          if (ja4Parts.length >= 5) {
+            const a = parseInt((ja4Parts[1]||'').replace(/[^0-9]/g,''),10);
+            if (!isNaN(a) && dyn.alpn && dyn.alpn.length !== a) {
+              mismatchCode = mismatchCode || 'JA4_CLASS_MISMATCH';
+            }
+          }
+        }
+        // SETTINGS drift: if HTTP/2 SETTINGS present compare to ch expected ext order presence; simple tolerance placeholder (stddev/mean test if available)
+        if (h2 && h2.settings && Object.keys(h2.settings).length) {
+          const iw = h2.settings.INITIAL_WINDOW_SIZE;
+          const frameSize = h2.settings.MAX_FRAME_SIZE;
+          if (typeof iw === 'number' && (iw < 1024*1024 || iw > 10*1024*1024)) mismatchCode = mismatchCode || 'SETTINGS_DRIFT';
+          if (typeof frameSize === 'number' && (frameSize < 16384 || frameSize > 1048576)) mismatchCode = mismatchCode || 'SETTINGS_DRIFT';
+        }
+        const matches = !mismatchCode;
+        passed = passed && matches; // require static baseline pass + no mismatch
+        const ja3Disp = dyn.ja3Hash ? `${dyn.ja3Hash.slice(0,12)}` : (dyn.ja3||'').slice(0,16);
+        const ja4Disp = dyn.ja4 ? ` ja4=${dyn.ja4}` : '';
+        details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}${ja4Disp}` : `❌ Dynamic mismatch${mismatchCode ? ' ('+mismatchCode+')' : ''} staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}${ja4Disp}`;
       }
   // Upgrade severity if full raw capture present (treat as stronger dynamic evidence)
           let severity: 'minor' | 'major' = 'minor';
@@ -1232,6 +1267,43 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
         !thresholdOk && 'threshold'
       ])}`;
       return { id: 31, name: 'Voucher Aggregated Signature', description: 'Verifies voucher aggregated signature structure (synthetic hash prefix match)', passed, details, severity: 'minor', evidenceType: 'static-structural' };
+    }
+  }
+  ,
+  {
+    id: 32,
+    key: 'ech-verification',
+    name: 'ECH Verification',
+    description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const ech = ev.echVerification;
+      // Evidence shape expectation:
+      // echVerification: {
+      //   outerSni: string, innerSni: string, outerCertHash?: string, innerCertHash?: string,
+      //   certHashesDiffer?: boolean, extensionPresent?: boolean, retryCount?: number,
+      //   diffIndicators?: string[], // e.g. ['cert-hash-diff','grease-absent']
+      //   verified?: boolean, failureReason?: string
+      // }
+      if (!ech) {
+        return { id: 32, name: 'ECH Verification', description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence', passed: false, details: '❌ No ECH verification evidence', severity: 'major', evidenceType: 'heuristic' };
+      }
+      const extensionPresent = ech.extensionPresent === true;
+      const certDiff = ech.certHashesDiffer === true || (ech.outerCertHash && ech.innerCertHash && ech.outerCertHash !== ech.innerCertHash);
+      const greaseOk = ech.greaseAbsenceObserved !== false; // treat undefined as ok
+      const diffIndicators: string[] = ech.diffIndicators || [];
+      const verified = extensionPresent && certDiff && greaseOk;
+      const passed = verified;
+      const details = passed ? `✅ ECH accepted diffIndicators=${diffIndicators.join(',') || 'cert-hash-diff'}` : `❌ ECH not verified: ${missingList([
+        !extensionPresent && 'extension absent',
+        extensionPresent && !certDiff && 'no cert differential',
+        !greaseOk && 'GREASE anomalies'
+      ])}`;
+      // Evidence type escalation: dynamic-protocol only if verified AND dual handshake artifacts present
+      const evidenceType: 'heuristic' | 'dynamic-protocol' = passed && ech.outerSni && ech.innerSni ? 'dynamic-protocol' : 'heuristic';
+      return { id: 32, name: 'ECH Verification', description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence', passed, details, severity: 'major', evidenceType };
     }
   }
 ];

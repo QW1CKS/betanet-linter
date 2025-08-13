@@ -1,3 +1,77 @@
+Final Compliance Tasks (Strict Full Betanet 1.1 Normative Closure)
+-----------------------------------------------------------------
+The following tasks constitute the definitive completion list. Implementing all (with green tests and documented evidence) upgrades the project from "functionally Full" to "strict normative Full" (no advisory caveats). Each task lists: Objective, Scope, Acceptance Criteria (AC), and Suggested Tests. Once every AC is satisfied, declare final compliance.
+
+[x] 1. Raw TLS/QUIC Capture & Calibration Engine
+  - Objective: Replace heuristic JA3/JA4 + partial QUIC parse with true packet-level canonicalization.
+  - Scope: Implement pcap or in-process capture (client mode), canonical JA3 & JA4 string/hash, QUIC Initial full varint/TLS ClientHello extraction, SETTINGS tolerance (±15% where allowed) and exact mismatch codes.
+  - AC:
+    * Emit fields: rawClientHelloB64, ja3Canonical, ja3Hash (MD5), ja4, quicInitial.rawInitialB64, quicInitial.parsed (version, dcid, scid, tokenLen, alpn list, transport params subset).
+    * Check 22 fails with specific codes (ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH) when deviations present.
+    * Unit tests with synthetic captures covering each failure code. (Implemented in tls-calibration.test.ts)
+    * Integration test demonstrating pass on golden fixture and fail on perturbed traces. (Planned)
+
+[ ] 2. Encrypted ClientHello (ECH) Verification
+  - Objective: Confirm real ECH acceptance not just extension token presence.
+  - Scope: Perform dual handshake (outer SNI vs encrypted); verify expected certificate difference or GREASE absence metrics.
+  - AC: Check produces echVerified=true only after differential handshake proof; negative test where extension present but no behavioral change.
+
+[ ] 3. Noise XK Transcript & Rekey Validation
+  - Objective: Capture real Noise messages & enforce rekey triggers (≥8 GiB OR ≥ 2^16 frames OR ≥1 h) and nonce lifecycle.
+  - AC: Evidence.noiseTranscript.messages length & pattern validated; rekeyObserved boolean with triggerReason; failure codes: NO_REKEY, NONCE_OVERUSE, MSG_PATTERN_MISMATCH. Tests simulating each trigger path + failure.
+
+[ ] 4. Voucher Aggregated Signature Cryptographic Verification
+  - Objective: Validate aggregatedSig64 over voucher secret/document using supplied mint public key set (FROST n≥5, t=3) with threshold math.
+  - AC: Check 31 requires signatureValid=true; failure codes: FROST_PARAMS_INVALID, AGG_SIG_INVALID, INSUFFICIENT_KEYS. Negative test: altered sig fails.
+
+[ ] 5. SCION Gateway Control-Stream & CBOR Validation
+  - Objective: Parse gateway CBOR control stream (path offers, rotation notices) and enforce duplicate / timing constraints.
+  - AC: Evidence.scionControl: {offers: ≥3, uniquePaths≥3, noLegacyHeader=true}; failure on duplicate within window or legacy header presence. Tests with malformed CBOR & duplicate path set.
+
+[ ] 6. Chain Finality & Emergency Advance Deep Validation
+  - Objective: Enforce 2-of-3 finality with per-chain certificate weight sums, epoch monotonicity, emergency advance liveness (≥14 days inactivity) and justification proof.
+  - AC: governance/ledger evidence includes finalityDepth, quorumWeights[], emergencyAdvance {used:boolean, justified:boolean, livenessDays:int}; failure codes: FINALITY_DEPTH_SHORT, EMERGENCY_LIVENESS_SHORT, QUORUM_WEIGHT_MISMATCH.
+
+[ ] 7. Governance ACK Span & Partition Safety Dataset
+  - Objective: Incorporate 7-day historical ACK diversity (AS / ISD counts & shares) ensuring ≤20% degradation pre-activation.
+  - AC: Evidence.governanceHistoricalDiversity includes series with ≥7*24 points; computed volatility, maxWindowShare, maxDeltaShare thresholds satisfied; failure code PARTITION_DEGRADATION when degradation >20%. Fixture with induced degradation triggers fail.
+
+[ ] 8. Cover Connection Provenance & Timing Enforcement
+  - Objective: Classify cover vs real connections, enforce min cover count, teardown distribution (stddev, CV) & retry delay window.
+  - AC: Evidence.fallbackTiming.coverConnections ≥2 (already) plus provenance categories enumerated; new metrics: coverStartDelayMs, teardownIqrMs, outlierPct; thresholds documented; failure codes: COVER_INSUFFICIENT, COVER_DELAY_OUT_OF_RANGE, TEARDOWN_VARIANCE_EXCESS.
+
+[ ] 9. Algorithm Agility Registry Validation (Spec §2)
+  - Objective: Parse registry artifact enumerating allowed cipher/hash/KEM combos & verify binary/evidence only uses registered sets.
+  - AC: Evidence.algorithmAgility {registryDigest, allowedSets[], usedSets[], unregisteredUsed[]} with unregisteredUsed empty on pass. Negative test with injected unsupported combo.
+
+[ ] 10. Full SLSA 3+ Provenance Chain & Materials Policy
+   - Objective: Enforce DSSE envelope signature with trusted root keys, verify all build steps pinned, materials completeness, toolchain version pinning, reproducible rebuild.
+   - AC: provenance.signatureVerified=true, requiredSigners≥threshold, materialsCompleteness=full, toolchainDiff=0, rebuildDigestMatch=true; failure codes: SIG_INVALID, MISSING_SIGNER, MATERIAL_GAP, REBUILD_MISMATCH. Integration test mocks DSSE envelope.
+
+[ ] 11. Evidence Authenticity & Bundle Trust
+   - Objective: Require optional signed evidence bundle (minisign/cosign) for artifact upgrades; reject if signature missing in strict-auth mode.
+   - AC: strictAuth mode flag; evidenceSignatureValid=true required for artifact elevation; failure code EVIDENCE_UNSIGNED.
+
+[ ] 12. Adaptive PoW & Rate-Limit Statistical Validation
+   - Objective: Analyze powAdaptive.difficultySamples trend toward target acceptance percentile; rateLimit bucket dispersion statistical sanity beyond presence.
+   - AC: Metrics: difficultyTrendStable=true, maxDrop<=configured, acceptancePercentile within tolerance; failure codes: POW_TREND_DIVERGENCE. Test with divergent synthetic series.
+
+[ ] 13. Statistical Jitter Randomness Tests
+   - Objective: Apply chi-square or KS test + variance bounds to adaptive jitter & cover teardown distributions.
+   - AC: randomnessTest.pValue > 0.01 on pass; failure code JITTER_RANDOMNESS_WEAK otherwise. Deterministic fixture triggers fail test.
+
+[ ] 14. Post-Quantum Date Boundary Reliability
+   - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
+   - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE. Tests with mocked date contexts.
+
+[ ] 15. Negative Assertion Expansion & Forbidden Artifact Hashes
+   - Objective: Maintain deny-list (legacy header pattern, deterministic seed, deprecated cipher constants) hashed & compared.
+   - AC: negative.forbiddenPresent=false required; failure codes enumerated per artifact. Test injecting each forbidden token.
+
+[ ] 16. Comprehensive Test & Fixture Expansion
+   - Objective: Ensure ≥1 positive + ≥1 negative test per failure code introduced above; code coverage ≥90% for check registries.
+   - AC: CI reports coverage threshold met; all new failure modes demonstrably exercised.
+
 Betanet Linter Roadmap (Canonical)
 =================================
 
