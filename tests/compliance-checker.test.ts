@@ -1233,8 +1233,8 @@ describe('BetanetComplianceChecker', () => {
         checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
       };
       (checkerLocal as any)._analyzer.evidence = {
-        noiseExtended: { pattern: 'XK', rekeysObserved: 1, rekeyTriggers: { bytes: 8*1024*1024*1024, timeMinSec: 3600, frames: 65536 } },
-        h2Adaptive: { withinTolerance: true, paddingJitterMeanMs: 40, paddingJitterP95Ms: 60, sampleCount: 20 }
+  noiseExtended: { pattern: 'XK', rekeysObserved: 1, rekeyTriggers: { bytes: 8*1024*1024*1024, timeMinSec: 3600, frames: 65536 } },
+  h2Adaptive: { withinTolerance: true, meanMs: 40, p95Ms: 60, stddevMs: 10, randomnessOk: true, sampleCount: 20 }
       };
       const result = await checkerLocal.checkCompliance(tmp, { allowHeuristic: true });
       const rekey = result.checks.find(c => c.id === 19);

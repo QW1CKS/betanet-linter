@@ -113,8 +113,8 @@ export interface HarnessEvidence {
   tlsProbe?: { host: string; port: number; offeredAlpn: string[]; selectedAlpn?: string | null; cipher?: string; protocol?: string | null; handshakeMs?: number; error?: string };
   fallback?: { udpAttempted: boolean; udpTimeoutMs: number; tcpConnected: boolean; tcpConnectMs?: number; tcpRetryDelayMs?: number; coverConnections?: number; coverTeardownMs?: number[]; error?: string; policy?: { retryDelayMsOk?: boolean; coverConnectionsOk?: boolean; teardownSpreadOk?: boolean; overall?: boolean } };
   mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
-  h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
-  h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
+    h2Adaptive?: { settings?: Record<string, number>; meanMs?: number; p95Ms?: number; stddevMs?: number; randomnessOk?: boolean; withinTolerance?: boolean; sampleCount?: number };
+    h3Adaptive?: { qpackTableSize?: number; meanMs?: number; p95Ms?: number; stddevMs?: number; randomnessOk?: boolean; withinTolerance?: boolean; sampleCount?: number };
   dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; ja3Hash?: string; ja3Canonical?: string; ja4?: string; rawClientHelloB64?: string; rawClientHelloCanonicalB64?: string; rawClientHelloCanonicalHash?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
   // (Phase 7 extension) ja3Hash added to dynamicClientHelloCapture; keep interface loose via index signature if needed
   calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
@@ -320,18 +320,20 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     values.sort((a,b)=>a-b);
     const mean = values.reduce((a,b)=>a+b,0)/values.length;
     const p95 = values[Math.min(values.length-1, Math.floor(values.length*0.95))];
-  const variance = values.reduce((a,b)=>a + Math.pow(b-mean,2),0)/values.length;
-  const stdDev = Math.sqrt(variance);
+      const variance = values.reduce((a,b)=>a + Math.pow(b-mean,2),0)/values.length;
+      const stdDev = Math.sqrt(variance);
     // Accept tolerance if mean within target window (e.g., 15–60ms) and p95 < 75ms
     const withinTolerance = mean >= 15 && mean <= 60 && p95 < 75;
     evidence.h2Adaptive = {
       settings: { INITIAL_WINDOW_SIZE: 6291456, MAX_FRAME_SIZE: 16384 },
-      paddingJitterMeanMs: mean,
-      paddingJitterP95Ms: p95,
+        meanMs: mean,
+        p95Ms: p95,
+        stddevMs: stdDev,
       withinTolerance,
-      sampleCount: samples
+      sampleCount: samples,
+      randomnessOk: stdDev > 0 && stdDev < 20
     };
-  evidence.statisticalJitter = { meanMs: mean, p95Ms: p95, stdDevMs: stdDev, samples, withinTarget: withinTolerance } as any;
+    evidence.statisticalJitter = { meanMs: mean, p95Ms: p95, stdDevMs: stdDev, samples, withinTarget: withinTolerance } as any;
   }
   // Simulate HTTP/3 adaptive jitter (QUIC padding behavior analogue) if requested
   if (opts.h3AdaptiveSimulate) {
@@ -344,7 +346,7 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     const variance = values.reduce((a,b)=>a + Math.pow(b-mean,2),0)/values.length;
     const stdDev = Math.sqrt(variance);
     const withinTolerance = mean >= 10 && mean <= 70 && p95 < 90;
-    (evidence as any).h3Adaptive = { qpackTableSize: 4096, paddingJitterMeanMs: mean, paddingJitterP95Ms: p95, withinTolerance, sampleCount: samples };
+  (evidence as any).h3Adaptive = { qpackTableSize: 4096, meanMs: mean, p95Ms: p95, stddevMs: stdDev, withinTolerance, sampleCount: samples, randomnessOk: stdDev > 0 && stdDev < 25 };
     (evidence as any).statisticalVariance = (evidence as any).statisticalVariance || {};
     if (!(evidence as any).statisticalVariance.jitterStdDevMs) {
       (evidence as any).statisticalVariance.jitterStdDevMs = stdDev;

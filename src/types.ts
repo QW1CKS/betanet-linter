@@ -1,3 +1,21 @@
+  h2AdaptiveDynamic?: {
+    settings?: Record<string, number>;
+    paddingJitterMeanMs?: number;
+    paddingJitterP95Ms?: number;
+    paddingJitterStdDevMs?: number;
+    sampleCount?: number;
+    withinTolerance?: boolean;
+    randomnessOk?: boolean;
+  };
+  h3AdaptiveDynamic?: {
+    qpackTableSize?: number;
+    paddingJitterMeanMs?: number;
+    paddingJitterP95Ms?: number;
+    paddingJitterStdDevMs?: number;
+    sampleCount?: number;
+    withinTolerance?: boolean;
+    randomnessOk?: boolean;
+  };
   noiseTranscriptDynamic?: {
     messagesObserved?: string[];
     expectedSequenceOk?: boolean;
@@ -228,8 +246,8 @@ export interface IngestedEvidence {
   nodeEntropyBits?: number; // Phase 7 extension: Shannon entropy of node occurrence distribution
   pathLengthStdDev?: number; // Phase 7 extension: stddev of path length distribution
   }; // Phase 7 mix diversity sampling evidence
-  h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
-  h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
+  h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; paddingJitterStdDevMs?: number; sampleCount?: number; withinTolerance?: boolean; randomnessOk?: boolean };
+  h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; paddingJitterStdDevMs?: number; sampleCount?: number; withinTolerance?: boolean; randomnessOk?: boolean };
   binaryMeta?: {
     format?: 'elf' | 'pe' | 'macho' | 'unknown';
     sections?: string[];

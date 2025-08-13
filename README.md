@@ -51,7 +51,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | 2 Access tickets (replay-bound, padding, rate) | 2 (presence), 30 (struct+dynamic policy) | static-structural + dynamic-protocol | Full | Structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling (rotation ≤10m, replay window ≤2m) |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 3 (AEAD), 10 (PQ date), 13 (pattern), 19 (rekey policy sim) | heuristic + static-structural + dynamic-protocol(sim) | Partial | Rekey & transcript real capture pending |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 13 (pattern), 19 (rekey policy) | static-structural + dynamic-protocol | Full | Static pattern + dynamic transcript, rekey triggers, PQ date enforced |
-| 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive sim), 28 (H3 adaptive sim) | dynamic-protocol(sim) | Partial | Real distribution capture & calibration pending |
+| 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive, Full), 28 (H3 adaptive, Full) | dynamic-protocol | Full | Dynamic evidence (mean, p95, stddev, randomnessOk) with strict tolerances enforced |
 | 5 SCION bridging + absence of legacy header | 4, 23 (negative assertions) | heuristic + static-structural | Partial | Needs explicit runtime absence validation |
 | 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | heuristic → artifact (bootstrap evidence) | Partial | bootstrap evidence upgrades when ≥2 epochs & ≥2 entropy sources & no legacy seed |
 | 7 Mix node selection diversity & hops | 11, 17 (sampling), 27 (advanced variance) | heuristic + dynamic-protocol | Partial | Real path sampling + confidence intervals pending |

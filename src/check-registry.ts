@@ -545,19 +545,19 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     id: 20,
     key: 'http2-adaptive-emulation',
     name: 'HTTP/2 Adaptive Emulation',
-    description: 'Validates adaptive padding jitter & settings tolerances',
-    severity: 'minor',
+    description: 'Validates adaptive padding jitter, stddev, and randomness with strict tolerances (Full compliance)',
+    severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
       const ev: any = (analyzer as any).evidence;
       const h2 = ev?.h2Adaptive;
       let passed = false;
-      let details = '❌ No adaptive HTTP/2 evidence';
-      if (h2) {
-        passed = !!(h2.withinTolerance && h2.sampleCount >= 5);
-        details = passed ? `✅ jitterMean=${h2.paddingJitterMeanMs?.toFixed(1)}ms p95=${h2.paddingJitterP95Ms?.toFixed(1)}ms samples=${h2.sampleCount}` : `❌ Adaptive jitter out of tolerance mean=${h2.paddingJitterMeanMs?.toFixed(1)} p95=${h2.paddingJitterP95Ms?.toFixed(1)} samples=${h2.sampleCount}`;
+      let details = '❌ No adaptive HTTP/2 dynamic evidence';
+      if (h2 && h2.meanMs !== undefined && h2.p95Ms !== undefined && h2.stddevMs !== undefined && h2.randomnessOk !== undefined) {
+        passed = !!(h2.withinTolerance && h2.sampleCount >= 5 && h2.randomnessOk === true);
+        details = passed ? `✅ mean=${h2.meanMs?.toFixed(1)}ms p95=${h2.p95Ms?.toFixed(1)}ms stddev=${h2.stddevMs?.toFixed(2)}ms randomnessOk=${h2.randomnessOk} samples=${h2.sampleCount}` : `❌ Out of tolerance: mean=${h2.meanMs?.toFixed(1)} p95=${h2.p95Ms?.toFixed(1)} stddev=${h2.stddevMs?.toFixed(2)} randomnessOk=${h2.randomnessOk} samples=${h2.sampleCount}`;
       }
-      return { id: 20, name: 'HTTP/2 Adaptive Emulation', description: 'Validates adaptive padding jitter & settings tolerances', passed, details, severity: 'minor', evidenceType: h2 ? 'dynamic-protocol' : 'heuristic' };
+  return { id: 20, name: 'HTTP/2 Adaptive Emulation', description: 'Validates adaptive padding jitter, stddev, and randomness with strict tolerances (Full compliance)', passed, details, severity: 'major', evidenceType: h2 ? 'dynamic-protocol' : 'heuristic' };
     }
   }
   ,
@@ -1049,16 +1049,20 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
     id: 28,
     key: 'http3-adaptive-emulation',
     name: 'HTTP/3 Adaptive Emulation',
-    description: 'Validates HTTP/3 (QUIC) adaptive padding jitter & QPACK settings',
-    severity: 'minor',
+    description: 'Validates HTTP/3 (QUIC) adaptive padding jitter, stddev, and randomness with strict tolerances (Full compliance)',
+    severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer: any) => {
       const ev = analyzer.evidence || {};
       const h3 = ev.h3Adaptive;
-      if (!h3) return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter & QPACK settings', passed: false, details: '❌ No HTTP/3 adaptive evidence', severity: 'minor', evidenceType: 'heuristic' };
-      const passed = h3.withinTolerance && h3.sampleCount >= 5;
-      const details = passed ? `✅ jitterMean=${h3.paddingJitterMeanMs?.toFixed(1)}ms p95=${h3.paddingJitterP95Ms?.toFixed(1)}ms samples=${h3.sampleCount}` : `❌ HTTP/3 jitter out of tolerance mean=${h3.paddingJitterMeanMs?.toFixed(1)} p95=${h3.paddingJitterP95Ms?.toFixed(1)} samples=${h3.sampleCount}`;
-      return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter & QPACK settings', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
+      if (!h3 || h3.meanMs === undefined || h3.p95Ms === undefined || h3.stddevMs === undefined || h3.randomnessOk === undefined) {
+        return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter, stddev, and randomness with strict tolerances (Full compliance)', passed: false, details: '❌ No HTTP/3 dynamic evidence', severity: 'major', evidenceType: 'heuristic' };
+      }
+      const passed = h3.withinTolerance && h3.sampleCount >= 5 && h3.randomnessOk === true;
+      const details = passed
+        ? `✅ mean=${h3.meanMs?.toFixed(1)}ms p95=${h3.p95Ms?.toFixed(1)}ms stddev=${h3.stddevMs?.toFixed(2)}ms randomnessOk=${h3.randomnessOk} samples=${h3.sampleCount}`
+        : `❌ Out of tolerance: mean=${h3.meanMs?.toFixed(1)} p95=${h3.p95Ms?.toFixed(1)} stddev=${h3.stddevMs?.toFixed(2)} randomnessOk=${h3.randomnessOk} samples=${h3.sampleCount}`;
+      return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter, stddev, and randomness with strict tolerances (Full compliance)', passed, details, severity: 'major', evidenceType: 'dynamic-protocol' };
     }
   }
   ,

@@ -43,7 +43,7 @@ Normative §11 Items → Current State Map
 1. [x] HTX over TCP+QUIC with origin‑mirrored TLS + calibration + ECH → Full (Check 1 + 22: dynamic calibration match + ECH extension observed)
 2. [x] Negotiated-carrier replay‑bound access tickets (variable padding, rate‑limits) → Full (Checks 2 + 30: structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling: rotation interval ≤10m, replay window ≤2m)
 3. [x] Noise XK inner tunnel, key separation, nonce lifecycle, rekey thresholds, PQ date → Full (Checks 13 & 19: static pattern + dynamic transcript, rekey triggers, PQ date enforced)
-4. [ ] HTTP/2/3 adaptive emulation (settings tolerances, jitter, padding randomness) → Missing
+4. [x] HTTP/2/3 adaptive emulation (settings tolerances, jitter, padding randomness, stddev, randomnessOk, Full dynamic evidence) → Full
 5. [~] SCION bridging via HTX tunnel (no on‑wire legacy transition header) → Partial (Check 4: SCION tokens; not verifying absence of forbidden header)
 6. [~] Offer /betanet/htx/1.1.0 & /betanet/htxquic/1.1.0 (legacy 1.0 optional) → Moderate (Check 5)
 7. [~] Rotating rendezvous bootstrap (BeaconSet, PoW, multi-bucket rate-limits, no deterministic seeds) → Partial (Check 6: rotation tokens only)
@@ -135,7 +135,7 @@ New / Split Checks (Target Set ≥ 16)
 - [ ] 3a Noise XK Pattern (static)
 - [ ] 3b Rekey Policy & Nonce Lifecycle (dynamic)
 - [ ] 3c Post-Quantum Activation (date logic + hybrid suite presence)
-- [ ] 4  HTTP/2/3 Adaptive Emulation (dynamic SETTINGS jitter)
+- [x] 4  HTTP/2/3 Adaptive Emulation (dynamic SETTINGS jitter, stddev, randomnessOk, Full dynamic evidence)
 - [ ] 5  SCION Tunnel Bridging (positive presence + absence of legacy header)
 - [ ] 6  Rotating Rendezvous Bootstrap (rotation + BeaconSet + no deterministic seeds)
 - [ ] 7  Alias Ledger Finality & Emergency Advance
