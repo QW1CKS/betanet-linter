@@ -103,10 +103,10 @@ export interface HarnessEvidence {
   mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
   h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
-  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; ja3Hash?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
+  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; ja3Hash?: string; ja4?: string; rawClientHelloB64?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
   // (Phase 7 extension) ja3Hash added to dynamicClientHelloCapture; keep interface loose via index signature if needed
   calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
-  quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number } };
+  quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number; scil?: number; tokenLength?: number; odcil?: number }; rawInitialB64?: string };
   statisticalJitter?: { meanMs: number; p95Ms: number; stdDevMs: number; samples: number; withinTarget?: boolean };
   meta: { generated: string; scenarios: string[] };
 }

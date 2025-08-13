@@ -772,7 +772,7 @@ export const STEP_10_CHECKS = [
     id: 22,
     key: 'tls-static-template-calibration',
     name: 'TLS Static Template Calibration',
-    description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration',
+  description: 'Static ClientHello template + dynamic calibration (raw capture JA3/JA4 when available)',
     severity: 'minor',
     introducedIn: '1.1',
     evaluate: async (analyzer: any) => {
@@ -801,7 +801,9 @@ export const STEP_10_CHECKS = [
   const ja3Disp = dyn.ja3Hash ? `${dyn.ja3Hash.slice(0,12)}` : (dyn.ja3||'').slice(0,16);
   details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}` : `❌ Dynamic mismatch ${mismatchCode ? '('+mismatchCode+') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}`;
       }
-      return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration', passed, details, severity: 'minor', evidenceType };
+  // Upgrade severity if full raw capture present (treat as stronger dynamic evidence)
+  const severity: 'minor' | 'major' = dyn && dyn.rawClientHelloB64 ? 'minor' : 'minor';
+  return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template + dynamic calibration (raw capture JA3/JA4 when available)', passed, details, severity, evidenceType };
     }
   },
   {

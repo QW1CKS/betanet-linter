@@ -110,7 +110,7 @@ Phase 7: Anti-Evasion & Scoring Hardening
 - [x] Multi-signer evidence bundle hashing + signature validation (--evidence-bundle) producing bundleSha256 & threshold flag.
 - [x] Statistical variance enforcement (jitter stddev/mean bounds) & fallback timing policy checks (Checks 26 & 25).
 - [x] Mix diversity deeper variance (entropy + path length stddev scaffolding; future CI confidence intervals pending).
-- [ ] Real dynamic TLS/QUIC transcript capture (JA3/JA4) feeding calibration & tolerance checks.
+- [x] Real dynamic TLS/QUIC transcript capture scaffolding (raw ClientHello base64, heuristic JA3 + ja3Hash, JA4 placeholder, QUIC Initial raw + partial parse) feeding calibration & tolerance checks (further deep parse pending).
 - [x] HTTP/3 adaptive metrics & settings tolerances (simulation; real capture pending).
 - [x] Quantitative cover connection behavioral modeling (median/p95/IQR/skew/outliers, CV & anomaly codes, model score) integrated into Check 25.
 - [x] Heuristic JA3 derivation & MD5 hash (ja3Hash) via OpenSSL parse; mismatch codes extended (ALPN_SET_DIFF scaffold).
