@@ -40,7 +40,7 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Objective: Classify cover vs real connections, enforce min cover count, teardown distribution (stddev, CV) & retry delay window.
   - AC: Evidence.fallbackTiming.coverConnections ≥2 (already) plus provenance categories enumerated; new metrics: coverStartDelayMs, teardownIqrMs, outlierPct; thresholds documented; failure codes: COVER_INSUFFICIENT, COVER_DELAY_OUT_OF_RANGE, TEARDOWN_VARIANCE_EXCESS.
 
-[ ] 9. Algorithm Agility Registry Validation (Spec §2)
+[x] 9. Algorithm Agility Registry Validation (Spec §2)
   - Objective: Parse registry artifact enumerating allowed cipher/hash/KEM combos & verify binary/evidence only uses registered sets.
   - AC: Evidence.algorithmAgility {registryDigest, allowedSets[], usedSets[], unregisteredUsed[]} with unregisteredUsed empty on pass. Negative test with injected unsupported combo.
 

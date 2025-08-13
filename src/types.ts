@@ -376,6 +376,13 @@ export interface IngestedEvidence {
     distinctScopes?: number; // number of distinct scope types (ip,user,global,...)
     scopeRefillVariancePct?: number; // variance across scope refill rates (sanity check of multi-bucket logic)
   };
+  // Task 9: Algorithm agility registry validation
+  algorithmAgility?: {
+    registryDigest?: string; // sha256 hex of registry artifact
+    allowedSets?: string[]; // e.g., 'TLS_AES_128_GCM_SHA256+X25519', 'CHACHA20_POLY1305_SHA256+X25519'
+    usedSets?: string[]; // sets extracted from binary/evidence
+    unregisteredUsed?: string[]; // computed: used - allowed
+  };
   negative?: {
     forbiddenPresent?: string[]; // list of forbidden tokens discovered
   };

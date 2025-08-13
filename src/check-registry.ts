@@ -1255,6 +1255,34 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
     }
   }
   ,
+  // Task 9: Algorithm Agility Registry Validation
+  {
+    id: 34,
+    key: 'algorithm-agility-registry',
+    name: 'Algorithm Agility Registry',
+    description: 'Validates cryptographic algorithm set usage against registered allowed sets',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const aa = ev.algorithmAgility;
+      if (!aa) return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed: false, details: '❌ No algorithmAgility evidence', severity: 'major', evidenceType: 'heuristic' };
+      const allowed = Array.isArray(aa.allowedSets) ? aa.allowedSets : [];
+      const used = Array.isArray(aa.usedSets) ? aa.usedSets : [];
+  const unregistered = (aa.unregisteredUsed && Array.isArray(aa.unregisteredUsed)) ? aa.unregisteredUsed : used.filter((s: string) => !allowed.includes(s));
+      const digestOk = typeof aa.registryDigest === 'string' && aa.registryDigest.length >= 32;
+      const usedOk = used.length > 0;
+      const passed = digestOk && usedOk && unregistered.length === 0;
+      const failReasons = !passed ? [
+        !digestOk && 'registry digest missing/invalid',
+        !usedOk && 'no usedSets',
+        unregistered.length > 0 && `unregisteredUsed=${unregistered.join(',')}`
+      ].filter(Boolean) : [];
+      const details = passed ? `✅ registryDigest=${aa.registryDigest?.slice(0,12)} sets=${used.length}` : `❌ Algorithm agility issues: ${missingList(failReasons)}`;
+      return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed, details, severity: 'major', evidenceType: 'artifact' };
+    }
+  }
+  ,
   {
     id: 29,
     key: 'voucher-frost-struct-validation',

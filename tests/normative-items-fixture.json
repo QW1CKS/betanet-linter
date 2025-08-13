@@ -141,6 +141,12 @@
 	"negative": {
 		"forbiddenPresent": []
 	},
+	"algorithmAgility": {
+		"registryDigest": "1234567890abcdef1234567890abcdef",
+		"allowedSets": ["TLS_AES_128_GCM_SHA256+X25519","CHACHA20_POLY1305_SHA256+X25519"],
+		"usedSets": ["TLS_AES_128_GCM_SHA256+X25519"],
+		"unregisteredUsed": []
+	},
 	"scionSupport": {
 		"hasSCION": true,
 		"pathManagement": true,

@@ -434,8 +434,40 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
-  // Task 9: Algorithm Agility Registry Validation
-  test.todo('Task 9: Implement tests for algorithmAgility registryDigest, allowedSets vs usedSets, and unregisteredUsed detection (fail when non-empty).');
+  // Task 9: Algorithm Agility Registry Validation (Check 34)
+  describe('Task 9: Algorithm Agility Registry Validation (Check 34)', () => {
+    function analyzerForAA(aa: any) {
+      return {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['tls','aes','x25519','kem'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        evidence: { algorithmAgility: aa }
+      } as any;
+    }
+
+    it('passes when all usedSets are registered', async () => {
+      const aa = { registryDigest: 'abcdef1234567890abcdef1234567890', allowedSets: ['TLS_AES_128_GCM_SHA256+X25519','CHACHA20_POLY1305_SHA256+X25519'], usedSets: ['TLS_AES_128_GCM_SHA256+X25519'] };
+      const result = await runWithAnalyzer(analyzerForAA(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(true);
+    });
+
+    it('fails when unregistered set present', async () => {
+      const aa = { registryDigest: 'abcdef1234567890abcdef1234567890', allowedSets: ['TLS_AES_128_GCM_SHA256+X25519'], usedSets: ['TLS_AES_128_GCM_SHA256+X25519','UNREGISTERED_CIPHER+FOO'] };
+      const result = await runWithAnalyzer(analyzerForAA(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/unregisteredUsed/);
+    });
+
+    it('fails when registry digest missing', async () => {
+      const aa = { allowedSets: ['A'], usedSets: ['A'] };
+      const result = await runWithAnalyzer(analyzerForAA(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/registry digest missing/);
+    });
+  });
 
   // Task 10: Full SLSA 3+ Provenance Chain & Materials Policy
   test.todo('Task 10: Implement tests for DSSE signatureVerified, requiredSigners threshold, materialsCompleteness full, toolchainDiff 0, rebuildDigestMatch true; failure codes SIG_INVALID / MISSING_SIGNER / MATERIAL_GAP / REBUILD_MISMATCH.');
