@@ -48,7 +48,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | Spec §11 Item | Related Checks | Dominant Evidence Types (current) | Status | Notes |
 |---------------|----------------|-----------------------------------|--------|-------|
 | 1 Transport presence + TLS/ECH + calibration | 1 (presence), 12 (static ClientHello), 22 (template + dynamic calibration match) | static-structural + dynamic-protocol + heuristic | Full | Dynamic calibration (ALPN & extension order) matched static template + ECH extension observed; raw JA4 & deep QUIC parse still pending |
-| 2 Access tickets (replay-bound, padding, rate) | 2 | heuristic | Partial | No structured carrier parse yet |
+| 2 Access tickets (replay-bound, padding, rate) | 2 (presence), 30 (struct+dynamic policy) | static-structural + dynamic-protocol | Full | Structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling (rotation ≤10m, replay window ≤2m) |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 3 (AEAD), 10 (PQ date), 13 (pattern), 19 (rekey policy sim) | heuristic + static-structural + dynamic-protocol(sim) | Partial | Rekey & transcript real capture pending |
 | 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive sim), 28 (H3 adaptive sim) | dynamic-protocol(sim) | Partial | Real distribution capture & calibration pending |
 | 5 SCION bridging + absence of legacy header | 4, 23 (negative assertions) | heuristic + static-structural | Partial | Needs explicit runtime absence validation |
