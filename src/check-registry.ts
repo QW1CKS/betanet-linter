@@ -798,12 +798,14 @@ export const STEP_10_CHECKS = [
           const parts = dyn.note.split(':');
             mismatchCode = parts[parts.length-1];
         }
-  const ja3Disp = dyn.ja3Hash ? `${dyn.ja3Hash.slice(0,12)}` : (dyn.ja3||'').slice(0,16);
-  details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}` : `❌ Dynamic mismatch ${mismatchCode ? '('+mismatchCode+') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}`;
+            const ja3Disp = dyn.ja3Hash ? `${dyn.ja3Hash.slice(0,12)}` : (dyn.ja3||'').slice(0,16);
+            const ja4Disp = dyn.ja4 ? ` ja4=${dyn.ja4}` : '';
+            details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}${ja4Disp}` : `❌ Dynamic mismatch ${mismatchCode ? '('+mismatchCode+') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}${ja4Disp}`;
       }
   // Upgrade severity if full raw capture present (treat as stronger dynamic evidence)
-  const severity: 'minor' | 'major' = dyn && dyn.rawClientHelloB64 ? 'minor' : 'minor';
-  return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template + dynamic calibration (raw capture JA3/JA4 when available)', passed, details, severity, evidenceType };
+          let severity: 'minor' | 'major' = 'minor';
+          if (dyn && dyn.rawClientHelloB64) severity = 'major';
+          return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template + dynamic calibration (raw capture JA3/JA4 when available)', passed, details, severity, evidenceType };
     }
   },
   {
