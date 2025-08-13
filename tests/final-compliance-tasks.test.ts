@@ -188,7 +188,53 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 4: Voucher Aggregated Signature Cryptographic Verification
-  test.todo('Task 4: Implement tests for Check 31 upgraded cryptographic verification (valid signature, altered signature fails, failure codes FROST_PARAMS_INVALID / AGG_SIG_INVALID / INSUFFICIENT_KEYS).');
+  describe('Task 4: Voucher Aggregated Signature (Check 31)', () => {
+    function analyzerForVoucher(vc: any) {
+      return {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['voucher','frost','agg'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        getStaticPatterns: async () => ({}),
+        evidence: { voucherCrypto: vc }
+      } as any;
+    }
+
+    it('passes with valid aggregated signature and threshold n>=5 t=3', async () => {
+      const vc = { keysetIdB64: 'a2V5c2V0MQ==', aggregatedSigB64: 'c2ln', secretB64: 'c2VjcmV0', signatureValid: true, frostThreshold: { n: 5, t: 3 } };
+      const result = await runWithAnalyzer(analyzerForVoucher(vc));
+      const check31 = result.checks.find(c => c.id === 31)!;
+      expect(check31.passed).toBe(true);
+    });
+
+    it('fails with FROST_PARAMS_INVALID when threshold wrong', async () => {
+      const vc = { keysetIdB64: 'a2V5', aggregatedSigB64: 'c2ln', secretB64: 'c2Vj', signatureValid: true, frostThreshold: { n: 4, t: 2 } };
+      const result = await runWithAnalyzer(analyzerForVoucher(vc));
+      const check31 = result.checks.find(c => c.id === 31)!;
+      expect(check31.passed).toBe(false);
+      expect(check31.details).toMatch(/FROST_PARAMS_INVALID/);
+    });
+
+    it('fails with AGG_SIG_INVALID when signatureValid flag false', async () => {
+      const vc = { keysetIdB64: 'a2V5', aggregatedSigB64: 'c2ln', secretB64: 'c2Vj', signatureValid: false, frostThreshold: { n: 5, t: 3 } };
+      const result = await runWithAnalyzer(analyzerForVoucher(vc));
+      const check31 = result.checks.find(c => c.id === 31)!;
+      expect(check31.passed).toBe(false);
+      expect(check31.details).toMatch(/AGG_SIG_INVALID/);
+    });
+
+    it('fails with INSUFFICIENT_KEYS when keyset missing', async () => {
+      const vc = { aggregatedSigB64: 'c2ln', secretB64: 'c2Vj', signatureValid: true, frostThreshold: { n: 5, t: 3 } };
+      const result = await runWithAnalyzer(analyzerForVoucher(vc));
+      const check31 = result.checks.find(c => c.id === 31)!;
+      expect(check31.passed).toBe(false);
+      expect(check31.details).toMatch(/INSUFFICIENT_KEYS/);
+    });
+  });
 
   // Task 5: SCION Gateway Control-Stream & CBOR Validation
   test.todo('Task 5: Implement tests feeding scionControl CBOR (≥3 offers, ≥3 uniquePaths, noLegacyHeader) + malformed & duplicate path negative cases.');

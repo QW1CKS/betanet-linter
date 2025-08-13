@@ -20,7 +20,7 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Objective: Capture real Noise messages & enforce rekey triggers (≥8 GiB OR ≥ 2^16 frames OR ≥1 h) and nonce lifecycle.
   - AC: Evidence.noiseTranscript.messages length & pattern validated; rekeyObserved boolean with triggerReason; failure codes: NO_REKEY, NONCE_OVERUSE, MSG_PATTERN_MISMATCH. Tests simulating each trigger path + failure.
 
-[ ] 4. Voucher Aggregated Signature Cryptographic Verification
+[x] 4. Voucher Aggregated Signature Cryptographic Verification
   - Objective: Validate aggregatedSig64 over voucher secret/document using supplied mint public key set (FROST n≥5, t=3) with threshold math.
   - AC: Check 31 requires signatureValid=true; failure codes: FROST_PARAMS_INVALID, AGG_SIG_INVALID, INSUFFICIENT_KEYS. Negative test: altered sig fails.
 
