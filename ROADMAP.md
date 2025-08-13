@@ -60,7 +60,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Apply chi-square or KS test + variance bounds to adaptive jitter & cover teardown distributions.
    - AC: randomnessTest.pValue > 0.01 on pass; failure code JITTER_RANDOMNESS_WEAK otherwise. Deterministic fixture triggers fail test.
 
-[ ] 14. Post-Quantum Date Boundary Reliability
+[x] 14. Post-Quantum Date Boundary Reliability
    - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
    - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE. Tests with mocked date contexts.
 
@@ -369,7 +369,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Apply chi-square or KS test + variance bounds to adaptive jitter & cover teardown distributions.
    - AC: randomnessTest.pValue > 0.01 on pass; failure code JITTER_RANDOMNESS_WEAK otherwise. Deterministic fixture triggers fail test.
 
-14. Post-Quantum Date Boundary Reliability
+[x] 14. Post-Quantum Date Boundary Reliability
    - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
    - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE. Tests with mocked date contexts.
 

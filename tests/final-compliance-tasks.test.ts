@@ -634,7 +634,47 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 14: Post-Quantum Date Boundary Reliability
-  test.todo('Task 14: Implement tests for pqDateEnforced positive & boundary failures PQ_PAST_DUE / PQ_EARLY_WITHOUT_OVERRIDE via mocked date contexts.');
+  describe('Task 14: Post-Quantum Date Boundary Reliability (Check 38)', () => {
+    const mandatoryEpoch = require('../src/constants').POST_QUANTUM_MANDATORY_EPOCH_MS;
+    function analyzerForPQ(evPartial: any, cryptoCaps: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: ['pq','kyber'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve(cryptoCaps),
+        getDiagnostics: () => ({}),
+        evidence: evPartial
+      } as any;
+    }
+    it('passes after mandatory date when PQ present', async () => {
+      const ev = { pqTestNowEpoch: mandatoryEpoch + 1000 };
+      const cryptoCaps = { hasKyber768: true };
+      const result = await runWithAnalyzer(analyzerForPQ(ev, cryptoCaps));
+      const check38 = result.checks.find(c => c.id === 38)!;
+      expect(check38.passed).toBe(true);
+    });
+    it('fails with PQ_PAST_DUE when after mandatory date and PQ absent', async () => {
+      const ev = { pqTestNowEpoch: mandatoryEpoch + 5000 };
+      const cryptoCaps = { hasKyber768: false };
+      const result = await runWithAnalyzer(analyzerForPQ(ev, cryptoCaps));
+      const check38 = result.checks.find(c => c.id === 38)!;
+      expect(check38.passed).toBe(false);
+      expect(check38.details).toMatch(/PQ_PAST_DUE/);
+    });
+    it('fails with PQ_EARLY_WITHOUT_OVERRIDE when before date and PQ present without override', async () => {
+      const ev = { pqTestNowEpoch: mandatoryEpoch - 10000 };
+      const cryptoCaps = { hasKyber768: true };
+      const result = await runWithAnalyzer(analyzerForPQ(ev, cryptoCaps));
+      const check38 = result.checks.find(c => c.id === 38)!;
+      expect(check38.passed).toBe(false);
+      expect(check38.details).toMatch(/PQ_EARLY_WITHOUT_OVERRIDE/);
+    });
+    it('passes before date with override approved and PQ present', async () => {
+      const ev = { pqTestNowEpoch: mandatoryEpoch - 10000, pqOverride: { approved: true } };
+      const cryptoCaps = { hasKyber768: true };
+      const result = await runWithAnalyzer(analyzerForPQ(ev, cryptoCaps));
+      const check38 = result.checks.find(c => c.id === 38)!;
+      expect(check38.passed).toBe(true);
+    });
+  });
 
   // Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes
   test.todo('Task 15: Implement tests injecting each forbidden token to trigger specific failure codes; clean binary passes with negative.forbiddenPresent=false.');

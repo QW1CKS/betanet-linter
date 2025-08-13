@@ -584,6 +584,34 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     }
   }
   ,
+  // Task 14: Post-Quantum Date Boundary Reliability (Check 38)
+  {
+    id: 38,
+    key: 'pq-date-boundary',
+    name: 'Post-Quantum Date Boundary',
+    description: 'Enforces PQ suite presence after mandatory date; forbids premature PQ without approved override',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any, now: Date) => {
+      const ev = analyzer.evidence || {};
+      const cryptoCaps = await (analyzer.checkCryptographicCapabilities?.() || Promise.resolve({}));
+      // Allow test override of current epoch for deterministic tests
+      let currentEpoch = now.getTime();
+      if (typeof ev.pqTestNowEpoch === 'number') currentEpoch = ev.pqTestNowEpoch;
+      const mandatoryEpoch = POST_QUANTUM_MANDATORY_EPOCH_MS; // imported from constants
+      const pqPresent = !!(cryptoCaps.hasKyber768 || cryptoCaps.hasPQHybrid || ev.provenance?.pqHybridUsed || ev.pqSuite?.kyber768);
+      const overrideApproved = !!(ev.pqOverride?.approved === true || ev.provenance?.pqOverrideApproved === true);
+      const afterDate = currentEpoch >= mandatoryEpoch;
+      let passed = true;
+      let failCode: string | null = null;
+      if (afterDate && !pqPresent) { passed = false; failCode = 'PQ_PAST_DUE'; }
+      if (!afterDate && pqPresent && !overrideApproved) { passed = false; failCode = 'PQ_EARLY_WITHOUT_OVERRIDE'; }
+      const evidenceType: 'heuristic' | 'artifact' = pqPresent ? 'artifact' : 'heuristic';
+      const details = passed ? `✅ PQ boundary ok (${afterDate ? 'post' : 'pre'}-date${pqPresent ? ' pq-present' : ' pq-absent'}${overrideApproved ? ' override-approved' : ''})` : `❌ ${failCode}`;
+      return { id: 38, name: 'Post-Quantum Date Boundary', description: 'Enforces PQ suite presence after mandatory date; forbids premature PQ without approved override', passed, details, severity: 'major', evidenceType };
+    }
+  }
+  ,
   // Task 13: Statistical Jitter Randomness Tests (Check 37)
   {
     id: 37,
