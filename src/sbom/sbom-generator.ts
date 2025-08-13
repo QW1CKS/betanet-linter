@@ -12,6 +12,9 @@ export class SBOMGenerator {
     const binaryInfo = await this.getBinaryInfo(binaryPath);
     const components = await this.extractComponents(binaryPath);
     const dependencies = await this.extractDependencies(binaryPath);
+  // Derive a root version (avoid hard-coded 1.0.0). Prefer first meaningful component semver.
+  const rootVersion = this.selectRootVersion(components) || '0.0.0';
+  (binaryInfo as any).rootVersion = rootVersion;
     // Derive feature tags (Betanet spec-era capabilities) if we can analyze the binary
     try {
       const features = await this.deriveFeatures(binaryPath, analyzer);
@@ -52,6 +55,27 @@ export class SBOMGenerator {
         generated: new Date().toISOString()
       };
     }
+  }
+
+  // Prefer a semver looking version from detected components (score heuristic: presence of dots & digits)
+  private selectRootVersion(components: any[]): string | undefined {
+    for (const c of components) {
+      const v = c.version;
+      if (v && v !== 'unknown' && /\d+\.\d+\.\d+/.test(v)) return v;
+    }
+    for (const c of components) { // fallback any non-unknown
+      const v = c.version;
+      if (v && v !== 'unknown') return v;
+    }
+    return undefined;
+  }
+
+  private getToolVersion(): string {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pkg = require('../../package.json');
+      return pkg.version || '0.0.0';
+    } catch { return '0.0.0'; }
   }
 
   private async deriveFeatures(binaryPath: string, analyzer?: BinaryAnalyzer): Promise<string[]> {
@@ -466,16 +490,35 @@ export class SBOMGenerator {
   }
 
   private generateCycloneDX(binaryInfo: any, components: any[], dependencies: any[]): any {
-    const depsSection = dependencies.length ? [
-        {
-          ref: binaryInfo.name,
-          dependsOn: dependencies.map(dep => dep.ref)
-        },
-        ...dependencies.map(dep => ({
-          ref: dep.ref,
-          dependsOn: []
-        }))
-      ] : undefined;
+    // Consolidate dependency refs into component set (ensure every dependency has a component w/ bom-ref)
+    const componentMap = new Map<string, any>();
+    components.forEach(c => componentMap.set(`${c.name}@${c.version || 'unknown'}`.toLowerCase(), c));
+    const depBomRefs: string[] = [];
+    dependencies.forEach(dep => {
+      const name = sanitizeName(dep.ref);
+      const version = dep.version || 'unknown';
+      const key = `${name}@${version}`.toLowerCase();
+      if (!componentMap.has(key)) {
+        componentMap.set(key, {
+          type: 'library',
+          name,
+          version,
+          purl: dep.purl || `pkg:generic/${name}@${version}`,
+          _syntheticDependency: true
+        });
+      }
+      depBomRefs.push(this.computeBomRef(name, version, dep.purl));
+    });
+    const allComponents = Array.from(componentMap.values());
+
+    const rootName = sanitizeName(binaryInfo.name);
+    const rootVersion = binaryInfo.rootVersion || '0.0.0';
+    const rootBomRef = this.computeBomRef(rootName, rootVersion, `pkg:generic/${rootName}@${rootVersion}`);
+
+    const depsSection = depBomRefs.length ? [
+      { ref: rootBomRef, dependsOn: depBomRefs }
+    ] : undefined;
+
     return {
       bomFormat: 'CycloneDX',
       specVersion: '1.4',
@@ -485,9 +528,10 @@ export class SBOMGenerator {
         timestamp: new Date().toISOString(),
         component: {
           type: 'application',
-          name: sanitizeName(binaryInfo.name),
-          version: '1.0.0',
-          purl: `pkg:generic/${sanitizeName(binaryInfo.name)}@1.0.0`,
+          name: rootName,
+          version: rootVersion,
+          purl: `pkg:generic/${rootName}@${rootVersion}`,
+          'bom-ref': rootBomRef,
           hashes: [
             {
               alg: 'SHA-256',
@@ -500,21 +544,29 @@ export class SBOMGenerator {
             { name: 'binary:type', value: binaryInfo.type },
             ...(binaryInfo.betanetFeatures ? (binaryInfo.betanetFeatures as string[]).map(f => ({ name: 'betanet.feature', value: f })) : [])
           ]
-        }
+        },
+        tools: [
+          {
+            vendor: 'QW1CKS',
+            name: 'betanet-compliance-linter',
+            version: this.getToolVersion()
+          }
+        ]
       },
-      components: components.map(comp => ({
+      components: allComponents.map(comp => ({
         type: comp.type || 'library',
-  name: sanitizeName(comp.name),
+        name: sanitizeName(comp.name),
         version: comp.version || 'unknown',
         purl: comp.purl,
+        'bom-ref': this.computeBomRef(sanitizeName(comp.name), comp.version || 'unknown', comp.purl),
         hashes: comp.hash ? [{ alg: 'SHA-256', content: comp.hash }] : undefined,
         licenses: comp.license ? [{ license: { id: comp.license } }] : undefined,
-        properties: comp.detected ? [{
-          name: 'detected',
-          value: 'true'
-        }] : []
+        properties: [
+          ...(comp.detected ? [{ name: 'betanet.detected', value: 'true' }] : []),
+          ...(comp._syntheticDependency ? [{ name: 'betanet.synthetic', value: 'dependency' }] : [])
+        ]
       })),
-  dependencies: depsSection
+      dependencies: depsSection
     };
   }
 
@@ -534,7 +586,7 @@ export class SBOMGenerator {
     const rootSpdxId = 'SPDXRef-Package-Root';
     lines.push(`PackageName: ${safeDocName}`);
     lines.push(`SPDXID: ${rootSpdxId}`);
-    lines.push('PackageVersion: 1.0.0');
+  lines.push(`PackageVersion: ${(binaryInfo.rootVersion) || 'NOASSERTION'}`);
     lines.push('PackageDownloadLocation: NOASSERTION');
     lines.push('FilesAnalyzed: false');
     lines.push('PackageLicenseConcluded: NOASSERTION');
@@ -544,6 +596,7 @@ export class SBOMGenerator {
     if (binaryInfo.betanetFeatures && binaryInfo.betanetFeatures.length) {
       (binaryInfo.betanetFeatures as string[]).forEach((f: string) => lines.push(`PackageComment: betanet.feature=${f}`));
     }
+    const dependencyIds: string[] = [];
     components.forEach((c, idx) => {
       const compId = `SPDXRef-Comp-${idx}`;
       lines.push('');
@@ -557,10 +610,21 @@ export class SBOMGenerator {
       if (c.hash) lines.push(`PackageChecksum: SHA256: ${c.hash}`);
     });
     if (dependencies.length) {
-      lines.push('');
-      dependencies.forEach(dep => {
-        const depRef = `SPDXRef-${dep.ref.replace(/[^A-Za-z0-9]/g, '_')}`;
-        lines.push(`Relationship: ${rootSpdxId} DEPENDS_ON ${depRef}`);
+      dependencies.forEach((d, i) => {
+        const depId = `SPDXRef-Dep-${i}`;
+        dependencyIds.push(depId);
+        lines.push('');
+        lines.push(`PackageName: ${sanitizeName(d.ref)}`);
+        lines.push(`SPDXID: ${depId}`);
+        lines.push(`PackageVersion: ${d.version || 'unknown'}`);
+        lines.push('PackageDownloadLocation: NOASSERTION');
+        lines.push('FilesAnalyzed: false');
+        lines.push('PackageLicenseConcluded: NOASSERTION');
+        lines.push('PackageLicenseDeclared: NOASSERTION');
+      });
+      // Relationships for dependencies
+      dependencyIds.forEach(id => {
+        lines.push(`Relationship: ${rootSpdxId} DEPENDS_ON ${id}`);
       });
     }
     return lines.join('\n');
@@ -570,11 +634,7 @@ export class SBOMGenerator {
     const docId = `SPDXRef-DOCUMENT`;
     const safeBin = sanitizeName(binaryInfo.name);
     const packageId = `SPDXRef-Package-Root`;
-    const relationships = dependencies.length ? dependencies.map(dep => ({
-      spdxElementId: packageId,
-      relationshipType: 'DEPENDS_ON',
-      relatedSpdxElement: `SPDXRef-${dep.ref.replace(/[^a-zA-Z0-9]/g, '_')}`
-    })) : [];
+    const relationships: any[] = [];
     return {
       SPDXID: docId,
       spdxVersion: 'SPDX-2.3',
@@ -583,13 +643,13 @@ export class SBOMGenerator {
       documentNamespace: `https://spdx.org/spdxdocs/${safeBin}-${this.generateUUID()}`,
       creationInfo: {
         created: new Date().toISOString(),
-        creators: ['Tool: betanet-compliance-linter']
+        creators: ['Tool: betanet-compliance-linter', 'Organization: QW1CKS']
       },
       packages: [
         {
           name: safeBin,
           SPDXID: packageId,
-          versionInfo: '1.0.0',
+          versionInfo: (binaryInfo.rootVersion) || 'NOASSERTION',
           filesAnalyzed: false,
           downloadLocation: 'NOASSERTION',
           checksums: binaryInfo.hash ? [{ algorithm: 'SHA256', checksumValue: binaryInfo.hash }] : [],
@@ -608,10 +668,33 @@ export class SBOMGenerator {
           licenseConcluded: 'NOASSERTION',
           copyrightText: 'NOASSERTION',
           checksums: c.hash ? [{ algorithm: 'SHA256', checksumValue: c.hash }] : []
+  })),
+        // dependency packages
+        ...dependencies.map((d, i) => ({
+          name: sanitizeName(d.ref),
+          SPDXID: `SPDXRef-Dep-${i}`,
+          versionInfo: d.version || 'unknown',
+          filesAnalyzed: false,
+          downloadLocation: 'NOASSERTION',
+          licenseDeclared: 'NOASSERTION',
+          licenseConcluded: 'NOASSERTION',
+          copyrightText: 'NOASSERTION'
         }))
       ],
-      relationships
+      relationships: [
+        ...relationships,
+        ...dependencies.map((d, i) => ({
+          spdxElementId: packageId,
+          relationshipType: 'DEPENDS_ON',
+          relatedSpdxElement: `SPDXRef-Dep-${i}`
+        }))
+      ]
     };
+  }
+
+  private computeBomRef(name: string, version: string, purl?: string): string {
+    if (purl) return purl; // purl is acceptable as bom-ref (common practice)
+    return `urn:betanet:component:${name}:${version}`;
   }
 
   private generateUUID(): string {
