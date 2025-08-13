@@ -73,9 +73,14 @@ Phase 2: Dynamic Harness (Behavioral Evidence)
 - Deferred (Not blocking Phase 2 completion): raw packet JA3/JA4 canonicalization, full QUIC Initial TLV parse, deep Noise transcript decoding, stronger fallback statistical thresholds, evidence signing (moved to Phase 7 / Anti-Evasion & authenticity).
 
 Phase 3: Governance & Ledger Verification
-- [x] Accept alias-ledger observation file: validates 2-of-3 finality rules. (Implemented Checks 15 & 16 basic finality & quorum cert validity)
-- [~] Parse Emergency Advance quorum certificates (CBOR) verifying signatures, weight caps (config-supplied weight mapping) and monotonic seq. (CBOR parsing + validity done; signature & weight cap rigor pending)
-- [x] Governance check: ingest participation snapshot (weights, AS/Org mapping) to compute caps & diversity conditions. (Derived metrics implemented; historical diversity dataset pending)
+- [x] Accept alias-ledger observation file: validates 2-of-3 finality rules (Check 16 baseline).
+- [x] Quorum certificates: CBOR parsing + epoch monotonicity + aggregate threshold validation (simplified) integrated.
+- [x] Governance snapshot ingestion: derive AS/org caps, partition detection, integrate historical diversity dataset (`governanceHistoricalDiversity.series`) with stability evaluation.
+- [x] Emergency Advance quorum cert validation: prerequisite liveness days (≥14) + justification flag enforced when emergencyAdvanceUsed.
+- [x] Validator signature cryptographic verification (Ed25519 support) & root hash chain (repeat root detection) integrated (signature path auto‑enabled when validatorKeys supplied).
+- [x] Historical diversity advanced analytics (sliding window volatility & max window share) implemented (`advancedStable`, `volatility`, `maxWindowShare`).
+- [x] Advanced diversity stability enforcement (requires advancedStable !== false when dataset present) in Check 15.
+- Phase 3 COMPLETE: governance & ledger checks now artifact-based with quorum cert reason diagnostics and diversity stability gating.
 
 Phase 4: Adaptive/Bootstrap & Mix Diversity Deepening
 - [~] Bootstrap simulation: feed synthetic rendezvous epochs verifying rotating IDs, absence of deterministic seeds. (Rotation token & hits heuristic present; full simulation pending)
@@ -316,6 +321,8 @@ Current Deliverables:
 - Per-evidence-section SHA256 hashing stored under `meta.hashes` for integrity; still unsigned.
 - Optional `--noise-run` attempts to detect live rekey markers (heuristic) upgrading `noiseExtended` counters.
 - Check 22 upgrades to dynamic when capture present and requires static hash match.
+- Mismatch diagnostics codes implemented for TLS calibration (ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH) surfaced via `dynamicClientHelloCapture.note`.
+- Governance advanced diversity metrics (`advancedStable`, `volatility`, `maxWindowShare`) ingested to inform future tightening.
 Remaining (Slice Exit Criteria):
 1. Raw ClientHello byte capture (pcap or custom client) to compute true JA3/JA4 and extension ordering without OpenSSL formatting ambiguity.
 2. Granular mismatch diagnostics (distinct codes: ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH, ALPN_SET_DIFF, EXT_COUNT_DIFF).

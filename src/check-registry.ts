@@ -28,23 +28,24 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'HTX over TCP-443 & QUIC-443',
     description: 'Implements HTX over TCP-443 and QUIC-443 with TLS 1.3 mimic + ECH',
     severity: 'critical',
-  introducedIn: '1.0',
-  mandatoryIn: '1.0',
+    introducedIn: '1.0',
+    mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const networkCaps = await analyzer.checkNetworkCapabilities();
       const passed = networkCaps.hasTLS && networkCaps.hasQUIC && networkCaps.hasHTX && networkCaps.hasECH && networkCaps.port443;
+      const details = passed ? '✅ HTX over TCP+QUIC with TLS1.3 mimic & ECH present' : `❌ Missing: ${missingList([
+        !networkCaps.hasTLS && 'TLS',
+        !networkCaps.hasQUIC && 'QUIC',
+        !networkCaps.hasHTX && 'HTX',
+        !networkCaps.hasECH && 'ECH',
+        !networkCaps.port443 && 'port 443'
+      ])}`;
       return {
         id: 1,
         name: 'HTX over TCP-443 & QUIC-443',
         description: 'Implements HTX over TCP-443 and QUIC-443 with TLS 1.3 mimic + ECH',
         passed,
-        details: passed ? '✅ Found HTX, QUIC, TLS, ECH, and port 443 support' : `❌ Missing: ${missingList([
-          !networkCaps.hasTLS && 'TLS',
-          !networkCaps.hasQUIC && 'QUIC',
-          !networkCaps.hasHTX && 'HTX',
-          !networkCaps.hasECH && 'ECH',
-          !networkCaps.port443 && 'port 443'
-        ])}`,
+        details,
         severity: 'critical',
         evidenceType: 'heuristic'
       };
@@ -554,14 +555,19 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
             gov.orgCapApplied = derived.orgCapApplied;
           } catch {/* ignore */}
         }
+        // Integrate historical diversity stability if present
+        const hist = (analyzer as any).evidence?.governanceHistoricalDiversity;
         const { asCapApplied, orgCapApplied, maxASShare, maxOrgShare, partitionsDetected } = gov;
-        passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false);
-        details = passed ? `✅ Caps enforced (AS<=${maxASShare} org<=${maxOrgShare}) no partitions` : `❌ Governance issues: ${missingList([
+        // Historical diversity now requires BOTH basic stability and (if present) advancedStable not false
+        const histStable = hist ? (hist.stable === true && (hist.advancedStable !== false)) : true;
+        passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && histStable);
+        details = passed ? `✅ Caps enforced (AS<=${maxASShare} org<=${maxOrgShare}) no partitions${hist ? ' diversityStable=' + hist.stable : ''}` : `❌ Governance issues: ${missingList([
           !asCapApplied && 'AS caps not applied',
           !orgCapApplied && 'Org caps not applied',
           (maxASShare > 0.2) && `AS share ${maxASShare}`,
           (maxOrgShare > 0.25) && `Org share ${maxOrgShare}`,
-          partitionsDetected === true && 'partitions detected'
+          partitionsDetected === true && 'partitions detected',
+          hist && !histStable && 'historical diversity unstable (basic or advanced)'
         ])}`;
       }
       return { id: 15, name: 'Governance Anti-Concentration', description: 'Validates AS/org caps & partition safety (evidence-based)', passed, details, severity: 'major', evidenceType: gov ? 'artifact' : 'heuristic' };
@@ -586,18 +592,31 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
             const { parseQuorumCertificates, validateQuorumCertificates } = require('./governance-parser');
             const buffers = ledger.quorumCertificatesCbor.map((b: string) => Buffer.from(b, 'base64'));
             const qcs = parseQuorumCertificates(buffers);
-            ledger.quorumCertificatesValid = validateQuorumCertificates(qcs);
+            const validatorKeys = (ev.governance && ev.governance.validatorKeys) || undefined;
+            const validation = validateQuorumCertificates(qcs, 2/3, { validatorKeys, requireSignatures: !!validatorKeys });
+            ledger.quorumCertificatesValid = validation.valid;
+            if (!validation.valid && validation.reasons?.length) {
+              ledger.quorumCertificateInvalidReasons = validation.reasons;
+            }
             ledger.finalitySets = ledger.finalitySets || qcs.map((q: any) => `epoch-${q.epoch}`);
           } catch {/* ignore */}
         }
-        const { finalitySets, quorumCertificatesValid, emergencyAdvanceUsed } = ledger;
+        const { finalitySets, quorumCertificatesValid, emergencyAdvanceUsed, emergencyAdvanceLivenessDays, emergencyAdvanceJustification } = ledger;
         const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2; // simplified proxy
-        passed = !!(has2of3 && quorumCertificatesValid === true && emergencyAdvanceUsed !== true);
-        details = passed ? `✅ Finality sets=${finalitySets.length} quorum certs valid` : `❌ Ledger issues: ${missingList([
+        let emergencyOk = true;
+        if (emergencyAdvanceUsed === true) {
+          // Require liveness failure prerequisite >=14 days and justification token
+            emergencyOk = (typeof emergencyAdvanceLivenessDays === 'number' && emergencyAdvanceLivenessDays >= 14) && !!emergencyAdvanceJustification;
+        }
+        passed = !!(has2of3 && quorumCertificatesValid === true && emergencyOk);
+        details = passed ? `✅ Finality sets=${finalitySets.length} quorum certs valid${emergencyAdvanceUsed ? ' (emergency advance justified)' : ''}` : `❌ Ledger issues: ${missingList([
           !has2of3 && 'insufficient finality sets',
           quorumCertificatesValid !== true && 'invalid quorum certificates',
-          emergencyAdvanceUsed === true && 'emergency advance used'
+          emergencyAdvanceUsed === true && !emergencyOk && 'emergency advance unjustified'
         ])}`;
+        if (!passed && Array.isArray(ledger.quorumCertificateInvalidReasons) && ledger.quorumCertificateInvalidReasons.length) {
+          details += ' reasons=' + ledger.quorumCertificateInvalidReasons.join(',');
+        }
       }
       return { id: 16, name: 'Ledger Finality Observation', description: 'Evidence of 2-of-3 finality & quorum certificate validity', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
     }

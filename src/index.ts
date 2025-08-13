@@ -187,6 +187,20 @@ export class BetanetComplianceChecker {
         analyzerAny.evidence = analyzerAny.evidence || {};
         if (govObj.governance) analyzerAny.evidence.governance = govObj.governance;
         if (govObj.ledger) analyzerAny.evidence.ledger = govObj.ledger;
+        if (govObj.governanceHistoricalDiversity) {
+          analyzerAny.evidence.governanceHistoricalDiversity = govObj.governanceHistoricalDiversity;
+          try {
+            const { evaluateHistoricalDiversity, evaluateHistoricalDiversityAdvanced } = require('./governance-parser');
+            const result = evaluateHistoricalDiversity(govObj.governanceHistoricalDiversity.series || []);
+            analyzerAny.evidence.governanceHistoricalDiversity.stable = result.stable;
+            analyzerAny.evidence.governanceHistoricalDiversity.maxASShare = result.maxASShare;
+            analyzerAny.evidence.governanceHistoricalDiversity.avgTop3 = result.avgTop3;
+            const adv = evaluateHistoricalDiversityAdvanced(govObj.governanceHistoricalDiversity.series || []);
+            analyzerAny.evidence.governanceHistoricalDiversity.advancedStable = adv.advancedStable;
+            analyzerAny.evidence.governanceHistoricalDiversity.volatility = adv.volatility;
+            analyzerAny.evidence.governanceHistoricalDiversity.maxWindowShare = adv.maxWindowShare;
+          } catch {/* ignore */}
+        }
       } catch (e: any) {
         console.warn(`⚠️  Failed to ingest governance evidence ${options.governanceFile}: ${e.message}`);
       }

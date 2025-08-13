@@ -128,6 +128,12 @@ export interface IngestedEvidence {
   noiseExtended?: { pattern?: string; rekeysObserved?: number; rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number } };
   governance?: any; // Phase 6 governance snapshot evidence
   ledger?: any; // Phase 6 ledger observation evidence
+  governanceHistoricalDiversity?: {
+    // Time-series of AS share distributions: array of { timestamp, asShares: { [as: string]: number } }
+    series?: { timestamp: string; asShares: Record<string, number> }[];
+    maxASShareDropPct?: number; // computed metric of largest single AS share drop (partition safety)
+    stable?: boolean; // flag after verification thresholds
+  };
   mix?: {
     samples?: number; // number of path construction samples observed
     uniqueHopSets?: number; // count of unique hop sets among samples

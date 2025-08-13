@@ -981,6 +981,41 @@ describe('BetanetComplianceChecker', () => {
     expect(ledgerCheck?.details).toMatch(/quorum certs valid/);
     await fs.remove(govFile); await fs.remove(tmp);
   });
+
+  it('integrates governance historical diversity stability', async () => {
+    const checker = new BetanetComplianceChecker();
+    const tmp = path.join(__dirname, 'temp-existing-bin6');
+    await fs.writeFile(tmp, Buffer.from('binary data governance diversity history'));
+    (checker as any)._analyzer = {
+      checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+      analyze: () => Promise.resolve({ strings: ['/betanet/htx/1.0.0','/betanet/htxquic/1.0.0'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+      checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasEd25519: true, hasX25519: true, hasKyber768: true, hasSHA256: true, hasHKDF: true }),
+      checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+      checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+      checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+      checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+      checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+    };
+    const histSeries = [
+      { timestamp: '2025-08-01T00:00:00Z', asShares: { AS1: 0.12, AS2: 0.11, AS3: 0.10 } },
+      { timestamp: '2025-08-02T00:00:00Z', asShares: { AS1: 0.13, AS2: 0.09, AS3: 0.08 } },
+      { timestamp: '2025-08-03T00:00:00Z', asShares: { AS1: 0.14, AS2: 0.10, AS3: 0.07 } }
+    ];
+    const govFile = path.join(__dirname, 'gov-evidence3.json');
+    const weights = [
+      { validator: 'val1', as: 'AS1', org: 'OrgA', weight: 20 },
+      { validator: 'val2', as: 'AS2', org: 'OrgB', weight: 20 },
+      { validator: 'val3', as: 'AS3', org: 'OrgC', weight: 20 },
+      { validator: 'val4', as: 'AS4', org: 'OrgD', weight: 20 },
+      { validator: 'val5', as: 'AS5', org: 'OrgE', weight: 20 }
+    ];
+    const govEvidence = { governance: { weights, partitionsDetected: false }, governanceHistoricalDiversity: { series: histSeries } };
+    await fs.writeFile(govFile, JSON.stringify(govEvidence));
+    const result = await checker.checkCompliance(tmp, { governanceFile: govFile, allowHeuristic: true });
+    const govCheck = result.checks.find(c => c.id === 15);
+    expect(govCheck?.details).toMatch(/diversityStable|Caps enforced/);
+    await fs.remove(govFile); await fs.remove(tmp);
+  });
   });
 
   describe('performance memoization', () => {
