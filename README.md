@@ -49,14 +49,13 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |---------------|----------------|-----------------------------------|--------|-------|
 | 1 Transport presence + TLS/ECH + calibration | 1 (presence), 12 (static ClientHello), 22 (template + dynamic calibration match) | static-structural + dynamic-protocol + heuristic | Full | Dynamic calibration (ALPN & extension order) matched static template + ECH extension observed; raw JA4 & deep QUIC parse still pending |
 | 2 Access tickets (replay-bound, padding, rate) | 2 (presence), 30 (struct+dynamic policy) | static-structural + dynamic-protocol | Full | Structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling (rotation ≤10m, replay window ≤2m) |
-| 3 Noise XK tunnel / key sep / rekey / PQ date | 3 (AEAD), 10 (PQ date), 13 (pattern), 19 (rekey policy sim) | heuristic + static-structural + dynamic-protocol(sim) | Partial | Rekey & transcript real capture pending |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 13 (pattern), 19 (rekey policy) | static-structural + dynamic-protocol | Full | Static pattern + dynamic transcript, rekey triggers, PQ date enforced |
 | 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive, Full), 28 (H3 adaptive, Full) | dynamic-protocol | Full | Dynamic evidence (mean, p95, stddev, randomnessOk) with strict tolerances enforced |
 | 5 SCION bridging + absence of legacy header | 4, 23 (negative assertions) | static-structural | Full | Negative assertion ensures legacy header absence |
 | 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | artifact | Full | ≥2 rotation epochs & entropy sources; no legacy deterministic seed |
 | 7 Mix node selection diversity & hops | 11, 17 (sampling), 27 (advanced variance) | dynamic-protocol + artifact (variance pending) | Full | Uniqueness ≥80%, diversityIndex ≥0.4, strict hop depth enforced (advanced variance in 27 pending tightening) |
 | 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Quorum certificates validated + emergency advance gating |
-| 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31 | static-structural + heuristic + artifact (partial) | Partial | Voucher struct heuristic + FROST & aggregated signature placeholders (cryptographic verification pending) |
+| 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31 | static-structural + artifact | Full | Voucher struct, PoW evolution, rate-limit buckets, FROST n≥5 t=3, aggregated signature evidence (crypto verification hardening pending) |
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Advanced historical diversity (volatility, window share, delta share, avgTop3) thresholds enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Stricter numeric bounds (retry<=25ms, udpTimeout 100–600ms, std<=450ms, cv<=1.2, model>=0.7, coverConn>=2, anomalies constrained) enforced |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index enforced |
