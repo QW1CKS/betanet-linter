@@ -1,0 +1,84 @@
+{
+	"clientHello": {
+		"alpn": ["h2", "http/1.1"],
+		"extOrderSha256": "abc123def456",
+		"extensions": [65293]
+	},
+	"clientHelloTemplate": {
+		"alpn": ["h2", "http/1.1"],
+		"extOrderSha256": "abc123def456",
+		"extensions": [65293]
+	},
+	"dynamicClientHelloCapture": {
+		"alpn": ["h2", "http/1.1"],
+		"extOrderSha256": "abc123def456",
+		"extensions": [65293],
+		"matchStaticTemplate": true,
+		"ja3Hash": "deadbeefcafebabe"
+	},
+	"provenance": {
+		"predicateType": "https://slsa.dev/provenance/v1",
+		"builderId": "example/builder",
+		"binaryDigest": "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
+		"materialsValidated": true,
+		"signatureVerified": true,
+		"dsseThresholdMet": true
+	},
+	"accessTicket": {
+		"detected": true,
+		"fieldsPresent": ["ticket", "nonce", "exp", "sig"],
+		"rotationTokenPresent": true,
+		"paddingVariety": 2,
+		"rateLimitTokensPresent": true,
+		"structConfidence": 0.5
+	},
+	"noisePatternDetail": {
+		"pattern": "XK",
+		"hkdfLabelsFound": 3,
+		"messageTokensFound": 3
+	},
+	"noiseTranscriptDynamic": {
+		"rekeysObserved": 1,
+		"rekeyTriggers": {"bytes": 8589934592, "timeMinSec": 3600, "frames": 65536},
+		"pqDateOk": true,
+		"expectedSequenceOk": true,
+		"patternVerified": true
+	},
+	"h2Adaptive": {
+		"meanMs": 50,
+		"p95Ms": 100,
+		"stddevMs": 10,
+		"randomnessOk": true,
+		"withinTolerance": true,
+		"sampleCount": 6
+	},
+	"h3Adaptive": {
+		"meanMs": 60,
+		"p95Ms": 120,
+		"stddevMs": 12,
+		"randomnessOk": true,
+		"withinTolerance": true,
+		"sampleCount": 6
+	},
+	"negative": {
+		"forbiddenPresent": []
+	},
+	"scionSupport": {
+		"hasSCION": true,
+		"pathManagement": true,
+		"hasIPTransition": true,
+		"pathDiversityCount": 2
+	},
+	"htxCompliance": {
+		"tcpQuicSupport": true,
+		"tlsCalibration": true,
+		"echEnabled": true,
+		"dynamicCalibration": true
+	},
+	"httpAdaptive": {
+		"h2Support": true,
+		"h3Support": true,
+		"jitterVariance": true,
+		"adaptiveEmulation": true
+	}
+}

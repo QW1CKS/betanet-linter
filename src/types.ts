@@ -1,3 +1,4 @@
+export interface Evidence {
   h2AdaptiveDynamic?: {
     settings?: Record<string, number>;
     paddingJitterMeanMs?: number;
@@ -26,6 +27,7 @@
     pqDateOk?: boolean;
     withinPolicy?: boolean;
   };
+}
 export interface ComplianceCheck {
   id: number;
   name: string;
