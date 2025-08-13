@@ -9,7 +9,7 @@ The following tasks constitute the definitive completion list. Implementing all 
     * Emit fields: rawClientHelloB64, ja3Canonical, ja3Hash (MD5), ja4, quicInitial.rawInitialB64, quicInitial.parsed (version, dcid, scid, tokenLen, alpn list, transport params subset).
     * Check 22 fails with specific codes (ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH) when deviations present.
     * Unit tests with synthetic captures covering each failure code. (Implemented in tls-calibration.test.ts)
-    * Integration test demonstrating pass on golden fixture and fail on perturbed traces. (Planned)
+  * Integration test demonstrating pass on golden fixture and fail on perturbed traces. (Implemented in tls-calibration-integration.test.ts)
 
 [ ] 2. Encrypted ClientHello (ECH) Verification
   - Objective: Confirm real ECH acceptance not just extension token presence.
