@@ -140,6 +140,10 @@ export interface IngestedEvidence {
     hopSets?: string[][]; // optional raw hop sets for future statistical validation
     minHopsBalanced?: number; // balanced mode min hops (e.g., 2)
     minHopsStrict?: number; // strict mode min hops (e.g., 3)
+  mode?: 'balanced' | 'strict'; // declared privacy mode (Phase 4 enforcement)
+  pathLengths?: number[]; // observed path lengths
+  uniquenessRatio?: number; // derived uniqueHopSets/samples
+  diversityIndex?: number; // dispersion metric (0-1)
   }; // Phase 7 mix diversity sampling evidence
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
   binaryMeta?: {
@@ -179,6 +183,25 @@ export interface IngestedEvidence {
     pattern?: string;
     hkdfLabelsFound?: number;
     messageTokensFound?: number;
+  };
+  // Phase 4 additions: bootstrap rotation evidence & PoW / rate-limit evolution
+  bootstrap?: {
+    rotationEpochs?: number; // number of distinct rendezvous/beacon epochs observed
+    beaconSetEntropySources?: number; // distinct entropy sources feeding beacon set (e.g., drand, vrf, pow)
+    deterministicSeedDetected?: boolean; // flag if legacy deterministic seed constant still present
+    sampleEpochSpanHours?: number; // timespan covered by sampled epochs (approx)
+  };
+  powAdaptive?: {
+    difficultySamples?: number[]; // sequential bit-difficulty observations (e.g., from replay log)
+    targetBits?: number; // expected steady-state target (e.g., 22)
+    monotonicTrend?: boolean; // optional precomputed trend flag (ingester may supply)
+    anomalies?: string[]; // anomaly codes from ingestion (e.g., 'large-drop','oscillation')
+  };
+  rateLimit?: {
+    buckets?: { name?: string; capacity?: number; refillPerSec?: number }[]; // parsed bucket definitions
+    bucketCount?: number; // convenience (can be derived from buckets length)
+    distinctScopes?: number; // number of distinct scope types (ip,user,global,...)
+    scopeRefillVariancePct?: number; // variance across scope refill rates (sanity check of multi-bucket logic)
   };
   negative?: {
     forbiddenPresent?: string[]; // list of forbidden tokens discovered

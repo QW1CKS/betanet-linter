@@ -4,7 +4,7 @@ import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
 import * as xml2js from 'xml2js';
-import { CHECK_REGISTRY, getChecksByIds } from './check-registry';
+import { ALL_CHECKS, getChecksByIds } from './check-registry';
 import { SPEC_VERSION_SUPPORTED_BASE, SPEC_VERSION_PARTIAL, SPEC_11_PENDING_ISSUES, isVersionLE } from './constants';
 import { SBOMGenerator } from './sbom/sbom-generator';
 import { SEVERITY_EMOJI } from './constants';
@@ -211,7 +211,7 @@ export class BetanetComplianceChecker {
     }
   }
   private resolveDefinitions(options: CheckOptions) {
-    let ids = CHECK_REGISTRY.map(c => c.id);
+  let ids = ALL_CHECKS.map(c => c.id);
     if (options.checkFilters?.include) ids = ids.filter(id => options.checkFilters!.include!.includes(id));
     if (options.checkFilters?.exclude) ids = ids.filter(id => !options.checkFilters!.exclude!.includes(id));
     return getChecksByIds(ids);
@@ -303,8 +303,8 @@ export class BetanetComplianceChecker {
       if (heuristicContributionCount > 0) passed = false;
     }
     const diagnostics = (() => { const a: any = this.analyzer; if (a && typeof a.getDiagnostics === 'function') { try { return a.getDiagnostics(); } catch { return undefined; } } return undefined; })();
-    const implementedChecks = CHECK_REGISTRY.filter(c => isVersionLE(c.introducedIn, SPEC_VERSION_PARTIAL)).length;
-    const specSummary = { baseline: SPEC_VERSION_SUPPORTED_BASE, latestKnown: SPEC_VERSION_PARTIAL, implementedChecks, totalChecks: CHECK_REGISTRY.length, pendingIssues: SPEC_11_PENDING_ISSUES };
+  const implementedChecks = ALL_CHECKS.filter((c: any) => isVersionLE(c.introducedIn, SPEC_VERSION_PARTIAL)).length;
+  const specSummary = { baseline: SPEC_VERSION_SUPPORTED_BASE, latestKnown: SPEC_VERSION_PARTIAL, implementedChecks, totalChecks: ALL_CHECKS.length, pendingIssues: SPEC_11_PENDING_ISSUES };
     const result: ComplianceResult = { binaryPath, timestamp: new Date().toISOString(), overallScore, passed, checks, summary: { total: considered.length, passed: passedChecks.length, failed: considered.length - passedChecks.length, critical: criticalChecks.length }, specSummary, diagnostics };
     // Multi-signal scoring (Step 8)
     const catCounts = { heuristic: 0, 'static-structural': 0, 'dynamic-protocol': 0, artifact: 0 } as any;

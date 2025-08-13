@@ -83,10 +83,11 @@ Phase 3: Governance & Ledger Verification
 - Phase 3 COMPLETE: governance & ledger checks now artifact-based with quorum cert reason diagnostics and diversity stability gating.
 
 Phase 4: Adaptive/Bootstrap & Mix Diversity Deepening
-- [~] Bootstrap simulation: feed synthetic rendezvous epochs verifying rotating IDs, absence of deterministic seeds. (Rotation token & hits heuristic present; full simulation pending)
-- [ ] Validate PoW difficulty evolution & multi-bucket rate-limit logic via controlled replay logs (evidence ingestion). (Pending)
+- [x] Bootstrap rotation evidence: added `bootstrap` evidence (rotationEpochs, beaconSetEntropySources, deterministicSeedDetected); Check 6 upgraded to artifact when evidence present (requires ≥2 epochs, ≥2 entropy sources, no legacy seed). (Temporal span & deeper replay simulation still future enhancement)
+- [x] PoW difficulty evolution: added `powAdaptive` evidence (difficultySamples, targetBits); Check 8 validates convergence band, max drop, monotonic trend and upgrades evidenceType to artifact when present.
+- [x] Multi-bucket rate-limit logic: `rateLimit` evidence + Check 24 (bucket presence, global+scoped, dispersion sanity, variance bounds).
 - [x] Mix diversity sampling: request N (e.g., 10) path constructions; assert ≥8 unique hop sets before reuse. (Implemented Check 17 with uniqueness & diversityIndex thresholds)
-- [~] Privacy mode enforcement: balanced vs strict hop threshold evidence. (Check 11 hop depth & dynamic upgrade; strict vs balanced differentiation pending)
+ - [x] Privacy mode enforcement: balanced vs strict hop threshold via `mix.mode` + upgraded Check 11 requiring higher min hops in strict mode.
 
 Phase 5: Build Provenance & Reproducibility
 - [~] Harden GitHub Action: pinned SHAs, least-privilege permissions, concurrency guard. (Partial: scaffold & some pinning; full audit pending)
@@ -137,6 +138,8 @@ Evidence JSON (example fields):
   "mix": { "samples": 10, "uniqueHopSets": 8, "minHopsBalanced": 2, "minHopsStrict": 3 },
   "governance": { "asCapApplied": true, "orgCapApplied": true, "ackSpanAS": 24, "ackSpanISD": 3 },
   "bootstrap": { "rotationEpochs": 3, "beaconSetEntropySources": 3, "deterministicSeedDetected": false },
+  "powAdaptive": { "difficultySamples": [22,22,21,22], "targetBits": 22 },
+  "rateLimit": { "buckets": [{"name":"global","capacity":100,"refillPerSec":5},{"name":"perIP","capacity":20,"refillPerSec":1}], "distinctScopes": 2 },
   "ledger": { "finalitySets": ["handshake","filecoin","raven-l2"], "emergencyAdvanceUsed": false },
   "voucher": { "structCount128B": 1, "frostGroupThreshold": {"n":5, "t":3} },
   "provenance": { "predicateType": "https://slsa.dev/provenance/v1", "builderId": "github.com/...", "binaryDigest": "sha256:..." }

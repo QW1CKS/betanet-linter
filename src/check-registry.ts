@@ -172,20 +172,37 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const dhtSupport = await analyzer.checkDHTSupport();
-      const passed = !!(dhtSupport.hasDHT && (dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation));
+      const ev: any = (analyzer as any).evidence;
+      const bootstrap = ev?.bootstrap;
+      // Heuristic baseline
+      let passed = !!(dhtSupport.hasDHT && (dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation));
+      let modeDetail = dhtSupport.rendezvousRotation ? `rotating rendezvous (hits=${dhtSupport.rotationHits})` : (dhtSupport.deterministicBootstrap ? 'deterministic' : 'unknown');
+      // Bootstrap evidence upgrade (Phase 4): require ≥2 rotation epochs & no deterministic seed and at least 2 entropy sources
+      let evidenceType: 'heuristic' | 'artifact' = 'heuristic';
+      if (bootstrap) {
+        evidenceType = 'artifact';
+        const epochsOk = (bootstrap.rotationEpochs || 0) >= 2;
+        const entropyOk = (bootstrap.beaconSetEntropySources || 0) >= 2;
+        const noLegacySeed = bootstrap.deterministicSeedDetected !== true;
+        passed = passed && epochsOk && entropyOk && noLegacySeed;
+        modeDetail += ` epochs=${bootstrap.rotationEpochs||0} entropySrc=${bootstrap.beaconSetEntropySources||0}${bootstrap.deterministicSeedDetected? ' legacy-seed' : ''}`;
+      }
       return {
         id: 6,
         name: 'DHT Seed Bootstrap',
         description: 'Implements deterministic (1.0) or rotating rendezvous (1.1) DHT seed bootstrap',
         passed,
-        details: passed ? `✅ DHT ${dhtSupport.rendezvousRotation ? `rotating rendezvous (hits=${dhtSupport.rotationHits})` : 'deterministic'} bootstrap` +
+        details: passed ? `✅ DHT ${modeDetail} bootstrap` +
           (dhtSupport.beaconSetIndicator ? ' + BeaconSet' : '') :
           `❌ Missing: ${missingList([
             !dhtSupport.hasDHT && 'DHT support',
-            !(dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation) && 'deterministic or rendezvous bootstrap'
+            !(dhtSupport.deterministicBootstrap || dhtSupport.rendezvousRotation) && 'deterministic or rendezvous bootstrap',
+            bootstrap && (bootstrap.rotationEpochs||0) < 2 && '≥2 rotation epochs',
+            bootstrap && (bootstrap.beaconSetEntropySources||0) < 2 && '≥2 entropy sources',
+            bootstrap && bootstrap.deterministicSeedDetected === true && 'legacy deterministic seed'
           ])}`,
         severity: 'major',
-        evidenceType: 'heuristic'
+        evidenceType
       };
     }
   },
@@ -225,24 +242,46 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const paymentSupport = await analyzer.checkPaymentSupport();
-      const passed = paymentSupport.hasCashu && paymentSupport.hasLightning && paymentSupport.hasFederation;
-      return {
-        id: 8,
-        name: 'Payment System',
-        description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)',
-        passed,
-        details: passed ? '✅ Found Cashu, Lightning, and federation support' +
+      const ev: any = (analyzer as any).evidence;
+      const pow = ev?.powAdaptive;
+      let passed = paymentSupport.hasCashu && paymentSupport.hasLightning && paymentSupport.hasFederation;
+      let powDetail = '';
+      if (pow && Array.isArray(pow.difficultySamples) && pow.difficultySamples.length >= 3) {
+        // Simple evolution validation: ensure samples converge within ±2 bits of target and no single backward jump >4 bits
+        const target = pow.targetBits || 22;
+  const withinBand = pow.difficultySamples.every((b: number) => Math.abs(b - target) <= 2);
+        let maxDrop = 0;
+        for (let i=1;i<pow.difficultySamples.length;i++) {
+          const drop = pow.difficultySamples[i-1] - pow.difficultySamples[i];
+            if (drop > maxDrop) maxDrop = drop;
+        }
+        const noLargeDrop = maxDrop <= 4;
+        const monotonicApprox = pow.monotonicTrend === true || pow.difficultySamples[pow.difficultySamples.length-1] >= pow.difficultySamples[0] - 2;
+        const powOk = withinBand && noLargeDrop && monotonicApprox;
+        passed = passed && powOk;
+        powDetail = ` powDiff=[${pow.difficultySamples.join('>')}] target=${target} maxDrop=${maxDrop}` + (powOk ? '' : ' pow-evolution-fail');
+      }
+      let details: string;
+      if (passed) {
+        details = '✅ Found Cashu, Lightning, and federation support' +
           (paymentSupport.hasVoucherFormat ? ' + voucher format' : '') +
           (paymentSupport.hasFROST ? ' + FROST group' : '') +
-          (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '') :
-          `❌ Missing: ${missingList([
-            !paymentSupport.hasCashu && 'Cashu support',
-            !paymentSupport.hasLightning && 'Lightning support',
-            !paymentSupport.hasFederation && 'federation support'
-          ])}`,
-        severity: 'major',
-        evidenceType: 'heuristic'
-      };
+          (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '') + powDetail;
+      } else {
+        const missingParts = [
+          !paymentSupport.hasCashu && 'Cashu support',
+          !paymentSupport.hasLightning && 'Lightning support',
+          !paymentSupport.hasFederation && 'federation support'
+        ];
+        const baseMissing = missingList(missingParts as any);
+        const noBaseMissing = missingParts.filter(Boolean).length === 0;
+        if (pow && powDetail.includes('pow-evolution-fail') && noBaseMissing) {
+          details = `❌ PoW evolution invalid ${powDetail.trim()}`;
+        } else {
+          details = `❌ Missing: ${baseMissing}${pow ? powDetail : ''}`;
+        }
+      }
+      return { id: 8, name: 'Payment System', description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)', passed, details, severity: 'major', evidenceType: pow ? 'artifact' : 'heuristic' };
     }
   },
   {
@@ -392,10 +431,12 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       let detailParts: string[] = [];
       if (mix && typeof mix === 'object') {
         dynamicUpgrade = true;
-        const minLen = Math.min(...(mix.pathLengths || []));
-        const hopDepthOk = minLen >= 2; // strict future: require >=3 for strict mode
+  const minLen = Math.min(...(mix.pathLengths || []));
+  const declaredMode = mix.mode || 'balanced';
+  const requiredDepth = declaredMode === 'strict' ? (mix.minHopsStrict || 3) : (mix.minHopsBalanced || 2);
+  const hopDepthOk = minLen >= requiredDepth;
         passed = passed && hopDepthOk && (mix.uniquenessRatio ? mix.uniquenessRatio >= 0.7 : true);
-        detailParts.push(`hopDepthMin=${minLen}`);
+  detailParts.push(`hopDepthMin=${minLen} required=${requiredDepth} mode=${declaredMode}`);
         if (mix.uniquenessRatio !== undefined) detailParts.push(`uniqueness=${(mix.uniquenessRatio*100).toFixed(1)}%`);
         if (mix.diversityIndex !== undefined) detailParts.push(`divIdx=${(mix.diversityIndex*100).toFixed(1)}%`);
       }
@@ -779,14 +820,64 @@ export const STEP_10_CHECKS = [
   }
 ];
 
+// Phase 4 extension: new appended check for rate-limit multi-bucket validation
+export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
+  {
+    id: 24,
+    key: 'adaptive-rate-limit-buckets',
+    name: 'Adaptive Rate-Limit Buckets',
+    description: 'Validates multi-bucket rate-limit configuration (global + scoped) with sane dispersion',
+  severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const rl = ev.rateLimit;
+      let passed = false;
+      let details = '❌ No rate-limit evidence';
+      if (rl) {
+        const buckets = Array.isArray(rl.buckets) ? rl.buckets : [];
+        const bucketCount = rl.bucketCount || buckets.length;
+        const names = new Set(buckets.map((b: any) => (b.name||'').toLowerCase()));
+        const hasGlobal = [...names].some(n => n === 'global');
+        const hasScoped = bucketCount >= 2;
+        const capacities = buckets.map((b: any) => b.capacity).filter((n: any) => typeof n === 'number');
+        const refills = buckets.map((b: any) => b.refillPerSec).filter((n: any) => typeof n === 'number');
+        const capacitySpreadOk = capacities.length >= 2 ? (Math.max(...capacities) / Math.min(...capacities) <= 20) : true; // basic sanity
+        const refillSpreadOk = refills.length >= 2 ? (Math.max(...refills) / Math.min(...refills) <= 20) : true;
+        // Variance check (optional) fallback to computed variance if scopeRefillVariancePct absent
+        let varianceOk = true;
+        if (typeof rl.scopeRefillVariancePct === 'number') {
+          varianceOk = rl.scopeRefillVariancePct <= 2500; // <= 50% stddev^2 (rough heuristic)
+        }
+        passed = hasGlobal && hasScoped && capacitySpreadOk && refillSpreadOk && varianceOk;
+        details = passed ? `✅ buckets=${bucketCount} global+scoped present capSpreadOk=${capacitySpreadOk} refillSpreadOk=${refillSpreadOk}` :
+          `❌ Rate-limit issues: ${missingList([
+            !hasGlobal && 'missing global bucket',
+            !hasScoped && 'insufficient scoped buckets',
+            !capacitySpreadOk && 'capacity spread too large',
+            !refillSpreadOk && 'refill spread too large',
+            !varianceOk && 'variance excessive'
+          ])}`;
+      }
+      return { id: 24, name: 'Adaptive Rate-Limit Buckets', description: 'Validates multi-bucket rate-limit configuration (global + scoped) with sane dispersion', passed, details, severity: 'minor', evidenceType: rl ? 'artifact' : 'heuristic' };
+    }
+  }
+];
+
+// Unified export including all appended groups
+export const ALL_CHECKS: CheckDefinitionMeta[] = [...CHECK_REGISTRY, ...STEP_10_CHECKS as CheckDefinitionMeta[], ...PHASE_4_CHECKS];
+
 // Append new checks to registry
 // (Avoid mutation side-effects if imported elsewhere before evaluation)
 // Only push if not already present (idempotent on re-import in tests)
 for (const c of STEP_10_CHECKS) {
   if (!CHECK_REGISTRY.find(existing => existing.id === (c as any).id)) (CHECK_REGISTRY as any).push(c);
 }
+for (const c of PHASE_4_CHECKS) {
+  if (!CHECK_REGISTRY.find(existing => existing.id === (c as any).id)) (CHECK_REGISTRY as any).push(c);
+}
 
 export function getChecksByIds(ids: number[]): CheckDefinitionMeta[] {
   const set = new Set(ids);
-  return CHECK_REGISTRY.filter(c => set.has(c.id)).sort((a, b) => a.id - b.id);
+  return ALL_CHECKS.filter(c => set.has(c.id)).sort((a, b) => a.id - b.id);
 }
