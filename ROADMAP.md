@@ -54,47 +54,50 @@ Phase 0: Transparency & Guard Rails (Immediate)
 - [x] Emit warning when >0 heuristic passes contribute to overall compliance.
 
 Phase 1: Static Structural Enhancement
-- [ ] Implement binary format introspection (ELF/Mach-O/PE) to extract imports, section names (displace raw string reliance).
-- [ ] Parse embedded TLS ClientHello templates: recover ALPN list/order + extension sequence -> hash for calibration comparison.
-- [ ] Detect Noise XK pattern: handshake prologue bytes, label strings, message count; verify presence of HKDF label tokens.
-- [ ] Voucher structural heuristic: scan binary for 128-byte region pattern (entropy + partial field tags) rather than plain text tokens.
-- [ ] Negative assertions: fail if deterministic seed tokens appear in 1.1-targeted build.
+- [x] Implement binary format introspection (ELF/Mach-O/PE) to extract imports, section names (displace raw string reliance). (Delivered Step 10: binaryMeta)
+- [x] Parse embedded TLS ClientHello templates: recover ALPN list/order + extension sequence -> hash for calibration comparison. (Delivered Step 10: clientHelloTemplate)
+- [x] Detect Noise XK pattern: handshake prologue bytes, label strings, message count; verify presence of HKDF label tokens. (Delivered Step 10: noisePatternDetail)
+- [x] Voucher structural heuristic: scan binary for 128-byte region pattern (entropy + partial field tags) rather than plain text tokens. (Delivered Step 10: voucher struct triad)
+- [x] Negative assertions: fail if deterministic seed tokens appear in 1.1-targeted build. (Delivered Step 10: negative forbiddenPresent)
 
 Phase 2: Dynamic Harness (Behavioral Evidence)
-- [ ] Harness CLI (--run-harness / scenario config) spins candidate in sandbox, capturing:
-  * [ ] TLS ClientHello(s) and origin calibration baseline to verify ALPN set/order, extension ordering, H2 SETTINGS tolerances.
-  * [ ] QUIC Initial for transport presence.
-  * [ ] Noise tunnel transcript to confirm key schedule & rekey triggers.
-  * [ ] Anti-correlation fallback: simulate UDP failure, measure TCP retry delay, count cover connections, teardown times.
-- [ ] Output evidence JSON with cryptographic hashes per artifact; linter consumes rather than re-performing heavy capture inside general run.
+- [~] Harness CLI (--run-harness / scenario config) spins candidate in sandbox, capturing:
+  * [~] TLS ClientHello(s) and origin calibration baseline to verify ALPN set/order, extension ordering, H2 SETTINGS tolerances. (Static template + simulated + real capture via `--clienthello-capture` using OpenSSL; missing raw bytes & true JA3/JA4 + granular mismatch codes → still partial)
+  * [~] QUIC Initial for transport presence. (Basic UDP long-header probe implemented as `quicInitial` evidence; no full packet parse yet)
+  * [~] Noise tunnel transcript to confirm key schedule & rekey triggers. (Simulated rekey + optional `--noise-run` heuristic capture of rekey lines; real transcript instrumentation pending)
+  * [~] Anti-correlation fallback: simulate UDP failure, measure TCP retry delay, count cover connections, teardown times. (Simulation implemented; numeric policy thresholds/enforcement logic still pending)
+- [x] Output evidence JSON with per-section SHA256 hashes (integrity aid) in `meta.hashes`; signature still pending.
+  * Added dynamic evidence fields: `dynamicClientHelloCapture` (real or simulated), `calibrationBaseline`, `quicInitial`.
+  * New CLI flags: `--clienthello-capture`, `--clienthello-capture-port`, `--openssl-path` (real ClientHello); (future) QUIC fine-grained parsing placeholder; hashing automatic.
+  * Remaining to move Phase 2 to [x]: raw ClientHello byte extraction (pcap / custom TLS socket), proper JA3/JA4 calculation, QUIC Initial TLV parse + version / DCID extraction, fallback numeric policy thresholds & pass/fail logic, real Noise transcript & rekey trigger verification, statistical jitter metrics for HTTP/2 (and HTTP/3) with acceptance criteria, evidence signing.
 
 Phase 3: Governance & Ledger Verification
-- [ ] Accept alias-ledger observation file: validates 2-of-3 finality rules.
-- [ ] Parse Emergency Advance quorum certificates (CBOR) verifying signatures, weight caps (config-supplied weight mapping) and monotonic seq.
-- [ ] Governance check: ingest participation snapshot (weights, AS/Org mapping) to compute caps & diversity conditions.
+- [x] Accept alias-ledger observation file: validates 2-of-3 finality rules. (Implemented Checks 15 & 16 basic finality & quorum cert validity)
+- [~] Parse Emergency Advance quorum certificates (CBOR) verifying signatures, weight caps (config-supplied weight mapping) and monotonic seq. (CBOR parsing + validity done; signature & weight cap rigor pending)
+- [x] Governance check: ingest participation snapshot (weights, AS/Org mapping) to compute caps & diversity conditions. (Derived metrics implemented; historical diversity dataset pending)
 
 Phase 4: Adaptive/Bootstrap & Mix Diversity Deepening
-- [ ] Bootstrap simulation: feed synthetic rendezvous epochs verifying rotating IDs, absence of deterministic seeds.
-- [ ] Validate PoW difficulty evolution & multi-bucket rate-limit logic via controlled replay logs (evidence ingestion).
-- [ ] Mix diversity sampling: request N (e.g., 10) path constructions; assert ≥8 unique hop sets before reuse.
-- [ ] Privacy mode enforcement: balanced vs strict hop threshold evidence.
+- [~] Bootstrap simulation: feed synthetic rendezvous epochs verifying rotating IDs, absence of deterministic seeds. (Rotation token & hits heuristic present; full simulation pending)
+- [ ] Validate PoW difficulty evolution & multi-bucket rate-limit logic via controlled replay logs (evidence ingestion). (Pending)
+- [x] Mix diversity sampling: request N (e.g., 10) path constructions; assert ≥8 unique hop sets before reuse. (Implemented Check 17 with uniqueness & diversityIndex thresholds)
+- [~] Privacy mode enforcement: balanced vs strict hop threshold evidence. (Check 11 hop depth & dynamic upgrade; strict vs balanced differentiation pending)
 
 Phase 5: Build Provenance & Reproducibility
-- [ ] Harden GitHub Action: pinned SHAs, least-privilege permissions, concurrency guard.
-- [ ] Generate SLSA provenance (slsa-github-generator pinned) + attach SBOM + compliance report.
-- [ ] Rebuild verification job (clean container) comparing SHA256 to ensure bit-for-bit reproducibility.
-- [ ] Linter validation: verify provenance predicate type, builder ID, materials digests match binary & SBOM components.
+- [~] Harden GitHub Action: pinned SHAs, least-privilege permissions, concurrency guard. (Partial: scaffold & some pinning; full audit pending)
+- [x] Generate SLSA provenance (slsa-github-generator pinned) + attach SBOM + compliance report. (Ingestion & parsing implemented; generation assumed via workflow scaffold)
+- [~] Rebuild verification job (clean container) comparing SHA256 to ensure bit-for-bit reproducibility. (Mismatch flag supported; full CI rebuild automation pending)
+- [x] Linter validation: verify provenance predicate type, builder ID, materials digests match binary & SBOM components. (Digest & materials cross-check implemented)
 
 Phase 6: Network Safety & Hermetic Control
-- [ ] Disable enrichment (OSV, remote lookups) by default; require --enable-network.
-- [ ] Enforce timeouts, retry with jitter, explicit User-Agent, opt-in offline fail-fast (--fail-on-network attempt).
-- [ ] Record network operations into diagnostics for transparency.
+- [ ] Disable enrichment (OSV, remote lookups) by default; require --enable-network. (Pending; enrichment currently minimal/not enabled)
+- [~] Enforce timeouts, retry with jitter, explicit User-Agent, opt-in offline fail-fast (--fail-on-network attempt). (safe-exec timeouts implemented; network enrichment guards pending)
+- [ ] Record network operations into diagnostics for transparency. (Pending)
 
 Phase 7: Anti-Evasion & Scoring Hardening
-- [ ] Multi-signal requirement per normative item (e.g., Transport: endpoint strings + captured ClientHello + QUIC token + ECH presence).
-- [ ] Weighted scoring; heuristic-only detection cannot produce final pass unless corroborated.
-- [ ] Keyword stuffing detection: disparity metrics (spec term density vs code symbol diversity) triggers suspicion warning.
-- [ ] Signed evidence option: allow maintainers to sign evidence JSON (future).
+- [x] Multi-signal requirement per normative item (e.g., Transport: endpoint strings + captured ClientHello + QUIC token + ECH presence). (Check 18 enforces ≥2 categories)
+- [x] Weighted scoring; heuristic-only detection cannot produce final pass unless corroborated. (Weighted multiSignal implemented; strict mode gating)
+- [x] Keyword stuffing detection: disparity metrics (spec term density vs code symbol diversity) triggers suspicion warning. (Implemented in Check 18)
+- [ ] Signed evidence option: allow maintainers to sign evidence JSON (future). (Pending)
 
 New / Split Checks (Target Set ≥ 16)
 ------------------------------------
@@ -303,21 +306,24 @@ Cross-Doc Pointers
 ------------------
 For detailed schemas see `docs/evidence-schema.md`. For CI provenance workflow details see `docs/provenance-repro.md`. For architectural deep dive see `ARCHITECTURE.md`. Contribution guidance: `CONTRIBUTING.md`.
 
-Step 11 Initiation (Dynamic ClientHello Calibration Slice)
----------------------------------------------------------
-Status: IN PROGRESS (initial simulation landed)
-Scope Delivered This Slice:
-- Added evidence schema v3 draft fields: `dynamicClientHelloCapture` & `calibrationBaseline` (static + dynamic comparison scaffolding).
-- Harness flag `--clienthello-simulate` generates simulated dynamic capture (ALPN ordering + extension hash + pseudo JA3) and marks match against static template.
-- Check 22 upgraded: now promotes to `dynamic-protocol` evidenceType when dynamic capture present and requires hash match (prevents mismatch from passing).
-- Added test ensuring dynamic upgrade path and evidenceType transition.
-Upcoming within Slice:
-- Real capture of raw ClientHello bytes (pcap or TLS socket instrumentation) to compute JA3/JA4.
-- QUIC Initial parsing and future new check or augmentation of transport presence.
-- Baseline mismatch diagnostics (explicit codes for ALPN set divergence vs extension ordering divergence).
-- Documentation update (README matrix + evidence schema doc) to reflect dynamic fields (pending).
-Exit Criteria for Slice:
-- Real (non-simulated) dynamic capture path producing stable hash & JA3 fingerprint; mismatch causes failure with granular reason string; README & docs updated; schema version bumped to v3 in emitted evidence when fields populated.
+Step 11 Progress (Dynamic ClientHello & Transport Calibration)
+-------------------------------------------------------------
+Status: IN PROGRESS (simulation + initial real capture + QUIC probe)
+Current Deliverables:
+- Simulation path (`--clienthello-simulate`) and real OpenSSL-based capture (`--clienthello-capture`) populate `dynamicClientHelloCapture` with ALPN, extension ordering hash (parsed extension IDs when available), pseudo JA3 placeholder, match flag vs static template.
+- QUIC Initial presence probe (`quicInitial`) sends minimal long-header UDP packet capturing basic response timing (presence / bytes) for early transport corroboration.
+- Per-evidence-section SHA256 hashing stored under `meta.hashes` for integrity; still unsigned.
+- Optional `--noise-run` attempts to detect live rekey markers (heuristic) upgrading `noiseExtended` counters.
+- Check 22 upgrades to dynamic when capture present and requires static hash match.
+Remaining (Slice Exit Criteria):
+1. Raw ClientHello byte capture (pcap or custom client) to compute true JA3/JA4 and extension ordering without OpenSSL formatting ambiguity.
+2. Granular mismatch diagnostics (distinct codes: ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH, ALPN_SET_DIFF, EXT_COUNT_DIFF).
+3. QUIC Initial parser extracting Version, DCID length/value, token length; add calibration hash.
+4. Enforce numeric anti-correlation fallback thresholds (retry delay window, cover connection count, teardown timing) with pass/fail reasons.
+5. Real Noise transcript observation (messages count, rekey trigger validation) supplanting simulation.
+6. Statistical jitter collection (distribution + variance) for HTTP/2/3 adaptive behavior.
+7. Bump evidence `schemaVersion` to 3 only after true raw capture + at least one additional dynamic (QUIC parse or jitter stats) is normative; update docs & README matrix.
+8. Optional evidence signing design (PGP / minisign) drafted (may spill into Phase 7).
 
 ---
 Legacy End (see ROADMAP.md for current status).

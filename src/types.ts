@@ -171,5 +171,14 @@ export interface IngestedEvidence {
   negative?: {
     forbiddenPresent?: string[]; // list of forbidden tokens discovered
   };
+  // Future: quicInitial, statisticalJitter, signedEvidence, governanceHistoricalDiversity
   [k: string]: any; // allow forward-compatible keys
+}
+
+// Augmented harness meta (Phase 2 completion hashing)
+export interface EvidenceMeta {
+  generated: string;
+  scenarios: string[];
+  hashes?: { [key: string]: string }; // sha256 over JSON string of each evidence section (integrity aid)
+  tooling?: { opensslAvailable?: boolean }; // capture presence of external tools used for dynamic capture
 }

@@ -189,10 +189,14 @@ program
   .option('--h2-adaptive-simulate', 'Simulate HTTP/2 adaptive padding/jitter evidence (Step 9 placeholder)')
   .option('--jitter-samples <n>', 'Number of simulated jitter samples (default 20)', v => parseInt(v,10))
   .option('--clienthello-simulate', 'Simulate dynamic ClientHello capture & calibration (Step 11 placeholder)')
+  .option('--clienthello-capture <host>', 'Attempt real ClientHello capture against host:port (uses openssl)')
+  .option('--clienthello-capture-port <port>', 'Port for real ClientHello capture (default 443)', v => parseInt(v,10))
+  .option('--openssl-path <path>', 'Path to openssl binary (default "openssl")')
   .action(async (binaryPath, options) => {
     try {
     const { runHarness } = require('../src/harness');
-  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections, mixSamples: options.mixSamples, mixHopsRange: options.mixHopsRange, mixDeterministic: options.mixDeterministic, rekeySimulate: options.rekeySimulate, h2AdaptiveSimulate: options.h2AdaptiveSimulate, jitterSamples: options.jitterSamples, clientHelloSimulate: options.clienthelloSimulate });
+    const clientHelloCapture = options.clienthelloCapture ? { host: options.clienthelloCapture, port: options.clienthelloCapturePort, opensslPath: options.opensslPath } : undefined;
+  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections, mixSamples: options.mixSamples, mixHopsRange: options.mixHopsRange, mixDeterministic: options.mixDeterministic, rekeySimulate: options.rekeySimulate, h2AdaptiveSimulate: options.h2AdaptiveSimulate, jitterSamples: options.jitterSamples, clientHelloSimulate: options.clienthelloSimulate, clientHelloCapture });
       console.log(`✅ Harness evidence written to ${out}`);
     } catch (e) {
       console.error('❌ Harness error:', e.message);

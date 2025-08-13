@@ -3,6 +3,8 @@ import { BinaryAnalyzer } from './analyzer';
 import * as tls from 'tls';
 import * as net from 'net';
 import * as dgram from 'dgram';
+import { spawn } from 'child_process';
+import * as crypto from 'crypto';
 
 // Lightweight TLS probe (scaffold) – Phase 2 foundation
 // Captures negotiated ALPN, cipher, protocol version and basic timing.
@@ -80,6 +82,11 @@ export interface HarnessOptions {
   h2AdaptiveSimulate?: boolean; // simulate HTTP/2 adaptive padding/jitter metrics
   jitterSamples?: number; // number of jitter samples to simulate
   clientHelloSimulate?: boolean; // simulate dynamic ClientHello capture (Step 11 initial slice)
+  clientHelloCapture?: { host: string; port?: number; opensslPath?: string }; // real capture target
+  quicInitialHost?: string; // target host for QUIC Initial attempt
+  quicInitialPort?: number; // target port (default 443)
+  quicInitialTimeoutMs?: number; // wait for response
+  noiseRun?: boolean; // attempt to run binary to observe real noise rekey markers
 }
 
 export interface HarnessEvidence {
@@ -96,6 +103,7 @@ export interface HarnessEvidence {
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
   dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string };
   calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
+  quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string };
   meta: { generated: string; scenarios: string[] };
 }
 
@@ -235,6 +243,133 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       capturedAt: new Date().toISOString()
     };
   }
+  // Real ClientHello capture (Phase 2) if requested
+  if (!opts.clientHelloSimulate && opts.clientHelloCapture) {
+    const host = opts.clientHelloCapture.host;
+    const port = opts.clientHelloCapture.port || 443;
+    const openssl = opts.clientHelloCapture.opensslPath || 'openssl';
+    try {
+      const output = await new Promise<string>((resolve) => {
+        const proc = spawn(openssl, ['s_client', '-connect', `${host}:${port}`, '-servername', host, '-alpn', 'h2,http/1.1', '-tls1_3', '-tlsextdebug'], { stdio: ['ignore', 'pipe', 'pipe'] });
+        let buf = '';
+        proc.stdout.on('data', d => { buf += d.toString(); });
+        proc.stderr.on('data', d => { buf += d.toString(); });
+        proc.on('close', () => resolve(buf));
+        // safety timeout
+        setTimeout(() => { try { proc.kill(); } catch { /* ignore */ } }, 8000);
+      });
+      // Parse ALPN protocol and simplistic extension listing if present
+      const alpnMatch = output.match(/ALPN protocol: (.+)/i);
+      const alpn = alpnMatch ? alpnMatch[1].split(',').map(s=>s.trim()).filter(Boolean) : evidence.clientHello?.alpn;
+      // Parse extension ordering from -tlsextdebug lines
+      const extLines = output.split(/\r?\n/).filter(l => /TLS extension type/i.test(l));
+      const extIds: number[] = [];
+      for (const line of extLines) {
+        const m = line.match(/TLS extension type (\d+)/i);
+        if (m) extIds.push(parseInt(m[1],10));
+      }
+      const extOrderSha256 = extIds.length ? crypto.createHash('sha256').update(extIds.join(',')).digest('hex') : crypto.createHash('sha256').update(output).digest('hex');
+      // Derive pseudo JA3 (not full fidelity without raw ClientHello bytes); we note degraded fidelity
+      const ja3 = `sim-${extOrderSha256.slice(0,12)}`;
+      evidence.dynamicClientHelloCapture = {
+        alpn,
+        extOrderSha256,
+        ja3,
+        capturedAt: new Date().toISOString(),
+        matchStaticTemplate: !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256),
+        note: 'openssl-s_client-capture'
+      };
+      if (!evidence.calibrationBaseline && evidence.clientHello) {
+        evidence.calibrationBaseline = { alpn: evidence.clientHello.alpn, extOrderSha256: evidence.clientHello.extOrderSha256, source: 'static-template', capturedAt: new Date().toISOString() };
+      }
+    } catch (e: any) {
+      evidence.dynamicClientHelloCapture = {
+        note: 'capture-error:' + (e.message || 'unknown'),
+        capturedAt: new Date().toISOString(),
+        matchStaticTemplate: false
+      } as any;
+    }
+  }
+  // QUIC Initial attempt (best-effort UDP send & listen)
+  if (opts.quicInitialHost) {
+    const host = opts.quicInitialHost;
+    const port = opts.quicInitialPort || 443;
+    const timeout = opts.quicInitialTimeoutMs || 1200;
+    const start = Date.now();
+    const socket = dgram.createSocket('udp4');
+    let settled = false;
+    const initial: any = { host, port, udpSent: false };
+    await new Promise<void>((resolve) => {
+      try {
+        socket.on('message', (msg) => {
+          if (!settled) {
+            initial.responseBytes = msg.length;
+            initial.responseWithinMs = Date.now() - start;
+            settled = true;
+            try { socket.close(); } catch { /* ignore */ }
+            resolve();
+          }
+        });
+        socket.on('error', (e: any) => {
+          if (!settled) {
+            initial.error = (e && (e.code || e.message)) || 'error';
+            settled = true;
+            try { socket.close(); } catch { /* ignore */ }
+            resolve();
+          }
+        });
+        // Craft minimal QUIC long header (not a valid handshake, just presence poke)
+        const probe = Buffer.from([0xC3,0,0,0,0, 0,0,0,0, 0]);
+        socket.send(probe, port, host, (err) => {
+          initial.udpSent = !err;
+        });
+        setTimeout(() => {
+          if (!settled) {
+            settled = true;
+            try { socket.close(); } catch { /* ignore */ }
+            resolve();
+          }
+        }, timeout);
+      } catch (e: any) {
+        initial.error = e.message;
+        settled = true;
+        resolve();
+      }
+    });
+    (evidence as any).quicInitial = initial;
+  }
+  // Optional attempt to run binary and detect noise rekey markers (lines containing 'rekey')
+  if (opts.noiseRun) {
+    try {
+      const runOut = await new Promise<string>((resolve) => {
+        const proc = spawn(binaryPath, ['--version'], { stdio: ['ignore','pipe','pipe'] });
+        let buf = '';
+        proc.stdout.on('data', d => { buf += d.toString(); });
+        proc.stderr.on('data', d => { buf += d.toString(); });
+        proc.on('close', () => resolve(buf));
+        setTimeout(() => { try { proc.kill(); } catch { /* ignore */ } }, 4000);
+      });
+      const rekeyLines = runOut.split(/\r?\n/).filter(l => /rekey/i.test(l));
+      if (rekeyLines.length) {
+        const ne: any = (evidence as any).noiseExtended || { pattern: evidence.noise?.pattern || 'XK' };
+        ne.rekeysObserved = (ne.rekeysObserved || 0) + rekeyLines.length;
+        ne.rekeyTriggers = ne.rekeyTriggers || { bytes: 8 * 1024 * 1024 * 1024, timeMinSec: 3600, frames: 65536 };
+        (evidence as any).noiseExtended = ne;
+      }
+    } catch { /* ignore */ }
+  }
+  // Hash each top-level evidence subsection for integrity aid
+  try {
+    const hashKeys: (keyof HarnessEvidence)[] = ['clientHello','noise','noiseExtended','voucher','tlsProbe','fallback','mix','h2Adaptive','dynamicClientHelloCapture','calibrationBaseline'];
+    const hashes: Record<string,string> = {};
+    for (const k of hashKeys) {
+      const v: any = (evidence as any)[k];
+      if (v) {
+        hashes[k as string] = crypto.createHash('sha256').update(JSON.stringify(v)).digest('hex');
+      }
+    }
+    (evidence.meta as any).hashes = hashes;
+  } catch { /* ignore */ }
   // Simulated mix diversity sampling (Phase 7 foundation)
   if (opts.mixSamples && opts.mixSamples > 0) {
     const hopSets: string[][] = [];
