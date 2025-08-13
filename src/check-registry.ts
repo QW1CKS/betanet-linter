@@ -717,9 +717,23 @@ export const STEP_10_CHECKS = [
       await analyzer.getStaticPatterns?.();
       const ev = analyzer.evidence || {};
       const ch = ev.clientHelloTemplate;
-      const passed = !!(ch && Array.isArray(ch.alpn) && ch.alpn.length >= 2 && ch.extOrderSha256);
-      const details = passed ? `✅ static ALPN=${ch.alpn.join(',')} extHash=${ch.extOrderSha256.slice(0,12)}` : '❌ Incomplete static ClientHello evidence';
-      return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration', passed, details, severity: 'minor', evidenceType: ch ? 'static-structural' : 'heuristic' };
+      const dyn = ev.dynamicClientHelloCapture;
+      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
+      let passed = false;
+      let details = '❌ No ClientHello template';
+      if (ch) {
+        evidenceType = 'static-structural';
+        passed = Array.isArray(ch.alpn) && ch.alpn.length >= 2 && !!ch.extOrderSha256;
+        details = passed ? `✅ static ALPN=${ch.alpn.join(',')} extHash=${ch.extOrderSha256.slice(0,12)}` : '❌ Incomplete static ClientHello evidence';
+      }
+      // Dynamic upgrade: if dynamic capture present ensure it matches static template & promote evidence type
+      if (dyn && dyn.alpn && dyn.extOrderSha256) {
+        const matches = ch && dyn.alpn.join(',') === ch.alpn.join(',') && dyn.extOrderSha256 === ch.extOrderSha256;
+        evidenceType = 'dynamic-protocol';
+        passed = passed && matches; // require static baseline + dynamic match
+        details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} (ja3=${(dyn.ja3||'').slice(0,16)})` : `❌ Dynamic mismatch staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)}`;
+      }
+      return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration', passed, details, severity: 'minor', evidenceType };
     }
   },
   {

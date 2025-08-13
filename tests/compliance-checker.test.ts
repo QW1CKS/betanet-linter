@@ -1207,6 +1207,36 @@ describe('BetanetComplianceChecker', () => {
     });
   });
 
+  describe('ClientHello dynamic calibration (check 22 upgrade)', () => {
+    it('upgrades check 22 to dynamic-protocol when dynamicClientHelloCapture matches static template', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-existing-bin8');
+      await fs.writeFile(tmp, Buffer.from('binary data clienthello'));
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['h2','http/1.1','clienthello'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        getStaticPatterns: async () => ({ clientHello: { alpn: ['h2','http/1.1'], extOrderSha256: 'cafebabe1234' } })
+      };
+      // Attach evidence with both static & dynamic capture
+      (checkerLocal as any)._analyzer.evidence = {
+        clientHelloTemplate: { alpn: ['h2','http/1.1'], extOrderSha256: 'cafebabe1234' },
+        dynamicClientHelloCapture: { alpn: ['h2','http/1.1'], extOrderSha256: 'cafebabe1234', ja3: '771,h2-http/1.1,cafebabe', capturedAt: new Date().toISOString(), matchStaticTemplate: true }
+      };
+      const result = await checkerLocal.checkCompliance(tmp, { allowHeuristic: true });
+      const chCal = result.checks.find(c => c.id === 22);
+      expect(chCal).toBeDefined();
+      expect(chCal?.evidenceType).toBe('dynamic-protocol');
+      expect(chCal?.passed).toBe(true);
+      await fs.remove(tmp);
+    });
+  });
+
   describe('degradation (stripped binaries)', () => {
     it('should degrade gracefully with skipped symbol tools (ISSUE-056)', async () => {
       process.env.BETANET_SKIP_TOOLS = 'nm,objdump';

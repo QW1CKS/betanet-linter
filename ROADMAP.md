@@ -303,5 +303,21 @@ Cross-Doc Pointers
 ------------------
 For detailed schemas see `docs/evidence-schema.md`. For CI provenance workflow details see `docs/provenance-repro.md`. For architectural deep dive see `ARCHITECTURE.md`. Contribution guidance: `CONTRIBUTING.md`.
 
+Step 11 Initiation (Dynamic ClientHello Calibration Slice)
+---------------------------------------------------------
+Status: IN PROGRESS (initial simulation landed)
+Scope Delivered This Slice:
+- Added evidence schema v3 draft fields: `dynamicClientHelloCapture` & `calibrationBaseline` (static + dynamic comparison scaffolding).
+- Harness flag `--clienthello-simulate` generates simulated dynamic capture (ALPN ordering + extension hash + pseudo JA3) and marks match against static template.
+- Check 22 upgraded: now promotes to `dynamic-protocol` evidenceType when dynamic capture present and requires hash match (prevents mismatch from passing).
+- Added test ensuring dynamic upgrade path and evidenceType transition.
+Upcoming within Slice:
+- Real capture of raw ClientHello bytes (pcap or TLS socket instrumentation) to compute JA3/JA4.
+- QUIC Initial parsing and future new check or augmentation of transport presence.
+- Baseline mismatch diagnostics (explicit codes for ALPN set divergence vs extension ordering divergence).
+- Documentation update (README matrix + evidence schema doc) to reflect dynamic fields (pending).
+Exit Criteria for Slice:
+- Real (non-simulated) dynamic capture path producing stable hash & JA3 fingerprint; mismatch causes failure with granular reason string; README & docs updated; schema version bumped to v3 in emitted evidence when fields populated.
+
 ---
 Legacy End (see ROADMAP.md for current status).

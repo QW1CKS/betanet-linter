@@ -188,10 +188,11 @@ program
   .option('--rekey-simulate', 'Simulate observing a Noise rekey event (Step 9 placeholder)')
   .option('--h2-adaptive-simulate', 'Simulate HTTP/2 adaptive padding/jitter evidence (Step 9 placeholder)')
   .option('--jitter-samples <n>', 'Number of simulated jitter samples (default 20)', v => parseInt(v,10))
+  .option('--clienthello-simulate', 'Simulate dynamic ClientHello capture & calibration (Step 11 placeholder)')
   .action(async (binaryPath, options) => {
     try {
-      const { runHarness } = require('../src/harness');
-  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections, mixSamples: options.mixSamples, mixHopsRange: options.mixHopsRange, mixDeterministic: options.mixDeterministic, rekeySimulate: options.rekeySimulate, h2AdaptiveSimulate: options.h2AdaptiveSimulate, jitterSamples: options.jitterSamples });
+    const { runHarness } = require('../src/harness');
+  const out = await runHarness(binaryPath, options.out, { scenarios: options.scenarios, probeHost: options.probeHost, probePort: options.probePort, probeTimeoutMs: options.probeTimeout, fallbackHost: options.fallbackHost, fallbackUdpPort: options.fallbackUdpPort, fallbackTcpPort: options.fallbackTcpPort, fallbackUdpTimeoutMs: options.fallbackUdpTimeout, coverConnections: options.coverConnections, mixSamples: options.mixSamples, mixHopsRange: options.mixHopsRange, mixDeterministic: options.mixDeterministic, rekeySimulate: options.rekeySimulate, h2AdaptiveSimulate: options.h2AdaptiveSimulate, jitterSamples: options.jitterSamples, clientHelloSimulate: options.clienthelloSimulate });
       console.log(`✅ Harness evidence written to ${out}`);
     } catch (e) {
       console.error('❌ Harness error:', e.message);

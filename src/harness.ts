@@ -79,6 +79,7 @@ export interface HarnessOptions {
   rekeySimulate?: boolean; // simulate observing a Noise rekey event
   h2AdaptiveSimulate?: boolean; // simulate HTTP/2 adaptive padding/jitter metrics
   jitterSamples?: number; // number of jitter samples to simulate
+  clientHelloSimulate?: boolean; // simulate dynamic ClientHello capture (Step 11 initial slice)
 }
 
 export interface HarnessEvidence {
@@ -93,6 +94,8 @@ export interface HarnessEvidence {
   fallback?: { udpAttempted: boolean; udpTimeoutMs: number; tcpConnected: boolean; tcpConnectMs?: number; tcpRetryDelayMs?: number; coverConnections?: number; coverTeardownMs?: number[]; error?: string };
   mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
+  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string };
+  calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
   meta: { generated: string; scenarios: string[] };
 }
 
@@ -211,6 +214,25 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       paddingJitterP95Ms: p95,
       withinTolerance,
       sampleCount: samples
+    };
+  }
+  // Simulated dynamic ClientHello capture (initial calibration slice)
+  if (opts.clientHelloSimulate && evidence.clientHello) {
+    // Derive a pseudo JA3 fingerprint from ALPN + ext hash (placeholder)
+    const ja3 = `771,${(evidence.clientHello.alpn||[]).join('-')},${(evidence.clientHello.extOrderSha256||'').slice(0,12)}`;
+    evidence.dynamicClientHelloCapture = {
+      alpn: evidence.clientHello.alpn,
+      extOrderSha256: evidence.clientHello.extOrderSha256,
+      ja3,
+      capturedAt: new Date().toISOString(),
+      matchStaticTemplate: true,
+      note: 'simulated-capture'
+    };
+    evidence.calibrationBaseline = {
+      alpn: evidence.clientHello.alpn,
+      extOrderSha256: evidence.clientHello.extOrderSha256,
+      source: 'simulated',
+      capturedAt: new Date().toISOString()
     };
   }
   // Simulated mix diversity sampling (Phase 7 foundation)

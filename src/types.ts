@@ -148,6 +148,21 @@ export interface IngestedEvidence {
     extensions?: number[];
     extOrderSha256?: string;
   };
+  // Dynamic TLS ClientHello capture (evidence schema v3 draft field – Step 11 slice)
+  dynamicClientHelloCapture?: {
+    alpn?: string[]; // observed negotiated ALPN proposal ordering
+    extOrderSha256?: string; // hash of observed extension ordering
+    ja3?: string; // optional JA3/JA4 style fingerprint string (simulated until real capture integrated)
+    capturedAt?: string; // ISO timestamp of capture
+    matchStaticTemplate?: boolean; // analyzer/harness comparison result against static template
+    note?: string; // free-form note / simulation marker
+  };
+  calibrationBaseline?: {
+    alpn?: string[];
+    extOrderSha256?: string;
+    source?: string; // e.g. 'origin-probe', 'manual', 'simulated'
+    capturedAt?: string;
+  };
   noisePatternDetail?: {
     pattern?: string;
     hkdfLabelsFound?: number;
