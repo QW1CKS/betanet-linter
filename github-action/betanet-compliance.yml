@@ -1,5 +1,14 @@
 name: Betanet Compliance Check
 
+concurrency:
+  group: betanet-compliance-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  id-token: write
+  actions: read
+
 on:
   push:
     branches: [ main, develop ]
@@ -15,10 +24,10 @@ jobs:
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0 pinned
       
     - name: Set up Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0 pinned
       with:
         node-version: '18'
         cache: 'npm'
@@ -71,7 +80,7 @@ jobs:
         fi
         
     - name: Upload Compliance Results
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2 pinned
       if: always()
       with:
         name: compliance-results-${{ github.run_number }}
@@ -109,7 +118,7 @@ jobs:
         
     - name: Comment on PR
       if: github.event_name == 'pull_request'
-      uses: actions/github-script@v6
+      uses: actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea # v7.0.1 pinned
       with:
         script: |
           const fs = require('fs');
@@ -168,3 +177,9 @@ jobs:
       if: steps.compliance.outputs.status == 'passed'
       run: |
         echo "::notice::All Betanet compliance checks passed! 🎉"
+    - name: Reproducibility Verification
+      if: steps.compliance.outputs.status == 'passed'
+      run: |
+        npm ci
+        npm run build
+        npm run repro:verify || echo "::warning::Rebuild digest mismatch detected" && exit 1

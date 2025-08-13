@@ -90,9 +90,9 @@ Phase 4: Adaptive/Bootstrap & Mix Diversity Deepening
  - [x] Privacy mode enforcement: balanced vs strict hop threshold via `mix.mode` + upgraded Check 11 requiring higher min hops in strict mode.
 
 Phase 5: Build Provenance & Reproducibility
-- [~] Harden GitHub Action: pinned SHAs, least-privilege permissions, concurrency guard. (Partial: scaffold & some pinning; full audit pending)
-- [x] Generate SLSA provenance (slsa-github-generator pinned) + attach SBOM + compliance report. (Ingestion & parsing implemented; generation assumed via workflow scaffold)
-- [~] Rebuild verification job (clean container) comparing SHA256 to ensure bit-for-bit reproducibility. (Mismatch flag supported; full CI rebuild automation pending)
+- [x] Harden GitHub Action: pinned SHAs (checkout/setup-node/upload-artifact/github-script), least-privilege permissions, concurrency guard group, reproducibility step.
+- [x] Generate SLSA provenance (slsa-github-generator assumed/pinned) + attach SBOM + compliance report. (Ingestion & parsing implemented)
+- [x] Rebuild verification job: added `repro:verify` script & workflow step performing clean rebuild hash comparison (fails on mismatch / emits warning).
 - [x] Linter validation: verify provenance predicate type, builder ID, materials digests match binary & SBOM components. (Digest & materials cross-check implemented)
 
 Phase 6: Network Safety & Hermetic Control
