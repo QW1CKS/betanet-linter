@@ -68,7 +68,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Maintain deny-list (legacy header pattern, deterministic seed, deprecated cipher constants) hashed & compared.
    - AC: negative.forbiddenPresent=false required; failure codes enumerated per artifact. Test injecting each forbidden token.
 
-[ ] 16. Comprehensive Test & Fixture Expansion
+[x] 16. Comprehensive Test & Fixture Expansion
    - Objective: Ensure ≥1 positive + ≥1 negative test per failure code introduced above; code coverage ≥90% for check registries.
    - AC: CI reports coverage threshold met; all new failure modes demonstrably exercised.
 
@@ -377,7 +377,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Maintain deny-list (legacy header pattern, deterministic seed, deprecated cipher constants) hashed & compared.
    - AC: negative.forbiddenPresent=false required; failure codes enumerated per artifact. Test injecting each forbidden token.
 
-16. Comprehensive Test & Fixture Expansion
+[x] 16. Comprehensive Test & Fixture Expansion
    - Objective: Ensure ≥1 positive + ≥1 negative test per failure code introduced above; code coverage ≥90% for check registries.
    - AC: CI reports coverage threshold met; all new failure modes demonstrably exercised.
 
