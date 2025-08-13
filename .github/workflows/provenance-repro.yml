@@ -9,7 +9,7 @@ on:
 
 permissions:
   contents: read
-  id-token: write  # needed for provenance OIDC token (future full SLSA attestation)
+  id-token: write  # for provenance OIDC token
   actions: none
   checks: none
   deployments: none
@@ -36,14 +36,12 @@ jobs:
       overall_sha256: ${{ steps.hash.outputs.overall_sha256 }}
     steps:
       - name: Checkout
-        # Pinned actions/checkout@v4 (update SHA periodically)
         uses: actions/checkout@b4ffde65f46336ab0da05f224ef0f1088f6e61b1 # v4.1.6
       - name: Setup Node
-        # Pinned actions/setup-node@v4 (update SHA periodically)
         uses: actions/setup-node@60edb5dd545a775178f52524783378180af0d1f8 # v4.0.2
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
+          cache: npm
       - name: Install (clean)
         run: npm ci
       - name: Build
@@ -57,7 +55,7 @@ jobs:
           fi
           if [ -s dist.sha256sum ]; then
             overall=$(sha256sum dist.sha256sum | cut -d' ' -f1)
-            echo "overall_sha256=$overall" >> $GITHUB_OUTPUT
+            echo "overall_sha256=$overall" >> "$GITHUB_OUTPUT"
             echo "Computed overall dist digest: $overall"
           else
             echo 'No dist files found; skipping digest.'
@@ -81,16 +79,15 @@ jobs:
           set -e
           line="betanet-linter:sha256:${{ steps.hash.outputs.overall_sha256 }}"
           echo "Subject line: $line"
-          # Cross-platform base64 (GNU vs BSD)
           if base64 --help 2>&1 | grep -qi -- '-w'; then
             encoded=$(printf '%s' "$line" | base64 -w0)
           else
             encoded=$(printf '%s' "$line" | base64)
           fi
+          encoded=$(printf '%s' "$encoded" | tr -d '\n\r')
           echo "encoded=$encoded" >> "$GITHUB_OUTPUT"
           echo "Base64 subjects: $encoded"
       - name: Upload build artifacts
-        # Pinned actions/upload-artifact@v4
         uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.3
         with:
           name: build-dist-${{ github.run_number }}
@@ -103,7 +100,7 @@ jobs:
   provenance:
     name: Generate SLSA Provenance
     needs: build
-    if: needs.build.outputs.base64_subjects != ''
+    if: ${{ needs.build.outputs.base64_subjects != '' }}
     uses: slsa-framework/slsa-github-generator/.github/workflows/generator_generic_slsa3.yml@v2.0.0
     with:
       base64-subjects: ${{ needs.build.outputs.base64_subjects }}
@@ -114,7 +111,7 @@ jobs:
 
   rebuild:
     name: Rebuild & Verify
-    needs: [build, provenance]
+    needs: [ build, provenance ]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -134,7 +131,6 @@ jobs:
             sha256sum dist.sha256sum | cut -d' ' -f1 > overall.sha || true
           fi
       - name: Download original artifacts
-        # Pinned actions/download-artifact@v4
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
           name: build-dist-${{ github.run_number }}
@@ -162,7 +158,6 @@ jobs:
             echo 'No provenance evidence available.'
           fi
       - name: Upload verification outputs
-        # Pinned actions/upload-artifact@v4 (same pin as build job)
         uses: actions/upload-artifact@834a144ee995460fba8ed112a2fc961b36a5ec5a # v4.3.3
         with:
           name: reproducibility-verification-${{ github.run_number }}
