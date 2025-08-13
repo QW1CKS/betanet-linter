@@ -183,9 +183,11 @@ export interface IngestedEvidence {
   verified?: boolean; // internal flag after validation
   sourceDateEpoch?: number; // captured SOURCE_DATE_EPOCH if present
   rebuildDigestMismatch?: boolean; // flag set when CI detects non-reproducible rebuild
+  rebuildDigestMatch?: boolean; // explicit positive flag (Task 10)
   materialsValidated?: boolean; // set true when all provenance.materials digests accounted for in SBOM
   materialsMismatchCount?: number; // count of material digests not matched in SBOM (if sbom provided)
   materialsComplete?: boolean; // all listed materials include a digest
+  toolchainDiff?: number; // Task 10: count of differing toolchain components between builds
   signatureVerified?: boolean; // DSSE / provenance signature verified with provided key
   signatureError?: string; // capture signature verification error reason
   dsseEnvelopeVerified?: boolean; // Phase 7: DSSE envelope signature(s) verified
@@ -193,6 +195,8 @@ export interface IngestedEvidence {
   dsseVerifiedSignerCount?: number; // Count of signatures that cryptographically verified
   dsseThresholdMet?: boolean; // Policy: required threshold satisfied
   dsseRequiredKeysPresent?: boolean; // All required key ids present
+  dsseRequiredSignerThreshold?: number; // Task 10 explicit threshold
+  dsseRequiredSignerCount?: number; // Task 10 required signers present
   dsseSignerDetails?: { keyid?: string; verified: boolean; reason?: string }[]; // Per-signer diagnostics
   dssePolicyReasons?: string[]; // Aggregate failure reasons if policy not met
   };

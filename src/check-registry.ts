@@ -400,11 +400,17 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   const materialsMismatchCount = prov.materialsMismatchCount || 0;
   const materialsComplete = prov.materialsComplete === true;
   const signatureVerified = prov.signatureVerified === true;
+  const rebuildDigestMatch = prov.rebuildDigestMatch === true && prov.rebuildDigestMismatch !== true;
+  const toolchainDiff = typeof prov.toolchainDiff === 'number' ? prov.toolchainDiff : undefined;
+  const toolchainDiffOk = toolchainDiff === undefined || toolchainDiff === 0;
   const dsseSigners = prov.dsseSignerCount || 0;
   const dsseEnvelopeVerified = prov.dsseEnvelopeVerified === true;
   const dsseThresholdMet = prov.dsseThresholdMet === true;
   const dsseRequiredKeysPresent = prov.dsseRequiredKeysPresent === true;
   const dssePolicyReasons: string[] = prov.dssePolicyReasons || [];
+  const requiredSignerThreshold = prov.dsseRequiredSignerThreshold || prov.dsseThreshold; // allow existing field
+  const requiredSignerCount = prov.dsseVerifiedSignerCount || dsseSigners;
+  const signerThresholdOk = !requiredSignerThreshold || (requiredSignerCount >= requiredSignerThreshold);
       // Validate normative provenance
       let normativeDetails: string[] = [];
       let hasNormative = false;
@@ -459,7 +465,14 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         rebuildMismatch = true;
         normativeDetails.push('rebuild digest mismatch flagged');
       }
-      const passed = !rebuildMismatch && ((buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative) && (!materialsMismatchCount);
+      // Task 10 strict criteria
+      const strictSigOk = signatureVerified || dsseEnvelopeVerified;
+      const strictMaterialsOk = materialsValidated && materialsComplete && materialsMismatchCount === 0;
+      const strictRebuildOk = rebuildDigestMatch !== false && !rebuildMismatch;
+      const strictOverall = strictSigOk && signerThresholdOk && strictMaterialsOk && strictRebuildOk && toolchainDiffOk;
+  const provenancePresent = !!prov.predicateType || !!prov.builderId || !!prov.binaryDigest || Array.isArray(prov.subjects);
+  // If provenancePresent, require strictOverall; otherwise allow legacy heuristic fallback
+  const passed = provenancePresent ? strictOverall : (strictOverall || (!rebuildMismatch && ((buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative) && (!materialsMismatchCount)));
       const missing = missingList([
         !(buildInfo.hasSLSA || prov.predicateType) && 'SLSA support/predicate',
         !(buildInfo.reproducible || hasNormative) && 'reproducible builds',
@@ -470,9 +483,23 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         name: 'Build Provenance',
         description: 'Builds reproducibly and publishes SLSA 3 provenance',
         passed,
-  details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; detached signature verified' : ''}${dsseEnvelopeVerified ? '; dsse envelope verified' : (dsseSigners ? `; dsse signers=${dsseSigners}` : '')}${dsseThresholdMet ? '; dsse threshold met' : ''}${dsseRequiredKeysPresent ? '' : '; missing required dsse keys'}${dssePolicyReasons.length ? '; policy issues: '+dssePolicyReasons.join(',') : ''})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (
-          rebuildMismatch ? '❌ Rebuild digest mismatch (non-reproducible)' : (materialsMismatchCount ? `❌ Materials/SBOM mismatch (${materialsMismatchCount} unmatched)` : `❌ Missing: ${missing}`)
-        ),
+    details: passed
+      ? (hasNormative
+        ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; detached signature verified' : ''}${dsseEnvelopeVerified ? '; dsse envelope verified' : (dsseSigners ? `; dsse signers=${dsseSigners}` : '')}${dsseThresholdMet ? '; dsse threshold met' : ''}${dsseRequiredKeysPresent ? '' : '; missing required dsse keys'}${signerThresholdOk ? '' : '; signer threshold unmet'}${toolchainDiffOk ? '' : `; toolchainDiff=${toolchainDiff}`}${strictRebuildOk ? '' : '; rebuild mismatch'}${dssePolicyReasons.length ? '; policy issues: ' + dssePolicyReasons.join(',') : ''})`
+        : '✅ Found SLSA, reproducible builds, and provenance heuristics')
+      : (rebuildMismatch
+        ? '❌ REBUILD_MISMATCH'
+        : (materialsMismatchCount
+          ? '❌ MATERIAL_GAP'
+          : (!strictSigOk
+            ? '❌ SIG_INVALID'
+            : (!signerThresholdOk
+              ? '❌ MISSING_SIGNER'
+              : (!toolchainDiffOk
+                ? '❌ TOOLCHAIN_DIFF'
+                : (!strictMaterialsOk
+                  ? '❌ MATERIAL_GAP'
+                  : `❌ Missing: ${missing}`)))))) ,
         severity: 'minor',
         evidenceType: hasNormative ? 'artifact' : 'heuristic'
       };

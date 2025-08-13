@@ -21,8 +21,15 @@
 		"builderId": "example/builder",
 		"binaryDigest": "sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
 		"materialsValidated": true,
+		"materialsComplete": true,
+		"materialsMismatchCount": 0,
 		"signatureVerified": true,
-		"dsseThresholdMet": true
+		"dsseEnvelopeVerified": true,
+		"dsseSignerCount": 2,
+		"dsseVerifiedSignerCount": 2,
+		"dsseRequiredSignerThreshold": 2,
+		"rebuildDigestMatch": true,
+		"toolchainDiff": 0
 	},
 	"accessTicket": {
 		"detected": true,

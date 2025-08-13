@@ -114,7 +114,7 @@ describe('BetanetComplianceChecker', () => {
       const buildProv = result.checks.find(c => c.id === 9);
       expect(buildProv).toBeDefined();
       expect(buildProv?.passed).toBe(false);
-      expect(buildProv?.details).toMatch(/Rebuild digest mismatch/);
+  expect(buildProv?.details).toMatch(/REBUILD_MISMATCH/);
       await fs.remove(evidencePath);
     });
 
@@ -138,7 +138,7 @@ describe('BetanetComplianceChecker', () => {
         getBinarySha256: () => Promise.resolve(actualDigest)
       };
       const evidencePath = path.join(__dirname, 'temp-evidence.json');
-  const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest } };
+  const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest, materialsValidated: true, materialsComplete: true, materialsMismatchCount: 0, signatureVerified: true, dsseEnvelopeVerified: true, dsseSignerCount: 2, dsseVerifiedSignerCount: 2, dsseRequiredSignerThreshold: 2, rebuildDigestMatch: true, toolchainDiff: 0 } };
       await fs.writeFile(evidencePath, JSON.stringify(evidence));
       const result = await checkerLocal.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
       const buildProv = result.checks.find(c => c.id === 9);
@@ -167,7 +167,7 @@ describe('BetanetComplianceChecker', () => {
       };
       const evidencePath = path.join(__dirname, 'temp-evidence-materials.json');
       const materials = [ { uri: 'git+https://example.com/repo@abc', digest: 'sha256:' + actualDigest } ];
-      const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest, materials } };
+  const evidence = { provenance: { predicateType: 'https://slsa.dev/provenance/v1', builderId: 'github.com/example/builder', binaryDigest: 'sha256:' + actualDigest, materials, materialsValidated: true, materialsComplete: true, materialsMismatchCount: 0, signatureVerified: true, dsseEnvelopeVerified: true, dsseSignerCount: 2, dsseVerifiedSignerCount: 2, dsseRequiredSignerThreshold: 2, rebuildDigestMatch: true, toolchainDiff: 0 } };
       await fs.writeFile(evidencePath, JSON.stringify(evidence));
       // Create minimal SPDX JSON SBOM containing the digest
       const sbomPath = path.join(__dirname, 'temp-sbom.spdx.json');
@@ -207,7 +207,7 @@ describe('BetanetComplianceChecker', () => {
       const result = await checkerLocal.checkCompliance(tmpBin, { evidenceFile: evidencePath, sbomFile: sbomPath, allowHeuristic: true });
       const buildProv = result.checks.find(c => c.id === 9);
       expect(buildProv?.passed).toBe(false);
-      expect(buildProv?.details).toMatch(/Materials\/SBOM mismatch/);
+  expect(buildProv?.details).toMatch(/MATERIAL_GAP/);
       await fs.remove(evidencePath); await fs.remove(sbomPath); await fs.remove(tmpBin);
     });
 

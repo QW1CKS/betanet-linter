@@ -469,8 +469,71 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
-  // Task 10: Full SLSA 3+ Provenance Chain & Materials Policy
-  test.todo('Task 10: Implement tests for DSSE signatureVerified, requiredSigners threshold, materialsCompleteness full, toolchainDiff 0, rebuildDigestMatch true; failure codes SIG_INVALID / MISSING_SIGNER / MATERIAL_GAP / REBUILD_MISMATCH.');
+  // Task 10: Full SLSA 3+ Provenance Chain & Materials Policy (Check 9 strict)
+  describe('Task 10: Full SLSA 3+ Provenance Chain & Materials Policy (Check 9 strict)', () => {
+    function analyzerForProv(prov: any) {
+      return {
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        getBinarySha256: () => Promise.resolve('deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'),
+        analyze: () => Promise.resolve({ strings: ['slsa','provenance'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        evidence: { provenance: prov }
+      } as any;
+    }
+
+    const baseProv = {
+      predicateType: 'https://slsa.dev/provenance/v1',
+      builderId: 'github.com/example/builder',
+      binaryDigest: 'sha256:deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      materialsValidated: true,
+      materialsComplete: true,
+      materialsMismatchCount: 0,
+      signatureVerified: true,
+      dsseEnvelopeVerified: true,
+      dsseSignerCount: 2,
+      dsseVerifiedSignerCount: 2,
+      dsseRequiredSignerThreshold: 2,
+      rebuildDigestMatch: true,
+      toolchainDiff: 0
+    };
+
+    it('passes with all strict criteria satisfied', async () => {
+      const result = await runWithAnalyzer(analyzerForProv(baseProv));
+      const check9 = result.checks.find(c => c.id === 9)!;
+      expect(check9.passed).toBe(true);
+    });
+
+  it('fails with SIG_INVALID when signature missing', async () => {
+      const prov = { ...baseProv, signatureVerified: false, dsseEnvelopeVerified: false };
+      const result = await runWithAnalyzer(analyzerForProv(prov));
+      const check9 = result.checks.find(c => c.id === 9)!;
+      expect(check9.passed).toBe(false);
+      expect(check9.details).toMatch(/SIG_INVALID/);
+    });
+
+  it('fails with MISSING_SIGNER when threshold unmet', async () => {
+      const prov = { ...baseProv, dsseVerifiedSignerCount: 1, dsseSignerCount: 1, dsseRequiredSignerThreshold: 2 };
+      const result = await runWithAnalyzer(analyzerForProv(prov));
+      const check9 = result.checks.find(c => c.id === 9)!;
+      expect(check9.passed).toBe(false);
+      expect(check9.details).toMatch(/MISSING_SIGNER/);
+    });
+
+    it('fails with MATERIAL_GAP when materials mismatch present', async () => {
+      const prov = { ...baseProv, materialsMismatchCount: 2 };
+      const result = await runWithAnalyzer(analyzerForProv(prov));
+      const check9 = result.checks.find(c => c.id === 9)!;
+      expect(check9.passed).toBe(false);
+      expect(check9.details).toMatch(/MATERIAL_GAP/);
+    });
+
+    it('fails with REBUILD_MISMATCH when rebuildDigestMismatch flagged', async () => {
+      const prov = { ...baseProv, rebuildDigestMismatch: true };
+      const result = await runWithAnalyzer(analyzerForProv(prov));
+      const check9 = result.checks.find(c => c.id === 9)!;
+      expect(check9.passed).toBe(false);
+      expect(check9.details).toMatch(/REBUILD_MISMATCH/);
+    });
+  });
 
   // Task 11: Evidence Authenticity & Bundle Trust
   test.todo('Task 11: Implement tests for strictAuth mode requiring evidenceSignatureValid and failing with EVIDENCE_UNSIGNED when absent.');

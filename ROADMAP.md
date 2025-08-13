@@ -44,7 +44,7 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Objective: Parse registry artifact enumerating allowed cipher/hash/KEM combos & verify binary/evidence only uses registered sets.
   - AC: Evidence.algorithmAgility {registryDigest, allowedSets[], usedSets[], unregisteredUsed[]} with unregisteredUsed empty on pass. Negative test with injected unsupported combo.
 
-[ ] 10. Full SLSA 3+ Provenance Chain & Materials Policy
+[x] 10. Full SLSA 3+ Provenance Chain & Materials Policy
    - Objective: Enforce DSSE envelope signature with trusted root keys, verify all build steps pinned, materials completeness, toolchain version pinning, reproducible rebuild.
    - AC: provenance.signatureVerified=true, requiredSigners≥threshold, materialsCompleteness=full, toolchainDiff=0, rebuildDigestMatch=true; failure codes: SIG_INVALID, MISSING_SIGNER, MATERIAL_GAP, REBUILD_MISMATCH. Integration test mocks DSSE envelope.
 
