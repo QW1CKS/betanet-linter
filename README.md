@@ -1,8 +1,8 @@
 # Betanet Compliance Linter
 
-> **IMPORTANT – Transitional Compliance Notice (Phase 7 in progress)**  
-> The linter now contains **28 registered checks** (IDs 1–28) adding advanced mix variance (entropy & path length dispersion) and HTTP/3 adaptive jitter verification alongside earlier quantitative fallback timing and jitter variance enforcement. Phases 2–6 delivered dynamic harness simulations (fallback scaffold, rekey policy sim, HTTP/2 adaptive jitter stats, mix diversity sampling), governance & ledger artifact validation (quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, rate‑limit bucket dispersion, reproducibility + provenance cross‑checks, and network hermetic controls. Phase 7 adds detached evidence signature verification (ed25519), DSSE signer counting, optional DSSE envelope verification (`--dsse-public-keys`), multi‑signer evidence bundle hashing (`--evidence-bundle`), statistical variance/timing checks (25–26), advanced mix entropy & variance (Check 27), and HTTP/3 adaptive padding jitter (Check 28).  
-> Remaining gaps: real TLS/QUIC transcript capture & calibration (JA3/JA4), full DSSE/provenance trust chain & key policies, voucher cryptographic validation, expanded governance & ledger signature sets, quantitative cover connection behavioral modeling, and comprehensive materials policy enforcement. **Strict mode** (default) still excludes heuristic‑only passes unless `--allow-heuristic`.  
+> **IMPORTANT – Transitional Compliance Notice (Phase 7 advanced hardening)**  
+> The linter now contains **28 registered checks** (IDs 1–28) including advanced mix variance (entropy & path length dispersion), HTTP/3 adaptive jitter simulation, quantitative fallback timing & distribution modeling (Check 25 enhanced), and heuristic JA3 fingerprint hashing with raw TLS/QUIC capture scaffolding. Earlier phases delivered dynamic harness simulations (fallback, rekey policy sim, HTTP/2 adaptive jitter stats, mix diversity sampling), governance & ledger artifact validation (quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, rate‑limit bucket dispersion, reproducibility + provenance cross‑checks, and network hermetic controls. Phase 7 adds: detached evidence signature verification (ed25519), DSSE signer counting / optional DSSE envelope verification (`--dsse-public-keys`), multi‑signer evidence bundle hashing (`--evidence-bundle`), statistical variance & timing checks (25–26), advanced mix entropy & variance (Check 27), HTTP/3 adaptive padding jitter (Check 28), and enhanced cover connection behavioral metrics (median/p95/IQR/skew/outliers/model score).  
+> Remaining gaps: full raw JA3/JA4 canonicalization & QUIC Initial deep parse, complete DSSE/provenance trust chain & key policies, voucher cryptographic validation (aggregatedSig), expanded governance & ledger signature sets, comprehensive materials completeness policy, Noise transcript real capture. **Strict mode** (default) still excludes heuristic‑only passes unless `--allow-heuristic`.  
 > Treat PASS states as advisory unless supported by ≥2 non‑heuristic categories (see Multi‑Signal section).
 
 
@@ -25,7 +25,7 @@ A CLI tool that enumerates Betanet specification §11 requirements (1.0 baseline
 
 ## Limitations
 
-This tool relies on static + simulated evidence. It cannot yet fully guarantee runtime compliance or capture genuine TLS / QUIC handshakes, live jitter distributions, or actual Noise transcripts (planned). See the consolidated [ROADMAP.md](./ROADMAP.md) for remaining milestones.
+This tool relies on static + simulated evidence with emerging raw capture scaffolding. It does not yet fully guarantee runtime compliance or compute authoritative JA4 or complete QUIC Initial parameter sets, live jitter distributions, or actual Noise transcripts (planned). See the consolidated [ROADMAP.md](./ROADMAP.md) for remaining milestones.
 
 ### Strict Mode vs Heuristic Mode (Transitional)
 Checks advertise `evidenceType` among: `heuristic`, `static-structural`, `dynamic-protocol`, `artifact`. Strict mode (default) only counts non‑heuristic passes unless `--allow-heuristic`. Multi‑signal scoring (artifact=3, dynamic=2, static=1, heuristic=0) plus keyword stuffing detection (anti‑evasion) appear in JSON output under `multiSignal`.
@@ -47,7 +47,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 ### Compliance Matrix (Updated Through Phase 7 Continuation)
 | Spec §11 Item | Related Checks | Dominant Evidence Types (current) | Status | Notes |
 |---------------|----------------|-----------------------------------|--------|-------|
-| 1 Transport presence + TLS/ECH + calibration | 1 (presence), 12 (static ClientHello), 22 (static template calibration scaffold) | heuristic + static-structural | Partial | Calibration & dynamic extension order verification pending (future dynamic capture) |
+| 1 Transport presence + TLS/ECH + calibration | 1 (presence), 12 (static ClientHello), 22 (template + raw capture scaffold) | heuristic + static-structural + dynamic-protocol(scaffold) | Partial | Raw ClientHello base64 + heuristic JA3 hash present; full JA4 & deep QUIC parse pending |
 | 2 Access tickets (replay-bound, padding, rate) | 2 | heuristic | Partial | No structured carrier parse yet |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 3 (AEAD), 10 (PQ date), 13 (pattern), 19 (rekey policy sim) | heuristic + static-structural + dynamic-protocol(sim) | Partial | Rekey & transcript real capture pending |
 | 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive sim), 28 (H3 adaptive sim) | dynamic-protocol(sim) | Partial | Real distribution capture & calibration pending |
@@ -57,7 +57,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | 8 Alias ledger finality & Emergency Advance | 7, 16 | heuristic + artifact | Partial | CBOR quorum + emergency advance gating implemented; expanded sig sets pending |
 | 9 Payments (voucher struct, FROST, PoW) | 8, 14 | heuristic + static-structural | Partial | 128B struct parse heuristic only |
 |10 Governance anti-concentration & partition safety | 15 | artifact (when governance file) | Partial | Advanced volatility & window share metrics; broader dataset depth pending |
-|11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing policy) | dynamic-protocol(sim) | Partial | Cover behavior & deeper statistical modeling pending |
+|11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol(sim + quantitative) | Partial | Further anomaly CI thresholds & confidence intervals pending |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | heuristic + dynamic-protocol | Partial | Strict mode hop depth escalation pending |
 |13 Reproducible builds & SLSA provenance | 9 | artifact (when provenance present) | Partial | Detached evidence signature verify added; full provenance signature chain & materials policy pending |
 |– Binary structural meta (foundational) | 21 | static-structural | Baseline | Supports multi-signal diversity |
@@ -80,7 +80,7 @@ Limitations: Some action refs pinned; full signature validation & advanced mater
 JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Keyword stuffing detection flags excessive spec-token density with insufficient category diversity and can fail the multi-signal anti‑evasion check (ID 18).
 
 ### Evidence Schema Versioning
-Schema v2 fields: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative`, plus prior `mix`, `noiseExtended`, `h2Adaptive`, `provenance`, `governance`, `ledger`. See `docs/evidence-schema.md`.
+Schema v2 fields: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative`, plus prior `mix`, `noiseExtended`, `h2Adaptive`, `provenance`, `governance`, `ledger`. Phase 7 adds fallback distribution statistics and dynamicClientHelloCapture JA3/ja3Hash + raw capture placeholders ahead of schema v3 bump. See `docs/evidence-schema.md`.
 
 ## License
 
@@ -108,7 +108,9 @@ Current capabilities (heuristic unless noted):
  - 🧪 **Strict vs Heuristic Accounting**: `--strict` (default) + `--allow-heuristic` gate scoring so heuristic-only passes surface as exit code 2 (gap) rather than a silent pass
  - 🔒 **Network Hermetic Mode**: Disabled by default; opt-in with `--enable-network`, constrain hosts via `--network-allow`, fail on blocked attempts with `--fail-on-network`.
  - ✍️ **Detached Evidence Signature Verification**: `--evidence-signature` + `--evidence-public-key` (ed25519) validate evidence JSON integrity (Phase 7 foundation).
- - 🔐 **Heuristic JA3 Fingerprint Hash**: Dynamic ClientHello capture now emits `ja3` plus `ja3Hash` (MD5) for early fingerprint calibration (pre‑packet capture).
+- 🔐 **Heuristic JA3 Fingerprint Hash & Raw Capture Scaffold**: Dynamic ClientHello capture emits `ja3` + `ja3Hash` with optional `rawClientHelloB64` placeholder for full packet-calibrated JA3/JA4 (future v3).
+- 📡 **QUIC Initial Raw Scaffold**: `quicInitial` now can include partial parsed fields and `rawInitialB64` (deep parsing pending).
+- 📊 **Cover Connection Distribution Modeling**: Fallback evidence includes CV, median, p95, IQR, skewness, outlier count, anomaly codes & model score.
 
 
 ## Installation

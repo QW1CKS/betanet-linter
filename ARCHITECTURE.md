@@ -1,4 +1,4 @@
-# Betanet Compliance Linter - Project Structure
+# Betanet Compliance Linter - Project Structure (Phase 7 Updated)
 
 betanet-linter/
 # Betanet Compliance Linter - Project Structure
@@ -40,8 +40,9 @@ betanet-linter/
    - Lazy analyzer instantiation → enables dependency injection during tests
 
 -- **Check Registry** (`src/check-registry.ts`)
-   - Central list of 23 compliance checks (ids 1–23) (id, key, name, description, severity, version metadata, evidenceType)
-   - Evidence categories: heuristic, static-structural, dynamic-protocol (sim/sample), artifact
+   - Central list of 28 compliance checks (ids 1–28) including Phase 7 additions: fallback timing policy (25), padding jitter variance (26), mix advanced variance (27), HTTP/3 adaptive emulation (28)
+   - Evidence categories: heuristic, static-structural, dynamic-protocol (simulation / partial real), artifact
+   - Multi-signal anti-evasion & keyword stuffing guard (Check 18)
 5. Feature tagging: injects `betanet.feature` properties (transport-htx, transport-quic, transport-webrtc, crypto-pq-hybrid, payment-lightning, privacy-hop, etc.) across formats
 
 ## Performance & Diagnostics
@@ -57,13 +58,17 @@ betanet-linter/
    - Each entry exposes `evaluate(analyzer, now)` returning a `ComplianceCheck`
    - Handles dynamic severity escalation (post-quantum critical date) & version acceptances (transport 1.0 / 1.1)
 
-- **Analyzer / Structural Augmentation** (`src/analyzer.ts`)
+-- **Analyzer / Structural Augmentation** (`src/analyzer.ts`)
    - Extracts strings, symbols, dependencies (legacy heuristic base)
-   - Populates schema v2 evidence: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative`
-   - Integrates `binary-introspect.ts` for format, section list sample, imports sample, debug marker
-   - Injects simulated dynamic evidence (`noiseRekeySim`, `h2Adaptive`) pending real capture
-   - Counts Noise HKDF/message tokens for strengthened Check 13
+   - Populates schema v2 evidence: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative`, mix variance metrics
+   - Integrates `binary-introspect.ts` for format, sections, imports sample, debug marker
+   - Provides static baseline for dynamic TLS calibration (Check 22)
    - Single-pass memoization; sets `schemaVersion=2`
+
+-- **Dynamic Harness & Capture** (`src/harness.ts`)
+   - Generates dynamic evidence: fallback timing distribution (mean/stddev/CV + median, p95, IQR, skew, outlier detection, anomaly codes, model score), dynamic ClientHello capture (heuristic JA3 & ja3Hash, rawClientHelloB64 placeholder → future JA4), QUIC Initial probe (rawInitialB64 placeholder with partial parsed fields), HTTP/2 and HTTP/3 adaptive jitter simulations, mix path sampling entropy & path length stddev
+   - Outputs metrics consumed by Checks 22, 25, 26, 27, 28
+   - Scaffolds raw TLS/QUIC capture ahead of schema v3 canonical JA3/JA4 & full QUIC Initial parse
 
 ### 2. CLI Interface
 
@@ -75,9 +80,9 @@ betanet-linter/
 
 ### 3. Compliance Checks
 
-All 23 checks are declaratively defined. Append-only registration keeps orchestrator stable; multi-signal scoring consumes evidence categories post evaluation.
+All 28 checks are declaratively defined (append-only). Multi-signal scoring aggregates category diversity post evaluation.
 
-Abbreviated check map (1–23): Transport Presence, Access Tickets, Frame Encryption, SCION / legacy header absence, Transport Endpoints, DHT Bootstrap & rotation, Alias Ledger, Payment System, Build Provenance, Post-Quantum, Privacy Hop Enforcement, TLS ClientHello Template, Noise Pattern (enhanced), Payment Struct Detail, Governance Anti-Concentration, Ledger Emergency Advance, Diversity Sampling, Multi-Signal Anti-Evasion, Noise Rekey Simulation, HTTP/2 Adaptive Jitter Simulation, Binary Structural Meta, TLS Template Calibration Scaffold, Negative Assertions.
+Abbreviated map (selected deltas beyond 1–14): 15 Governance Diversity (artifact), 16 Ledger Emergency Advance, 17 Diversity Sampling (dynamic), 18 Multi-Signal Anti-Evasion, 19 Noise Rekey Simulation (sim), 20 HTTP/2 Adaptive Jitter (sim), 21 Binary Structural Meta, 22 TLS Template Calibration (+ dynamic raw scaffold), 23 Negative Assertions, 24 Rate-Limit Buckets, 25 Fallback Timing & Distribution Policy, 26 Padding Jitter Variance, 27 Mix Advanced Variance (entropy + path length stddev), 28 HTTP/3 Adaptive Emulation.
 
 ### 4. SBOM Generation
 
@@ -159,8 +164,8 @@ Each compliance check uses a combination of:
 
 ## Performance & Diagnostics
 
-- Single-pass memoized analysis (analyze() cached)
-- Diagnostics: invocation count, cache hit, tool availability, degradation reasons
-- Per-check timing captured; multi-signal scoring aggregated (artifact=3, dynamic=2, static=1, heuristic=0)
-- Environment gates: `BETANET_FAIL_ON_DEGRADED`, `BETANET_PQ_DATE_OVERRIDE`
-- Future: real dynamic handshake capture, HTTP/3 adaptive metrics, signed evidence bundle
+- Single-pass memoized structural analysis + on-demand harness runs
+- Per-check timing & aggregate parallel duration
+- Degradation tracking (missing tools, fallbacks) influences strict mode exit conditions
+- Multi-signal scoring (artifact=3, dynamic=2, static=1, heuristic=0) + stuffing density guard
+- Future (schema v3): canonical raw TLS/QUIC JA3/JA4, QUIC Initial full parse, signed evidence bundle

@@ -1,6 +1,6 @@
-# Evidence Schema
+# Evidence Schema (v2 → v3 Roadmap)
 
-Schema Version: 2 (Phases 2–6 additions; Phase 7 signature verification scaffold)
+Schema Version: 2 (current) – includes structural binary metadata, static ClientHello template, enhanced Noise pattern detail, negative assertions, adaptive jitter (sim), mix diversity variance, fallback timing, and Phase 7 distribution statistics + heuristic JA3 hashing scaffolds.
 
 ## Overview
 The linter ingests structured evidence objects (either via --evidence-file or produced internally by static/dynamic analyzers). Schema v2 introduces structural binary metadata, static ClientHello template extraction, enhanced Noise pattern details, and negative assertions.
@@ -47,8 +47,8 @@ clientHelloTemplate captures ALPN list, raw extension numeric ordering (subset) 
 noisePatternDetail supplements basic Noise_XK detection with heuristic counts of HKDF-related labels and message token markers for stronger multi-signal corroboration.
 
 ## Future Additions (Planned v3)
-- dynamicClientHelloCapture: full raw ClientHello bytes + JA3/JA4 fingerprint
-- quicInitial: transport parameters & version negotiation evidence
+- dynamicClientHelloCapture: full raw ClientHello bytes (rawClientHelloB64) + JA3/JA4 fingerprint classification
+- quicInitial: transport parameters & version negotiation evidence (rawInitialB64 + parsed version/DCID/SCID/token lengths)
 - statisticalJitter: distribution metrics for padding / PING / PRIORITY
 - signedEvidence bundle: canonical hash chain + multiple signatures
 

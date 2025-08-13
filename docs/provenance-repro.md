@@ -23,12 +23,13 @@ Rebuild job steps:
 - Run linter with evidence & SBOM file to upgrade Build Provenance to artifact evidence (materialsValidated/materialsMismatchCount)
 
 Current Status & Next Steps
----------------------------
+----------------------------
 - Actions pinned by commit SHA (checkout, setup-node, upload-artifact, github-script) – done.
 - Rebuild digest mismatch flagged via provenance.rebuildDigestMismatch.
 - Materials vs SBOM digests cross-check: sets provenance.materialsValidated & materialsMismatchCount.
 - Detached evidence signature verification (Phase 7) marks provenance.signatureVerified (separate from SLSA attestation sig).
-- Next: verify DSSE / SLSA attestation signatures, enforce materials completeness policy, record toolchain version set in provenance materials.
+- DSSE envelope signer counting & optional key mapping (`--dsse-public-keys`) implemented; multi-signer bundle hashing via `--evidence-bundle` (bundleSha256, threshold flag).
+- Next: verify DSSE / SLSA attestation signatures (cryptographic), enforce materials completeness policy (all SBOM components referenced), record toolchain version set in provenance materials, aggregated signature (FROST) voucher validation.
 
 Local Reproduction
 ------------------
