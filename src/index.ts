@@ -36,6 +36,8 @@ export class BetanetComplianceChecker {
     if (!this._analyzer || options.forceRefresh) {
       this._analyzer = new BinaryAnalyzer(binaryPath, options.verbose);
     }
+  // Phase 6: Apply network allowance (default deny)
+  try { (this._analyzer as any).setNetworkAllowed?.(!!options.enableNetwork, options.networkAllowlist); } catch { /* ignore */ }
     // Evidence ingestion (Phase 1 start)
     if (options.evidenceFile && fs.existsSync(options.evidenceFile)) {
       try {

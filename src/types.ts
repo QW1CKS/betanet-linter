@@ -80,6 +80,8 @@ export interface AnalyzerDiagnostics {
   platform?: string; // process.platform recorded for transparency
   missingCoreTools?: string[]; // core analysis tools unavailable on this platform
   degradationReasons?: string[]; // human-readable reasons driving degraded=true
+  networkAllowed?: boolean; // whether network operations permitted (Phase 6)
+  networkOps?: { url: string; method: string; durationMs: number; status?: number; error?: string; blocked?: boolean }[]; // recorded network attempts
 }
 
 export interface CheckOptions {
@@ -98,6 +100,9 @@ export interface CheckOptions {
   evidenceFile?: string; // path to external evidence JSON (Phase 1 ingestion)
   sbomFile?: string; // optional SBOM file path to cross-check provenance materials (Phase 3 extension)
   governanceFile?: string; // governance & ledger evidence (Phase 6)
+  enableNetwork?: boolean; // Phase 6: allow outbound network enrichment
+  failOnNetwork?: boolean; // Phase 6: if network attempted while disabled, treat as failure condition
+  networkAllowlist?: string[]; // Phase 6: restrict outbound network hosts (empty => allow any when enabled)
 }
 
 export interface SBOMOptions {

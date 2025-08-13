@@ -49,6 +49,9 @@ program
   .option('--evidence-file <path>', 'Path to external evidence JSON for normative checks (Phase 1)')
   .option('--sbom-file <path>', 'Path to SBOM file (CycloneDX XML/JSON or SPDX tag/json) for materials cross-check')
   .option('--governance-file <path>', 'Governance & ledger evidence JSON (Phase 6)')
+  .option('--enable-network', 'Allow network enrichment operations (default off)')
+  .option('--fail-on-network', 'Fail if any network access attempted while disabled')
+  .option('--network-allow <hosts>', 'Comma-separated host allowlist when network enabled')
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -80,7 +83,10 @@ program
         strictMode: options.strict !== undefined ? options.strict : true,
         allowHeuristic: options.allowHeuristic,
     evidenceFile: options.evidenceFile
-  , sbomFile: options.sbomFile, governanceFile: options.governanceFile
+  , sbomFile: options.sbomFile, governanceFile: options.governanceFile,
+  enableNetwork: options.enableNetwork,
+  failOnNetwork: options.failOnNetwork,
+  networkAllowlist: options.networkAllow ? options.networkAllow.split(',').map(h=>h.trim()).filter(Boolean) : undefined
       });
       
       if (options.sbom) {
@@ -99,6 +105,11 @@ program
       
       checker.displayResults(results, options.output);
       
+      // Fail if network attempts occurred while disabled and user requested strict failure
+      if (!options.enableNetwork && options.failOnNetwork && results.diagnostics?.networkOps?.some(op => op.blocked)) {
+        console.error('❌ Network operations attempted while disabled.');
+        process.exit(1);
+      }
       // Exit with appropriate code
       if (options.failOnDegraded && results.diagnostics?.degraded) {
         process.exit(1);

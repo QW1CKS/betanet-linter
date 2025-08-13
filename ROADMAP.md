@@ -96,9 +96,10 @@ Phase 5: Build Provenance & Reproducibility
 - [x] Linter validation: verify provenance predicate type, builder ID, materials digests match binary & SBOM components. (Digest & materials cross-check implemented)
 
 Phase 6: Network Safety & Hermetic Control
-- [ ] Disable enrichment (OSV, remote lookups) by default; require --enable-network. (Pending; enrichment currently minimal/not enabled)
-- [~] Enforce timeouts, retry with jitter, explicit User-Agent, opt-in offline fail-fast (--fail-on-network attempt). (safe-exec timeouts implemented; network enrichment guards pending)
-- [ ] Record network operations into diagnostics for transparency. (Pending)
+- [x] Disable enrichment (OSV, remote lookups) by default; require --enable-network. (CLI flags --enable-network / --fail-on-network; analyzer default denies)
+- [x] Enforce timeouts, retry with jitter, explicit User-Agent, opt-in offline fail-fast (--fail-on-network). (Exponential backoff with jitter in attemptNetwork; default UA betanet-linter/1.x; safe-exec timeouts already in place)
+- [x] Record network operations into diagnostics for transparency. (diagnostics.networkOps includes blocked attempts, durations, errors)
+- [x] Host allowlist (--network-allow) restricts outbound domains when enabled.
 
 Phase 7: Anti-Evasion & Scoring Hardening
 - [x] Multi-signal requirement per normative item (e.g., Transport: endpoint strings + captured ClientHello + QUIC token + ECH presence). (Check 18 enforces ≥2 categories)

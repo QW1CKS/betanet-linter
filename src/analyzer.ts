@@ -31,11 +31,63 @@ export class BinaryAnalyzer {
   private binarySha256: string | null = null;
   private staticPatterns: StaticPatterns | null = null;
   private structuralAugmented = false; // guard to avoid repeating Step 10 augmentation
+  private networkAllowed: boolean = false; // Phase 6: default deny network
+  private networkOps: { url: string; method: string; durationMs: number; status?: number; error?: string; blocked?: boolean }[] = [];
+  private networkAllowlist: string[] | null = null; // host allowlist when network enabled
+  private userAgent: string = 'betanet-linter/1.x';
 
   constructor(binaryPath: string, verbose: boolean = false) {
     this.binaryPath = binaryPath;
     this.verbose = verbose;
   this.toolsReady = this.detectTools();
+  }
+
+  // Phase 6: allow external enabling of network usage
+  setNetworkAllowed(allowed: boolean, allowlist?: string[]) {
+    this.networkAllowed = allowed;
+    this.networkAllowlist = allowlist && allowlist.length ? allowlist.map(h=>h.toLowerCase()) : null;
+    this.diagnostics.networkAllowed = allowed;
+  }
+
+  // Placeholder network fetch wrapper to centralize logging if added in future phases
+  async attemptNetwork(url: string, method: string = 'GET', fn?: () => Promise<any>) {
+    const start = performance.now();
+    const host = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
+    if (!this.networkAllowed) {
+      this.networkOps.push({ url, method, durationMs: 0, blocked: true });
+      this.diagnostics.networkOps = this.networkOps;
+      if (this.verbose) console.warn(`⚠️  Blocked network attempt (disabled): ${method} ${url}`);
+      throw new Error('network-disabled');
+    }
+    if (this.networkAllowlist && host && !this.networkAllowlist.includes(host)) {
+      this.networkOps.push({ url, method, durationMs: 0, blocked: true, error: 'host-not-allowlisted' });
+      this.diagnostics.networkOps = this.networkOps;
+      if (this.verbose) console.warn(`⚠️  Blocked network attempt (host not allowlisted): ${host}`);
+      throw new Error('network-host-blocked');
+    }
+    const maxRetries = 2;
+    let attempt = 0;
+    while (true) {
+      try {
+        const res = fn ? await fn() : null;
+        const dur = performance.now() - start;
+        this.networkOps.push({ url, method, durationMs: dur });
+        this.diagnostics.networkOps = this.networkOps;
+        return res;
+      } catch (e: any) {
+        attempt++;
+        if (attempt > maxRetries) {
+          const dur = performance.now() - start;
+            this.networkOps.push({ url, method, durationMs: dur, error: e?.message });
+            this.diagnostics.networkOps = this.networkOps;
+            throw e;
+        }
+        // Exponential backoff with jitter (50-150ms * attempt)
+        const base = 50 * attempt;
+        const jitter = Math.random() * 100;
+        await new Promise(r => setTimeout(r, base + jitter));
+      }
+    }
   }
 
   async getBinarySha256(): Promise<string> {
@@ -121,7 +173,8 @@ export class BinaryAnalyzer {
   }
 
   getDiagnostics(): AnalyzerDiagnostics {
-    return this.diagnostics;
+  this.diagnostics.networkOps = this.networkOps;
+  return this.diagnostics;
   }
 
   private async detectTools(): Promise<void> {
