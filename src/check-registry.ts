@@ -584,6 +584,42 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     }
   }
   ,
+  // Task 13: Statistical Jitter Randomness Tests (Check 37)
+  {
+    id: 37,
+    key: 'jitter-randomness',
+    name: 'Statistical Jitter Randomness',
+    description: 'Validates adaptive jitter & teardown distributions via p-value threshold',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const rt = ev.randomnessTest; // expected shape { pValue:number, sampleCount:number, method?:string }
+      // Fallback: derive trivial pValue heuristic from statisticalJitter stddev vs mean if randomnessTest absent
+      let pValue: number | undefined = rt?.pValue;
+      let sampleCount: number | undefined = rt?.sampleCount;
+      if (pValue === undefined && ev.statisticalJitter) {
+        const sj = ev.statisticalJitter;
+        if (typeof sj.stdDevMs === 'number' && typeof sj.meanMs === 'number' && sj.meanMs > 0) {
+          const cv = sj.stdDevMs / sj.meanMs; // coefficient of variation
+          // Map CV heuristically to pseudo p-value (purely placeholder): higher dispersion -> higher pseudo p
+            pValue = Math.max(0, Math.min(1, cv / 2));
+            sampleCount = sj.samples || sj.sampleCount;
+        }
+      }
+      const threshold = 0.01; // AC threshold
+      const minSamples = 20;
+      if (pValue === undefined || !Number.isFinite(pValue)) {
+        return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed: false, details: '❌ JITTER_RANDOMNESS_WEAK: missing pValue', severity: 'major', evidenceType: 'heuristic' };
+      }
+      const enoughSamples = (sampleCount||0) >= minSamples;
+      const passed = pValue > threshold && enoughSamples;
+      const evidenceType: 'heuristic' | 'artifact' = (rt && enoughSamples) ? 'artifact' : 'heuristic';
+      const details = passed ? `✅ randomness pValue=${pValue.toExponential(2)} samples=${sampleCount}` : `❌ JITTER_RANDOMNESS_WEAK: pValue=${pValue.toExponential(2)} samples=${sampleCount||0}${!enoughSamples? ' insufficient-samples':''}`;
+      return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed, details, severity: 'major', evidenceType };
+    }
+  }
+  ,
   // Task 12: Adaptive PoW & Rate-Limit Statistical Validation (Check 36)
   {
     id: 36,

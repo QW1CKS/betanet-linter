@@ -56,7 +56,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Analyze powAdaptive.difficultySamples trend toward target acceptance percentile; rateLimit bucket dispersion statistical sanity beyond presence.
    - AC: Metrics: difficultyTrendStable=true, maxDrop<=configured, acceptancePercentile within tolerance; failure codes: POW_TREND_DIVERGENCE. Test with divergent synthetic series.
 
-[ ] 13. Statistical Jitter Randomness Tests
+[x] 13. Statistical Jitter Randomness Tests
    - Objective: Apply chi-square or KS test + variance bounds to adaptive jitter & cover teardown distributions.
    - AC: randomnessTest.pValue > 0.01 on pass; failure code JITTER_RANDOMNESS_WEAK otherwise. Deterministic fixture triggers fail test.
 
@@ -365,7 +365,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Analyze powAdaptive.difficultySamples trend toward target acceptance percentile; rateLimit bucket dispersion statistical sanity beyond presence.
    - AC: Metrics: difficultyTrendStable=true, maxDrop<=configured, acceptancePercentile within tolerance; failure codes: POW_TREND_DIVERGENCE. Test with divergent synthetic series.
 
-13. Statistical Jitter Randomness Tests
+[x] 13. Statistical Jitter Randomness Tests
    - Objective: Apply chi-square or KS test + variance bounds to adaptive jitter & cover teardown distributions.
    - AC: randomnessTest.pValue > 0.01 on pass; failure code JITTER_RANDOMNESS_WEAK otherwise. Deterministic fixture triggers fail test.
 

@@ -596,7 +596,42 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 13: Statistical Jitter Randomness Tests
-  test.todo('Task 13: Implement tests performing chi-square / KS test mock with randomnessTest.pValue threshold; deterministic distribution => JITTER_RANDOMNESS_WEAK.');
+  describe('Task 13: Statistical Jitter Randomness Tests (Check 37)', () => {
+    function analyzerForRandom(rt: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: ['random','jitter'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        getDiagnostics: () => ({}),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        evidence: rt
+      } as any;
+    }
+    it('passes when pValue above threshold and sufficient samples', async () => {
+      const ev = { randomnessTest: { pValue: 0.05, sampleCount: 50, method: 'chi-square' } };
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(true);
+    });
+    it('fails when pValue below threshold producing JITTER_RANDOMNESS_WEAK', async () => {
+      const ev = { randomnessTest: { pValue: 0.0005, sampleCount: 60, method: 'chi-square' } };
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(false);
+      expect(check37.details).toMatch(/JITTER_RANDOMNESS_WEAK/);
+    });
+    it('fails when insufficient samples even if pValue high', async () => {
+      const ev = { randomnessTest: { pValue: 0.2, sampleCount: 5, method: 'chi-square' } };
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(false);
+      expect(check37.details).toMatch(/insufficient-samples/);
+    });
+    it('fails when pValue missing (derives heuristic) leading to weak randomness', async () => {
+      const ev = { statisticalJitter: { meanMs: 100, stdDevMs: 1, samples: 10 } }; // cv low => small pseudo pValue may be < threshold
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(false);
+    });
+  });
 
   // Task 14: Post-Quantum Date Boundary Reliability
   test.todo('Task 14: Implement tests for pqDateEnforced positive & boundary failures PQ_PAST_DUE / PQ_EARLY_WITHOUT_OVERRIDE via mocked date contexts.');
