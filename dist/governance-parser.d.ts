@@ -3,8 +3,10 @@ export interface QuorumCertificate {
     signatures: {
         validator: string;
         weight: number;
+        sig?: string;
     }[];
     aggregateSignature?: string;
+    rootHash?: string;
 }
 export interface GovernanceSnapshotDerived {
     maxASShare?: number;
@@ -28,5 +30,28 @@ export declare function deriveGovernanceMetrics(weights: {
     asCapApplied: boolean;
     orgCapApplied: boolean;
 };
-export declare function validateQuorumCertificates(qcs: QuorumCertificate[], thresholdFraction?: number): boolean;
+export declare function validateQuorumCertificates(qcs: QuorumCertificate[], thresholdFraction?: number, opts?: {
+    governanceTotalWeight?: number;
+    validatorKeys?: Record<string, string>;
+    requireSignatures?: boolean;
+}): {
+    valid: boolean;
+    reasons: string[];
+};
+export declare function evaluateHistoricalDiversity(series: {
+    timestamp: string;
+    asShares: Record<string, number>;
+}[], cap?: number): {
+    stable: boolean;
+    maxASShare: number;
+    avgTop3: number;
+};
+export declare function evaluateHistoricalDiversityAdvanced(series: {
+    timestamp: string;
+    asShares: Record<string, number>;
+}[], cap?: number, window?: number): {
+    advancedStable: boolean;
+    volatility: number;
+    maxWindowShare: number;
+};
 //# sourceMappingURL=governance-parser.d.ts.map

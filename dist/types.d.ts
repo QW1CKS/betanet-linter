@@ -1,3 +1,37 @@
+export interface Evidence {
+    h2AdaptiveDynamic?: {
+        settings?: Record<string, number>;
+        paddingJitterMeanMs?: number;
+        paddingJitterP95Ms?: number;
+        paddingJitterStdDevMs?: number;
+        sampleCount?: number;
+        withinTolerance?: boolean;
+        randomnessOk?: boolean;
+    };
+    h3AdaptiveDynamic?: {
+        qpackTableSize?: number;
+        paddingJitterMeanMs?: number;
+        paddingJitterP95Ms?: number;
+        paddingJitterStdDevMs?: number;
+        sampleCount?: number;
+        withinTolerance?: boolean;
+        randomnessOk?: boolean;
+    };
+    noiseTranscriptDynamic?: {
+        messagesObserved?: string[];
+        expectedSequenceOk?: boolean;
+        rekeysObserved?: number;
+        rekeyTriggers?: {
+            bytes?: number;
+            timeMinSec?: number;
+            frames?: number;
+        };
+        nonceReuseDetected?: boolean;
+        patternVerified?: boolean;
+        pqDateOk?: boolean;
+        withinPolicy?: boolean;
+    };
+}
 export interface ComplianceCheck {
     id: number;
     name: string;
@@ -21,6 +55,17 @@ export interface ComplianceResult {
         failed: number;
         critical: number;
     };
+    specItems?: SpecItemResult[];
+    multiSignal?: {
+        passedHeuristic: number;
+        passedStatic: number;
+        passedDynamic: number;
+        passedArtifact: number;
+        weightedScore: number;
+        categoriesPresent?: string[];
+        stuffingRatio?: number;
+        suspiciousStuffing?: boolean;
+    };
     specSummary?: {
         baseline: string;
         latestKnown: string;
@@ -37,6 +82,16 @@ export interface ComplianceResult {
         durationMs: number;
     }[];
     parallelDurationMs?: number;
+}
+export interface SpecItemResult {
+    id: number;
+    key: string;
+    name: string;
+    status: 'full' | 'partial' | 'missing';
+    passed: boolean;
+    reasons: string[];
+    evidenceTypes: string[];
+    checks: number[];
 }
 export interface SBOMComponent {
     name: string;
@@ -69,6 +124,16 @@ export interface AnalyzerDiagnostics {
     platform?: string;
     missingCoreTools?: string[];
     degradationReasons?: string[];
+    networkAllowed?: boolean;
+    networkOps?: {
+        url: string;
+        method: string;
+        durationMs: number;
+        status?: number;
+        error?: string;
+        blocked?: boolean;
+    }[];
+    evidenceSignatureValid?: boolean;
 }
 export interface CheckOptions {
     verbose?: boolean;
@@ -86,12 +151,23 @@ export interface CheckOptions {
     evidenceFile?: string;
     sbomFile?: string;
     governanceFile?: string;
+    enableNetwork?: boolean;
+    failOnNetwork?: boolean;
+    networkAllowlist?: string[];
+    evidenceSignatureFile?: string;
+    evidencePublicKeyFile?: string;
+    failOnSignatureInvalid?: boolean;
+    dssePublicKeysFile?: string;
+    dsseRequiredKeys?: string;
+    dsseThreshold?: number;
+    evidenceBundleFile?: string;
 }
 export interface SBOMOptions {
     format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json';
     outputPath?: string;
 }
 export interface IngestedEvidence {
+    schemaVersion?: number;
     provenance?: {
         predicateType?: string;
         builderId?: string;
@@ -115,11 +191,238 @@ export interface IngestedEvidence {
         materialsComplete?: boolean;
         signatureVerified?: boolean;
         signatureError?: string;
+        dsseEnvelopeVerified?: boolean;
+        dsseSignerCount?: number;
+        dsseVerifiedSignerCount?: number;
+        dsseThresholdMet?: boolean;
+        dsseRequiredKeysPresent?: boolean;
+        dsseSignerDetails?: {
+            keyid?: string;
+            verified: boolean;
+            reason?: string;
+        }[];
+        dssePolicyReasons?: string[];
+    };
+    signedEvidenceBundle?: {
+        entries?: {
+            canonicalSha256?: string;
+            signatureValid?: boolean;
+            signer?: string;
+        }[];
+        bundleSha256?: string;
+        multiSignerThresholdMet?: boolean;
+    };
+    fallbackTiming?: {
+        udpTimeoutMs?: number;
+        tcpConnectMs?: number;
+        retryDelayMs?: number;
+        coverConnections?: number;
+        coverTeardownMs?: number[];
+        withinPolicy?: boolean;
+        teardownStdDevMs?: number;
+    };
+    statisticalVariance?: {
+        jitterStdDevMs?: number;
+        jitterMeanMs?: number;
+        sampleCount?: number;
+        jitterWithinTarget?: boolean;
+        mixUniquenessRatio?: number;
+        mixDiversityIndex?: number;
+        mixNodeEntropyBits?: number;
+        mixPathLengthStdDev?: number;
     };
     clientHello?: any;
     noise?: any;
+    noiseExtended?: {
+        pattern?: string;
+        rekeysObserved?: number;
+        rekeyTriggers?: {
+            bytes?: number;
+            timeMinSec?: number;
+            frames?: number;
+        };
+    };
+    noiseTranscriptDynamic?: {
+        messagesObserved?: string[];
+        expectedSequenceOk?: boolean;
+        rekeysObserved?: number;
+        rekeyTriggers?: {
+            bytes?: number;
+            timeMinSec?: number;
+            frames?: number;
+        };
+        nonceReuseDetected?: boolean;
+        patternVerified?: boolean;
+        pqDateOk?: boolean;
+        withinPolicy?: boolean;
+    };
     governance?: any;
     ledger?: any;
+    governanceHistoricalDiversity?: {
+        series?: {
+            timestamp: string;
+            asShares: Record<string, number>;
+        }[];
+        maxASShareDropPct?: number;
+        stable?: boolean;
+    };
+    mix?: {
+        samples?: number;
+        uniqueHopSets?: number;
+        hopSets?: string[][];
+        minHopsBalanced?: number;
+        minHopsStrict?: number;
+        mode?: 'balanced' | 'strict';
+        pathLengths?: number[];
+        uniquenessRatio?: number;
+        diversityIndex?: number;
+        nodeEntropyBits?: number;
+        pathLengthStdDev?: number;
+    };
+    h2Adaptive?: {
+        settings?: Record<string, number>;
+        paddingJitterMeanMs?: number;
+        paddingJitterP95Ms?: number;
+        paddingJitterStdDevMs?: number;
+        sampleCount?: number;
+        withinTolerance?: boolean;
+        randomnessOk?: boolean;
+    };
+    h3Adaptive?: {
+        qpackTableSize?: number;
+        paddingJitterMeanMs?: number;
+        paddingJitterP95Ms?: number;
+        paddingJitterStdDevMs?: number;
+        sampleCount?: number;
+        withinTolerance?: boolean;
+        randomnessOk?: boolean;
+    };
+    binaryMeta?: {
+        format?: 'elf' | 'pe' | 'macho' | 'unknown';
+        sections?: string[];
+        importsSample?: string[];
+        hasDebug?: boolean;
+        sizeBytes?: number;
+    };
+    clientHelloTemplate?: {
+        alpn?: string[];
+        extensions?: number[];
+        extOrderSha256?: string;
+    };
+    dynamicClientHelloCapture?: {
+        alpn?: string[];
+        extOrderSha256?: string;
+        ja3?: string;
+        ja3Hash?: string;
+        ja3Canonical?: string;
+        capturedAt?: string;
+        matchStaticTemplate?: boolean;
+        note?: string;
+        ciphers?: number[];
+        extensions?: number[];
+        curves?: number[];
+        ecPointFormats?: number[];
+        captureQuality?: 'simulated' | 'parsed-openssl';
+        rawClientHelloB64?: string;
+        rawClientHelloCanonicalB64?: string;
+        rawClientHelloCanonicalHash?: string;
+    };
+    accessTicket?: {
+        detected: boolean;
+        fieldsPresent: string[];
+        hex16Count?: number;
+        hex32Count?: number;
+        structConfidence?: number;
+        paddingLengths?: number[];
+        paddingVariety?: number;
+        rateLimitTokensPresent?: boolean;
+        rotationTokenPresent?: boolean;
+    };
+    accessTicketDynamic?: {
+        samples: number;
+        paddingLengths?: number[];
+        uniquePadding?: number;
+        rotationIntervalSec?: number;
+        replayWindowSec?: number;
+        rateLimitBuckets?: number;
+        withinPolicy?: boolean;
+        paddingVarianceOk?: boolean;
+        rotationIntervalOk?: boolean;
+        replayWindowOk?: boolean;
+        rateLimitOk?: boolean;
+    };
+    voucherCrypto?: {
+        structLikely: boolean;
+        keysetIdB64?: string;
+        secretB64?: string;
+        aggregatedSigB64?: string;
+        signatureValid?: boolean;
+        frostThreshold?: {
+            n?: number;
+            t?: number;
+        };
+    };
+    calibrationBaseline?: {
+        alpn?: string[];
+        extOrderSha256?: string;
+        source?: string;
+        capturedAt?: string;
+    };
+    statisticalJitter?: {
+        meanMs: number;
+        p95Ms: number;
+        stdDevMs: number;
+        samples: number;
+        withinTarget?: boolean;
+    };
+    noisePatternDetail?: {
+        pattern?: string;
+        hkdfLabelsFound?: number;
+        messageTokensFound?: number;
+    };
+    bootstrap?: {
+        rotationEpochs?: number;
+        beaconSetEntropySources?: number;
+        deterministicSeedDetected?: boolean;
+        sampleEpochSpanHours?: number;
+    };
+    powAdaptive?: {
+        difficultySamples?: number[];
+        targetBits?: number;
+        monotonicTrend?: boolean;
+        anomalies?: string[];
+    };
+    rateLimit?: {
+        buckets?: {
+            name?: string;
+            capacity?: number;
+            refillPerSec?: number;
+        }[];
+        bucketCount?: number;
+        distinctScopes?: number;
+        scopeRefillVariancePct?: number;
+    };
+    negative?: {
+        forbiddenPresent?: string[];
+    };
     [k: string]: any;
+}
+export interface EvidenceMeta {
+    generated: string;
+    scenarios: string[];
+    hashes?: {
+        [key: string]: string;
+    };
+    tooling?: {
+        opensslAvailable?: boolean;
+    };
+}
+export interface SignedEvidence {
+    algorithm: string;
+    signature: string;
+    publicKey?: string;
+    keyId?: string;
+    canonicalHash?: string;
+    created: string;
 }
 //# sourceMappingURL=types.d.ts.map

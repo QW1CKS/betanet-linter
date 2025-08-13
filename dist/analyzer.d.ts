@@ -10,7 +10,14 @@ export declare class BinaryAnalyzer {
     private toolsReady;
     private binarySha256;
     private staticPatterns;
+    private structuralAugmented;
+    private networkAllowed;
+    private networkOps;
+    private networkAllowlist;
+    private userAgent;
     constructor(binaryPath: string, verbose?: boolean);
+    setNetworkAllowed(allowed: boolean, allowlist?: string[]): void;
+    attemptNetwork(url: string, method?: string, fn?: () => Promise<any>): Promise<any>;
     getBinarySha256(): Promise<string>;
     getStaticPatterns(): Promise<StaticPatterns>;
     setDynamicProbe(flag: boolean): void;

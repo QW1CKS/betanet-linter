@@ -19,6 +19,30 @@ export interface StaticPatterns {
     clientHello?: ClientHelloStatic;
     noise?: NoiseStatic;
     voucher?: VoucherStatic;
+    accessTicket?: AccessTicketStatic;
+    voucherCrypto?: VoucherCryptoStatic;
+}
+export interface AccessTicketStatic {
+    detected: boolean;
+    fieldsPresent: string[];
+    hex16Count?: number;
+    hex32Count?: number;
+    structConfidence?: number;
+    rotationTokenPresent?: boolean;
+    paddingLengths?: number[];
+    paddingVariety?: number;
+    rateLimitTokensPresent?: boolean;
+}
+export interface VoucherCryptoStatic {
+    structLikely: boolean;
+    keysetIdB64?: string;
+    secretB64?: string;
+    aggregatedSigB64?: string;
+    signatureValid?: boolean;
+    frostThreshold?: {
+        n?: number;
+        t?: number;
+    };
 }
 export declare function parseClientHelloStrings(strings: string[]): ClientHelloStatic | undefined;
 export declare function detectNoisePattern(strings: string[]): NoiseStatic | undefined;

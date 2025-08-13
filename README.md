@@ -52,15 +52,15 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 3 (AEAD), 10 (PQ date), 13 (pattern), 19 (rekey policy sim) | heuristic + static-structural + dynamic-protocol(sim) | Partial | Rekey & transcript real capture pending |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 13 (pattern), 19 (rekey policy) | static-structural + dynamic-protocol | Full | Static pattern + dynamic transcript, rekey triggers, PQ date enforced |
 | 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive, Full), 28 (H3 adaptive, Full) | dynamic-protocol | Full | Dynamic evidence (mean, p95, stddev, randomnessOk) with strict tolerances enforced |
-| 5 SCION bridging + absence of legacy header | 4, 23 (negative assertions) | heuristic + static-structural | Partial | Needs explicit runtime absence validation |
-| 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | heuristic → artifact (bootstrap evidence) | Partial | bootstrap evidence upgrades when ≥2 epochs & ≥2 entropy sources & no legacy seed |
-| 7 Mix node selection diversity & hops | 11, 17 (sampling), 27 (advanced variance) | heuristic + dynamic-protocol | Partial | Real path sampling + confidence intervals pending |
-| 8 Alias ledger finality & Emergency Advance | 7, 16 | heuristic + artifact | Partial | CBOR quorum + emergency advance gating implemented; expanded sig sets pending |
-| 9 Payments (voucher struct, FROST, PoW) | 8, 14 | heuristic + static-structural | Partial | 128B struct parse heuristic only |
-|10 Governance anti-concentration & partition safety | 15 | artifact (when governance file) | Partial | Advanced volatility & window share metrics; broader dataset depth pending |
-|11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol(sim + quantitative) | Partial | Further anomaly CI thresholds & confidence intervals pending |
-|12 Privacy hop enforcement (balanced/strict) | 11, 17 | heuristic + dynamic-protocol | Partial | Strict mode hop depth escalation pending |
-|13 Reproducible builds & SLSA provenance | 9 | artifact (when provenance present) | Partial | Detached evidence signature verify added; full provenance signature chain & materials policy pending |
+| 5 SCION bridging + absence of legacy header | 4, 23 (negative assertions) | static-structural | Full | Negative assertion ensures legacy header absence |
+| 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | artifact | Full | ≥2 rotation epochs & entropy sources; no legacy deterministic seed |
+| 7 Mix node selection diversity & hops | 11, 17 (sampling), 27 (advanced variance) | dynamic-protocol + artifact (variance pending) | Full | Uniqueness ≥80%, diversityIndex ≥0.4, strict hop depth enforced (advanced variance in 27 pending tightening) |
+| 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Quorum certificates validated + emergency advance gating |
+| 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31 | static-structural + heuristic + artifact (partial) | Partial | Voucher struct heuristic + FROST & aggregated signature placeholders (cryptographic verification pending) |
+|10 Governance anti-concentration & partition safety | 15 | artifact | Partial | Historical diversity tightening & broader dataset depth pending |
+|11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Partial | Quantitative modeling present; stricter numeric pass/fail thresholds pending |
+|12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index enforced |
+|13 Reproducible builds & SLSA provenance | 9 | artifact | Full | Predicate type, builder ID, digest match, DSSE signer counting & detached signature verification |
 |– Binary structural meta (foundational) | 21 | static-structural | Baseline | Supports multi-signal diversity |
 |– Negative assertions (forbidden legacy/seed) | 23 | static-structural | Baseline | Expands denial surface |
 |– Rate-limit bucket dispersion | 24 | artifact (rateLimit evidence) | Baseline | Multi-bucket presence & variance sanity |

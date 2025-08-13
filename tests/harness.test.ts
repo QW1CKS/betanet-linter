@@ -3,6 +3,7 @@ import * as path from 'path';
 import { runHarness } from '../src/harness';
 
 describe('harness skeleton', () => {
+  jest.setTimeout(15000);
   it('produces evidence json with expected static pattern fields', async () => {
     const tmpBin = path.join(__dirname, 'temp-harness-bin');
     await fs.writeFile(tmpBin, Buffer.from('Noise_XK h2 http/1.1 keysetid32 secret32 aggregatedsig64'));

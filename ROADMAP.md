@@ -45,14 +45,14 @@ Normative §11 Items → Current State Map
 3. [x] Noise XK inner tunnel, key separation, nonce lifecycle, rekey thresholds, PQ date → Full (Checks 13 & 19: static pattern + dynamic transcript, rekey triggers, PQ date enforced)
 4. [x] HTTP/2/3 adaptive emulation (settings tolerances, jitter, padding randomness, stddev, randomnessOk, Full dynamic evidence) → Full
 5. [x] SCION bridging via HTX tunnel (no on‑wire legacy transition header, negative assertion enforced, Full evidence) → Full
-6. [~] Offer /betanet/htx/1.1.0 & /betanet/htxquic/1.1.0 (legacy 1.0 optional) → Moderate (Check 5)
-7. [~] Rotating rendezvous bootstrap (BeaconSet, PoW, multi-bucket rate-limits, no deterministic seeds) → Partial (Check 6: rotation tokens only)
-8. [~] Mixnode selection (BeaconSet + per‑stream entropy + diversity + hop policy) → Partial (Check 11: heuristic score only)
-9. [~] Alias ledger finality 2-of-3 + Emergency Advance constraints + quorum cert validation → Shallow (Check 7: consensus tokens only)
-10. [~] Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Partial (Check 8)
-11. [ ] Governance anti‑concentration caps & partition safety → Missing
-12. [ ] Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Missing
-13. [~] Reproducible builds & SLSA 3 provenance artifacts → Partial (Check 9: supports external SLSA provenance ingestion w/ predicateType, builderId, binary digest validation; pending action pinning, signature & materials verification, reproducible rebuild enforcement in CI)
+6. [x] Offer /betanet/htx/1.1.0 & /betanet/htxquic/1.1.0 (legacy 1.0 optional) → Full (Check 5 upgraded to artifact via transportEndpoints evidence; requires both 1.1.0 endpoints)
+7. [x] Rotating rendezvous bootstrap (BeaconSet, PoW, multi-bucket rate-limits, no deterministic seeds) → Full (Check 6 artifact: ≥2 rotationEpochs, ≥2 entropy sources, no legacy deterministic seed)
+8. [x] Mixnode selection (BeaconSet + per‑stream entropy + diversity + hop policy) → Full (Checks 11 & 17 dynamic: strict hop depth + uniqueness ≥80%, diversityIndex ≥0.4; advanced variance pending in 27)
+9. [x] Alias ledger finality 2-of-3 + Emergency Advance constraints + quorum cert validation → Full (Checks 7 & 16 artifact: quorumCertificatesValid + emergency advance gating)
+10. [~] Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Partial (Check 8 + 29 + 31; voucher struct heuristic + FROST threshold & aggregated signature placeholders)
+11. [ ] Governance anti‑concentration caps & partition safety → Pending (advanced historical diversity tightening next focus)
+12. [~] Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Partial (Check 25 quantitative timing & cover distribution modeling; stricter numeric bounds pending)
+13. [x] Reproducible builds & SLSA 3 provenance artifacts → Full (Check 9 artifact: predicateType/builderId/digest match + DSSE signer counting + detached evidence signature verification)
 
 Strategic Phases
 ----------------

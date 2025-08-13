@@ -103,9 +103,16 @@ export class BetanetComplianceChecker {
               builderId: parsed.builderId
             };
           }
+          // Also merge any other top-level keys besides provenance/binaryDistDigest so additional evidence isn't lost
+          for (const k of Object.keys(parsed)) {
+            if (k === 'provenance' || k === 'binaryDistDigest' || k === 'predicateType' || k === 'builderId') continue;
+            (evidence as any)[k] = (parsed as any)[k];
+          }
         } else {
-          // Assume already shape of IngestedEvidence
-          Object.assign(evidence, parsed);
+          // Assume already shape of IngestedEvidence; deep merge top-level keys
+          for (const k of Object.keys(parsed)) {
+            (evidence as any)[k] = (parsed as any)[k];
+          }
         }
         (this._analyzer as any).evidence = evidence; // attach for evaluators
   // Phase 7: if signature & public key provided, verify detached signature over canonical JSON

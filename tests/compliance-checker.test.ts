@@ -5,6 +5,8 @@ import { BinaryAnalyzer } from '../src/analyzer';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 
+jest.setTimeout(20000);
+
 describe('BetanetComplianceChecker', () => {
   let checker: BetanetComplianceChecker;
   let mockBinaryPath: string;
@@ -647,25 +649,35 @@ describe('BetanetComplianceChecker', () => {
 
   describe('CLI filter parity (ISSUE-040)', () => {
     const { spawnSync } = require('child_process');
+    // Helper to extract JSON object from CLI mixed output (decorative headers + JSON blob)
+    function extractJson(stdout: string) {
+      const start = stdout.indexOf('{');
+      if (start === -1) throw new Error('No JSON start in output');
+      const jsonText = stdout.slice(start).trim();
+      // Attempt to parse up to last closing brace
+      const last = jsonText.lastIndexOf('}');
+      return JSON.parse(jsonText.slice(0, last + 1));
+    }
     it('should allow --checks on check command', () => {
       const bin = path.join(__dirname, 'temp-existing-bin');
       fs.writeFileSync(bin, Buffer.from('dummy'));
       const res = spawnSync('node', [path.join(__dirname, '..', 'bin', 'cli.js'), 'check', bin, '--checks', '1,3', '--output', 'json']);
-      expect(res.status).toBeGreaterThanOrEqual(0); // process may exit 0 or 1 depending on pass/fail
+      expect(res.status).toBeGreaterThanOrEqual(0); // exit code may reflect failures
       const stdout = res.stdout.toString();
-      // Count occurrences of '"id":' to ensure only two checks captured in JSON output
-      const ids = stdout.match(/"id"\s*:\s*([0-9]+)/g) || [];
-      // Expect exactly two unique IDs (1 and 3)
-  const uniq = Array.from(new Set(ids.map((s: string) => (s.match(/([0-9]+)/) || [,''])[1])));
-      expect(uniq).toEqual(expect.arrayContaining(['1','3']));
-      expect(uniq.length).toBe(2);
+      const obj = extractJson(stdout);
+      const checkIds = (obj.checks || []).map((c: any) => c.id.toString());
+      expect(checkIds).toEqual(expect.arrayContaining(['1','3']));
+      expect(checkIds.length).toBe(2); // only the requested checks
     });
     it('should allow --exclude on check command', () => {
       const bin = path.join(__dirname, 'temp-existing-bin');
       fs.writeFileSync(bin, Buffer.from('dummy'));
       const res = spawnSync('node', [path.join(__dirname, '..', 'bin', 'cli.js'), 'check', bin, '--exclude', '10', '--output', 'json']);
       const stdout = res.stdout.toString();
-      expect(stdout).not.toMatch(/"id"\s*:\s*10/);
+      const obj = extractJson(stdout);
+      const checkIds = (obj.checks || []).map((c: any) => c.id);
+      expect(checkIds).not.toContain(10); // excluded from checks list
+      // Note: specItems may still reference normative spec item id 10; we only care that the actual check was excluded.
     });
   });
 

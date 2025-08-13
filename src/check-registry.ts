@@ -204,19 +204,40 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       const hasHTXEndpoint = TRANSPORT_ENDPOINT_VERSIONS.some(v => strings.includes(`/betanet/htx/${v}`));
       const hasQUICEndpoint = TRANSPORT_ENDPOINT_VERSIONS.some(v => strings.includes(`/betanet/htxquic/${v}`));
       const optionalPresent = OPTIONAL_TRANSPORTS.filter(t => strings.includes(t.path));
-      const passed = hasHTXEndpoint && hasQUICEndpoint;
+      // Evidence-based upgrade: transportEndpoints evidence (artifact) allows strict validation of required versions
+      const ev: any = (analyzer as any).evidence || {};
+      const te = ev.transportEndpoints;
+      let evidenceType: 'heuristic' | 'artifact' = 'heuristic';
+      let passed = hasHTXEndpoint && hasQUICEndpoint;
+      let details: string;
+      if (te && Array.isArray(te.endpoints)) {
+        evidenceType = 'artifact';
+        const paths: string[] = te.endpoints.map((e: any) => e.path).filter(Boolean);
+        const has11HTX = paths.includes('/betanet/htx/1.1.0');
+        const has11QUIC = paths.includes('/betanet/htxquic/1.1.0');
+        const legacyHTX = paths.includes('/betanet/htx/1.0.0');
+        const legacyQUIC = paths.includes('/betanet/htxquic/1.0.0');
+        // Require both 1.1.0 endpoints; legacy 1.0.0 are optional (may be present or absent)
+        passed = has11HTX && has11QUIC;
+        details = passed ? `✅ endpoints 1.1.0 present${legacyHTX||legacyQUIC ? ' + legacy 1.0.0' : ''}` : `❌ Missing: ${missingList([
+          !has11HTX && 'HTX /betanet/htx/1.1.0',
+          !has11QUIC && 'HTX-QUIC /betanet/htxquic/1.1.0'
+        ])}`;
+      } else {
+        details = passed ? `✅ Found HTX & QUIC transport endpoints${optionalPresent.length ? ' + optional: ' + optionalPresent.map(o => o.kind).join(', ') : ''}` :
+          `❌ Missing: ${missingList([
+            !hasHTXEndpoint && 'HTX endpoint (v1.1.0 or 1.0.0)',
+            !hasQUICEndpoint && 'HTX-QUIC endpoint (v1.1.0 or 1.0.0)'
+          ])}`;
+      }
       return {
         id: 5,
         name: 'Transport Endpoints',
         description: 'Offers Betanet HTX & HTX-QUIC transports (v1.1.0 preferred, 1.0.0 legacy supported)',
         passed,
-        details: passed ? `✅ Found HTX & QUIC transport endpoints${optionalPresent.length ? ' + optional: ' + optionalPresent.map(o => o.kind).join(', ') : ''}` :
-          `❌ Missing: ${missingList([
-            !hasHTXEndpoint && 'HTX endpoint (v1.1.0 or 1.0.0)',
-            !hasQUICEndpoint && 'HTX-QUIC endpoint (v1.1.0 or 1.0.0)'
-          ])}`,
+        details,
         severity: 'major',
-        evidenceType: 'heuristic'
+        evidenceType
       };
     }
   },

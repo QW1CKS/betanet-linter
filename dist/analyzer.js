@@ -40,6 +40,7 @@ const constants_1 = require("./constants");
 const heuristics_1 = require("./heuristics");
 const crypto = __importStar(require("crypto"));
 const static_parsers_1 = require("./static-parsers");
+const binary_introspect_1 = require("./binary-introspect");
 // Removed unused execa import; all external commands routed through safeExec for centralized timeout control
 class BinaryAnalyzer {
     constructor(binaryPath, verbose = false) {
@@ -53,9 +54,68 @@ class BinaryAnalyzer {
         this.analysisStartHr = null;
         this.binarySha256 = null;
         this.staticPatterns = null;
+        this.structuralAugmented = false; // guard to avoid repeating Step 10 augmentation
+        this.networkAllowed = false; // Phase 6: default deny network
+        this.networkOps = [];
+        this.networkAllowlist = null; // host allowlist when network enabled
+        this.userAgent = 'betanet-linter/1.x';
         this.binaryPath = binaryPath;
         this.verbose = verbose;
         this.toolsReady = this.detectTools();
+    }
+    // Phase 6: allow external enabling of network usage
+    setNetworkAllowed(allowed, allowlist) {
+        this.networkAllowed = allowed;
+        this.networkAllowlist = allowlist && allowlist.length ? allowlist.map(h => h.toLowerCase()) : null;
+        this.diagnostics.networkAllowed = allowed;
+    }
+    // Placeholder network fetch wrapper to centralize logging if added in future phases
+    async attemptNetwork(url, method = 'GET', fn) {
+        const start = performance.now();
+        const host = (() => { try {
+            return new URL(url).hostname.toLowerCase();
+        }
+        catch {
+            return '';
+        } })();
+        if (!this.networkAllowed) {
+            this.networkOps.push({ url, method, durationMs: 0, blocked: true });
+            this.diagnostics.networkOps = this.networkOps;
+            if (this.verbose)
+                console.warn(`⚠️  Blocked network attempt (disabled): ${method} ${url}`);
+            throw new Error('network-disabled');
+        }
+        if (this.networkAllowlist && host && !this.networkAllowlist.includes(host)) {
+            this.networkOps.push({ url, method, durationMs: 0, blocked: true, error: 'host-not-allowlisted' });
+            this.diagnostics.networkOps = this.networkOps;
+            if (this.verbose)
+                console.warn(`⚠️  Blocked network attempt (host not allowlisted): ${host}`);
+            throw new Error('network-host-blocked');
+        }
+        const maxRetries = 2;
+        let attempt = 0;
+        while (true) {
+            try {
+                const res = fn ? await fn() : null;
+                const dur = performance.now() - start;
+                this.networkOps.push({ url, method, durationMs: dur });
+                this.diagnostics.networkOps = this.networkOps;
+                return res;
+            }
+            catch (e) {
+                attempt++;
+                if (attempt > maxRetries) {
+                    const dur = performance.now() - start;
+                    this.networkOps.push({ url, method, durationMs: dur, error: e?.message });
+                    this.diagnostics.networkOps = this.networkOps;
+                    throw e;
+                }
+                // Exponential backoff with jitter (50-150ms * attempt)
+                const base = 50 * attempt;
+                const jitter = Math.random() * 100;
+                await new Promise(r => setTimeout(r, base + jitter));
+            }
+        }
     }
     async getBinarySha256() {
         if (this.binarySha256)
@@ -91,12 +151,73 @@ class BinaryAnalyzer {
         catch {
             this.staticPatterns = {};
         }
+        // Step 10 augmentation: populate structural evidence once
+        if (!this.structuralAugmented) {
+            try {
+                const anySelf = this;
+                anySelf.evidence = anySelf.evidence || {};
+                anySelf.evidence.schemaVersion = 2;
+                // Binary meta introspection
+                const meta = await (0, binary_introspect_1.introspectBinary)(this.binaryPath, analysis.strings);
+                anySelf.evidence.binaryMeta = {
+                    format: meta.format,
+                    sections: meta.sections,
+                    importsSample: meta.importsSample,
+                    hasDebug: meta.hasDebug,
+                    sizeBytes: meta.sizeBytes
+                };
+                // ClientHello & Noise pattern details to new evidence keys
+                if (this.staticPatterns?.clientHello) {
+                    const ch = this.staticPatterns.clientHello;
+                    anySelf.evidence.clientHelloTemplate = {
+                        alpn: ch.alpn,
+                        extensions: ch.extensions,
+                        extOrderSha256: ch.extOrderSha256
+                    };
+                }
+                if (this.staticPatterns?.noise) {
+                    const np = this.staticPatterns.noise;
+                    // Heuristic count of HKDF labels & message tokens among strings
+                    const lower = analysis.strings.map(s => s.toLowerCase());
+                    const hkdfLabels = ['hkdf', 'chacha20', 'poly1305', 'hmac'];
+                    const messageTokens = ['-> e,', '-> s,', '-> es', '-> se', '-> ee', 'noise_xk'];
+                    let hkdfLabelsFound = 0;
+                    hkdfLabels.forEach(l => { if (lower.some(s => s.includes(l)))
+                        hkdfLabelsFound++; });
+                    let messageTokensFound = 0;
+                    messageTokens.forEach(t => { if (lower.some(s => s.includes(t.trim())))
+                        messageTokensFound++; });
+                    anySelf.evidence.noisePatternDetail = {
+                        pattern: np.pattern,
+                        hkdfLabelsFound,
+                        messageTokensFound
+                    };
+                }
+                if (this.staticPatterns?.accessTicket) {
+                    anySelf.evidence.accessTicket = this.staticPatterns.accessTicket;
+                }
+                // accessTicketDynamic is provided only via external harness evidence ingestion; analyzer itself does not simulate it here.
+                if (this.staticPatterns?.voucherCrypto) {
+                    anySelf.evidence.voucherCrypto = this.staticPatterns.voucherCrypto;
+                }
+                // Negative assertions: forbidden tokens
+                const forbidden = ['deterministic_seed', 'legacy_transition_header'];
+                const present = [];
+                const lowerAll = analysis.strings.map(s => s.toLowerCase());
+                forbidden.forEach(f => { if (lowerAll.some(s => s.includes(f)))
+                    present.push(f); });
+                anySelf.evidence.negative = { forbiddenPresent: present };
+            }
+            catch { /* ignore */ }
+            this.structuralAugmented = true;
+        }
         return this.staticPatterns;
     }
     setDynamicProbe(flag) {
         this.dynamicProbe = !!flag;
     }
     getDiagnostics() {
+        this.diagnostics.networkOps = this.networkOps;
         return this.diagnostics;
     }
     async detectTools() {

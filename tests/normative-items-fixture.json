@@ -52,6 +52,28 @@
 		"withinTolerance": true,
 		"sampleCount": 6
 	},
+	"transportEndpoints": {
+		"endpoints": [
+			{"path": "/betanet/htx/1.1.0", "proto": "http2"},
+			{"path": "/betanet/htxquic/1.1.0", "proto": "http3"},
+			{"path": "/betanet/htx/1.0.0", "proto": "http2", "legacy": true}
+		]
+	},
+	"bootstrap": {
+		"rotationEpochs": 3,
+		"beaconSetEntropySources": 3,
+		"deterministicSeedDetected": false
+	},
+	"mix": {
+		"samples": 10,
+		"uniqueHopSets": 9,
+		"pathLengths": [3,3,3,3,3,3,3,3,3,3],
+		"minHopsBalanced": 2,
+		"minHopsStrict": 3,
+		"mode": "strict",
+		"diversityIndex": 0.8,
+		"uniquenessRatio": 0.9
+	},
 	"h3Adaptive": {
 		"meanMs": 60,
 		"p95Ms": 120,
