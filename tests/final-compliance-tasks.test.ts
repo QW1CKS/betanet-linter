@@ -535,8 +535,38 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
-  // Task 11: Evidence Authenticity & Bundle Trust
-  test.todo('Task 11: Implement tests for strictAuth mode requiring evidenceSignatureValid and failing with EVIDENCE_UNSIGNED when absent.');
+  // Task 11: Evidence Authenticity & Bundle Trust (Check 35)
+  describe('Task 11: Evidence Authenticity & Bundle Trust (Check 35)', () => {
+    function analyzerForAuth(evidence: any, diagnostics: any = {}) {
+      return {
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        analyze: () => Promise.resolve({ strings: ['auth','signature','bundle'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        getDiagnostics: () => diagnostics,
+        evidence,
+        options: { strictAuthMode: true }
+      } as any;
+    }
+    it('passes when detached signature verified in strictAuth mode', async () => {
+      const prov = { provenance: { signatureVerified: true } };
+      const result = await runWithAnalyzer(analyzerForAuth(prov));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      expect(check35.passed).toBe(true);
+      expect(check35.details).toMatch(/authenticity/);
+    });
+    it('passes when multi-signer bundle threshold met', async () => {
+      const ev = { signedEvidenceBundle: { multiSignerThresholdMet: true, entries: [{ signatureValid: true }, { signatureValid: true }] } };
+      const result = await runWithAnalyzer(analyzerForAuth(ev));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      expect(check35.passed).toBe(true);
+    });
+    it('fails with EVIDENCE_UNSIGNED when strictAuth mode and no authenticity signals', async () => {
+      const ev = { provenance: { signatureVerified: false } };
+      const result = await runWithAnalyzer(analyzerForAuth(ev));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      expect(check35.passed).toBe(false);
+      expect(check35.details).toMatch(/EVIDENCE_UNSIGNED/);
+    });
+  });
 
   // Task 12: Adaptive PoW & Rate-Limit Statistical Validation
   test.todo('Task 12: Implement tests analyzing powAdaptive.difficultySamples trend (difficultyTrendStable, maxDrop) and acceptancePercentile; divergent synthetic series -> POW_TREND_DIVERGENCE.');

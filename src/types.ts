@@ -164,6 +164,7 @@ export interface CheckOptions {
   dsseRequiredKeys?: string; // comma separated list provided via CLI
   dsseThreshold?: number; // required verified signer threshold
   evidenceBundleFile?: string; // Phase 7: multi-signer evidence bundle JSON path
+  strictAuthMode?: boolean; // Task 11: require signed evidence authenticity for artifact elevation
 }
 
 export interface SBOMOptions {

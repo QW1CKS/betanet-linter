@@ -1310,6 +1310,32 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
     }
   }
   ,
+  // Task 11: Evidence Authenticity & Bundle Trust (Check 35)
+  {
+    id: 35,
+    key: 'evidence-authenticity',
+    name: 'Evidence Authenticity',
+    description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const diag = (analyzer.getDiagnostics && analyzer.getDiagnostics()) || {};
+      const provenance = ev.provenance || {};
+      const bundle = ev.signedEvidenceBundle;
+  const strictAuth = (analyzer as any).options?.strictAuthMode === true; // options attached in ensureAnalyzer
+      // Determine authenticity signals
+  const detachedValid = provenance.signatureVerified === true || diag.evidenceSignatureValid === true;
+  const bundleValid = bundle?.multiSignerThresholdMet === true;
+  const anyAuth = (detachedValid === true) || (bundleValid === true);
+      // Pass policy: if strictAuth mode enabled, require anyAuth true. If not strict, informational pass if authenticity present.
+  const passed = anyAuth; // bool
+      let evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
+  const details = anyAuth ? `✅ authenticity ${detachedValid ? 'detached-signature' : 'bundle'} verified` : (strictAuth ? '❌ EVIDENCE_UNSIGNED' : '❌ EVIDENCE_UNSIGNED (not enforced)');
+  return { id: 35, name: 'Evidence Authenticity', description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode', passed, details, severity: 'major', evidenceType };
+    }
+  }
+  ,
   {
     id: 29,
     key: 'voucher-frost-struct-validation',

@@ -48,7 +48,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Enforce DSSE envelope signature with trusted root keys, verify all build steps pinned, materials completeness, toolchain version pinning, reproducible rebuild.
    - AC: provenance.signatureVerified=true, requiredSigners≥threshold, materialsCompleteness=full, toolchainDiff=0, rebuildDigestMatch=true; failure codes: SIG_INVALID, MISSING_SIGNER, MATERIAL_GAP, REBUILD_MISMATCH. Integration test mocks DSSE envelope.
 
-[ ] 11. Evidence Authenticity & Bundle Trust
+[x] 11. Evidence Authenticity & Bundle Trust
    - Objective: Require optional signed evidence bundle (minisign/cosign) for artifact upgrades; reject if signature missing in strict-auth mode.
    - AC: strictAuth mode flag; evidenceSignatureValid=true required for artifact elevation; failure code EVIDENCE_UNSIGNED.
 
@@ -358,8 +358,8 @@ The following tasks constitute the definitive completion list. Implementing all 
    - AC: provenance.signatureVerified=true, requiredSigners≥threshold, materialsCompleteness=full, toolchainDiff=0, rebuildDigestMatch=true; failure codes: SIG_INVALID, MISSING_SIGNER, MATERIAL_GAP, REBUILD_MISMATCH. Integration test mocks DSSE envelope.
 
 11. Evidence Authenticity & Bundle Trust
-   - Objective: Require optional signed evidence bundle (minisign/cosign) for artifact upgrades; reject if signature missing in strict-auth mode.
-   - AC: strictAuth mode flag; evidenceSignatureValid=true required for artifact elevation; failure code EVIDENCE_UNSIGNED.
+  - Objective: Require optional signed evidence bundle (minisign/cosign) for artifact upgrades; reject if signature missing in strict-auth mode.
+  - AC: strictAuth mode flag (CLI --strict-auth) triggers Check 35 requiring detached signature OR multi-signer bundle; failure code EVIDENCE_UNSIGNED.
 
 12. Adaptive PoW & Rate-Limit Statistical Validation
    - Objective: Analyze powAdaptive.difficultySamples trend toward target acceptance percentile; rateLimit bucket dispersion statistical sanity beyond presence.

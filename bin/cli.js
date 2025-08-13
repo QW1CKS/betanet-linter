@@ -59,6 +59,7 @@ program
   .option('--dsse-threshold <n>', 'Numeric threshold of distinct verified signers required (default 1)')
   .option('--evidence-bundle <path>', 'Multi-signer evidence bundle JSON (array of {evidence,signature,publicKey,signer})')
   .option('--fail-on-sig-invalid', 'Exit non-zero if evidence signature invalid')
+  .option('--strict-auth', 'Require evidence authenticity (detached signature or bundle) for artifact elevation (Task 11)', false)
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -101,6 +102,7 @@ program
   dsseThreshold: options.dsseThreshold ? parseInt(options.dsseThreshold,10) : undefined,
   evidenceBundleFile: options.evidenceBundle,
   failOnSignatureInvalid: options.failOnSigInvalid
+  , strictAuthMode: options.strictAuth
       });
       
       if (options.sbom) {
