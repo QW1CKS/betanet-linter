@@ -31,15 +31,15 @@ describe('harness skeleton', () => {
   });
 
   it('simulates rekey and h2 adaptive jitter evidence when flags provided', async () => {
-    const tmpBin = path.join(__dirname, 'temp-harness-bin3');
-    await fs.writeFile(tmpBin, Buffer.from('Noise_XK h2 http/1.1 keysetid32 secret32 aggregatedsig64'));
-    const out = path.join(__dirname, 'harness-output3.json');
-    await runHarness(tmpBin, out, { rekeySimulate: true, h2AdaptiveSimulate: true, jitterSamples: 10 });
-    const data = JSON.parse(await fs.readFile(out, 'utf8'));
-    expect(data.noiseExtended).toBeDefined();
-    expect(data.noiseExtended.rekeysObserved).toBeGreaterThanOrEqual(1);
-    expect(data.h2Adaptive).toBeDefined();
-    expect(data.h2Adaptive.sampleCount).toBeGreaterThanOrEqual(5);
-    await fs.remove(tmpBin); await fs.remove(out);
+  const tmpBin = path.join(__dirname, 'temp-harness-bin3');
+  await fs.writeFile(tmpBin, Buffer.from('Noise_XK h2 http/1.1 keysetid32 secret32 aggregatedsig64'));
+  const out = path.join(__dirname, 'harness-output3.json');
+  await runHarness(tmpBin, out, { rekeySimulate: true, h2AdaptiveSimulate: true, jitterSamples: 10 });
+  const data = JSON.parse(await fs.readFile(out, 'utf8'));
+  expect(data.noiseTranscriptDynamic).toBeDefined();
+  expect(data.noiseTranscriptDynamic.rekeysObserved).toBeGreaterThanOrEqual(1);
+  expect(data.h2Adaptive).toBeDefined();
+  expect(data.h2Adaptive.sampleCount).toBeGreaterThanOrEqual(5);
+  await fs.remove(tmpBin); await fs.remove(out);
   });
 });

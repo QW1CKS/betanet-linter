@@ -1,3 +1,13 @@
+  noiseTranscriptDynamic?: {
+    messagesObserved?: string[];
+    expectedSequenceOk?: boolean;
+    rekeysObserved?: number;
+    rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number };
+    nonceReuseDetected?: boolean;
+    patternVerified?: boolean;
+    pqDateOk?: boolean;
+    withinPolicy?: boolean;
+  };
 export interface ComplianceCheck {
   id: number;
   name: string;
@@ -187,6 +197,16 @@ export interface IngestedEvidence {
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder
   noiseExtended?: { pattern?: string; rekeysObserved?: number; rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number } };
+  noiseTranscriptDynamic?: {
+    messagesObserved?: string[];
+    expectedSequenceOk?: boolean;
+    rekeysObserved?: number;
+    rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number };
+    nonceReuseDetected?: boolean;
+    patternVerified?: boolean;
+    pqDateOk?: boolean;
+    withinPolicy?: boolean;
+  };
   governance?: any; // Phase 6 governance snapshot evidence
   ledger?: any; // Phase 6 ledger observation evidence
   governanceHistoricalDiversity?: {

@@ -511,10 +511,14 @@ export class BetanetComplianceChecker {
           return { full, reasons };
         }),
         build(3, 'noise-rekey', 'Noise XK Tunnel & Rekey Policy', [13,19], 1, ({ evidence }) => {
-          const np = evidence?.noisePatternDetail; const rekey = evidence?.noiseExtended?.rekeysObserved >= 1; const reasons: string[] = [];
-          if (!(np && np.hkdfLabelsFound>=2 && np.messageTokensFound>=2)) reasons.push('incomplete-static-noise-pattern');
-          if (!rekey) reasons.push('rekey-unobserved');
-          return { full: reasons.length===0, reasons };
+          const np = evidence?.noisePatternDetail;
+          const dyn = evidence?.noiseTranscriptDynamic;
+          const reasons: string[] = [];
+          const staticOk = np && np.hkdfLabelsFound>=2 && np.messageTokensFound>=2;
+          const dynamicOk = dyn && dyn.rekeysObserved>=1 && dyn.expectedSequenceOk !== false && dyn.patternVerified !== false && dyn.pqDateOk !== false;
+          if (!staticOk) reasons.push('incomplete-static-noise-pattern');
+          if (!dynamicOk) reasons.push('dynamic-transcript-or-pqdate-missing');
+          return { full: staticOk && dynamicOk, reasons };
         }),
         build(4, 'http-adaptive', 'HTTP/2 & HTTP/3 Adaptive Emulation', [20,28,26], 1, () => {
           const h2 = checks.find(c=>c.id===20)?.passed; const h3 = checks.find(c=>c.id===28)?.passed; const jitter = checks.find(c=>c.id===26)?.passed; const reasons: string[] = [];

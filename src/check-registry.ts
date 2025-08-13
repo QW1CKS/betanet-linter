@@ -521,17 +521,24 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
       const ev: any = (analyzer as any).evidence;
-      const n = ev?.noiseExtended;
+      const n = ev?.noiseTranscriptDynamic || ev?.noiseExtended;
       let passed = false;
-      let details = '❌ No rekey evidence';
+      let details = '❌ No dynamic transcript evidence';
+      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
+      if (ev?.noiseTranscriptDynamic) evidenceType = 'dynamic-protocol';
+      else if (ev?.noiseExtended) evidenceType = 'dynamic-protocol';
       if (n) {
         const bytesOk = !n.rekeyTriggers?.bytes || n.rekeyTriggers.bytes >= (8 * 1024 * 1024 * 1024);
         const timeOk = !n.rekeyTriggers?.timeMinSec || n.rekeyTriggers.timeMinSec >= 3600;
         const framesOk = !n.rekeyTriggers?.frames || n.rekeyTriggers.frames >= 65536;
-        passed = (n.rekeysObserved || 0) >= 1 && bytesOk && timeOk && framesOk;
-        details = passed ? `✅ rekeysObserved=${n.rekeysObserved}` : `❌ Rekey policy insufficient rekeysObserved=${n.rekeysObserved||0}`;
+        const pqDateOk = n.pqDateOk !== false; // must be true or undefined
+        const transcriptOk = n.expectedSequenceOk !== false && n.patternVerified !== false;
+        passed = (n.rekeysObserved || 0) >= 1 && bytesOk && timeOk && framesOk && pqDateOk && transcriptOk;
+        details = passed
+          ? `✅ rekeysObserved=${n.rekeysObserved} pqDateOk=${pqDateOk} transcriptOk=${transcriptOk}`
+          : `❌ Rekey policy insufficient: rekeysObserved=${n.rekeysObserved||0} pqDateOk=${pqDateOk} transcriptOk=${transcriptOk}`;
       }
-      return { id: 19, name: 'Noise Rekey Policy', description: 'Observes at least one rekey event and validates trigger thresholds (bytes/time/frames)', passed, details, severity: 'minor', evidenceType: ev?.noiseExtended ? 'dynamic-protocol' : 'heuristic' };
+      return { id: 19, name: 'Noise Rekey Policy', description: 'Observes at least one rekey event and validates trigger thresholds (bytes/time/frames)', passed, details, severity: 'minor', evidenceType };
     }
   },
   {

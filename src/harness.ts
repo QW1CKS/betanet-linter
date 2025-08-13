@@ -93,6 +93,16 @@ export interface HarnessOptions {
 }
 
 export interface HarnessEvidence {
+  noiseTranscriptDynamic?: {
+    messagesObserved?: string[];
+    expectedSequenceOk?: boolean;
+    rekeysObserved?: number;
+    rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number };
+    nonceReuseDetected?: boolean;
+    patternVerified?: boolean;
+    pqDateOk?: boolean;
+    withinPolicy?: boolean;
+  };
   schemaVersion?: string;
   clientHello?: { alpn?: string[]; extOrderSha256?: string };
   noise?: { pattern?: string };
@@ -289,10 +299,15 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
   // Simulate a Noise rekey observation (Step 9 placeholder)
   if (opts.rekeySimulate) {
     const rekeysObserved = 1; // single rekey event
-    evidence.noiseExtended = {
-      pattern: evidence.noise?.pattern || 'XK',
+    evidence.noiseTranscriptDynamic = {
+      messagesObserved: ['e', 'ee', 's', 'es', 'rekey'],
+      expectedSequenceOk: true,
       rekeysObserved,
-      rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024, timeMinSec: 3600, frames: 65536 }
+      rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024, timeMinSec: 3600, frames: 65536 },
+      nonceReuseDetected: false,
+      patternVerified: true,
+      pqDateOk: true,
+      withinPolicy: true
     };
   }
   // Simulate HTTP/2 adaptive emulation jitter metrics (Step 9 placeholder)
