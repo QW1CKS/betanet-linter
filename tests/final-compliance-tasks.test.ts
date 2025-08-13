@@ -379,7 +379,60 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 8: Cover Connection Provenance & Timing Enforcement
-  test.todo('Task 8: Implement tests for provenance classification, coverStartDelayMs range, teardownIqrMs, outlierPct, failure codes COVER_INSUFFICIENT / COVER_DELAY_OUT_OF_RANGE / TEARDOWN_VARIANCE_EXCESS.');
+  describe('Task 8: Cover Connection Provenance & Timing Enforcement (Check 25 extension)', () => {
+    function analyzerForFallback(ft: any) {
+      return {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['fallback','udp','tcp','cover'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        evidence: { fallbackTiming: ft }
+      } as any;
+    }
+
+    it('passes with valid cover connection provenance & timing metrics', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 3, coverTeardownMs: [400,420,430,410], teardownStdDevMs: 12, coverStartDelayMs: 50, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(true);
+    });
+
+    it('fails with COVER_INSUFFICIENT when coverConnections <2', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 1, coverTeardownMs: [400,420], coverStartDelayMs: 50, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/COVER_INSUFFICIENT/);
+    });
+
+    it('fails with COVER_DELAY_OUT_OF_RANGE when start delay large', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [400,420,440], coverStartDelayMs: 1200, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/COVER_DELAY_OUT_OF_RANGE/);
+    });
+
+    it('fails with TEARDOWN_VARIANCE_EXCESS when stddev or IQR/outlierPct excessive', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [100,900,50,1200], teardownStdDevMs: 1000, coverStartDelayMs: 50, teardownIqrMs: 1200, outlierPct: 0.5, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/TEARDOWN_VARIANCE_EXCESS/);
+    });
+
+    it('fails when provenance categories insufficient', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [400,420,430], coverStartDelayMs: 50, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/insufficient provenance categories/);
+    });
+  });
 
   // Task 9: Algorithm Agility Registry Validation
   test.todo('Task 9: Implement tests for algorithmAgility registryDigest, allowedSets vs usedSets, and unregisteredUsed detection (fail when non-empty).');

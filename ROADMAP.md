@@ -36,7 +36,7 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Objective: Incorporate 7-day historical ACK diversity (AS / ISD counts & shares) ensuring ≤20% degradation pre-activation.
   - AC: Evidence.governanceHistoricalDiversity includes series with ≥7*24 points; computed volatility, maxWindowShare, maxDeltaShare thresholds satisfied; failure code PARTITION_DEGRADATION when degradation >20%. Fixture with induced degradation triggers fail.
 
-[ ] 8. Cover Connection Provenance & Timing Enforcement
+[x] 8. Cover Connection Provenance & Timing Enforcement
   - Objective: Classify cover vs real connections, enforce min cover count, teardown distribution (stddev, CV) & retry delay window.
   - AC: Evidence.fallbackTiming.coverConnections ≥2 (already) plus provenance categories enumerated; new metrics: coverStartDelayMs, teardownIqrMs, outlierPct; thresholds documented; failure codes: COVER_INSUFFICIENT, COVER_DELAY_OUT_OF_RANGE, TEARDOWN_VARIANCE_EXCESS.
 

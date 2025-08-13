@@ -114,7 +114,11 @@
 		"coverConnections": 2,
 		"behaviorModelScore": 0.72,
 		"coverTeardownAnomalyCodes": ["NONE"],
-		"coverTeardownMs": [400,500,520,540,560,600]
+		"coverTeardownMs": [400,500,520,540,560,600],
+		"coverStartDelayMs": 80,
+		"teardownIqrMs": 60,
+		"outlierPct": 0.1,
+		"provenanceCategories": ["real","cover"]
 	},
 	"mix": {
 		"samples": 10,

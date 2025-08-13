@@ -211,6 +211,11 @@ export interface IngestedEvidence {
     coverTeardownMs?: number[]; // teardown times for cover flows
     withinPolicy?: boolean; // aggregate policy evaluation
     teardownStdDevMs?: number; // computed stddev of teardown times
+  // Task 8 additions (Cover Connection Provenance & Timing Enforcement)
+  coverStartDelayMs?: number; // delay before first cover connection starts
+  teardownIqrMs?: number; // interquartile range of teardown times
+  outlierPct?: number; // proportion of teardown samples considered outliers
+  provenanceCategories?: string[]; // classification labels for connections (e.g., ['real','cover'])
   };
   // Phase 7: enhanced statistical variance metrics (jitter, mix)
   statisticalVariance?: {

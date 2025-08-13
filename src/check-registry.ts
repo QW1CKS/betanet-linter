@@ -1135,7 +1135,16 @@ export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
   // Fail if unexpected anomaly codes beyond an allowlist
   const allowedAnomalies = new Set(['NONE','EXPECTED_OUTLIER']);
   const anomaliesOk = anomalyCodes.every(c => allowedAnomalies.has(c));
-  const passed = udpOk && retryOk && teardownOk && behaviorOk && cvOk && skewOk && outlierOk && modelScoreOk && coverConnOk && medianOk && p95Ok && anomaliesOk;
+  // Task 8 metrics
+  const startDelay = ft.coverStartDelayMs;
+  const startDelayOk = typeof startDelay !== 'number' || (startDelay >= 0 && startDelay <= 500); // allow up to 500ms launch jitter
+  const iqr = ft.teardownIqrMs;
+  const iqrOk = typeof iqr !== 'number' || iqr <= 900; // IQR reasonable bound
+  const outlierPct = ft.outlierPct;
+  const outlierPctOk = typeof outlierPct !== 'number' || outlierPct <= 0.25; // ≤25% outliers
+  const provenance = Array.isArray(ft.provenanceCategories) ? ft.provenanceCategories : [];
+  const provenanceOk = provenance.length >= 2; // expect at least cover + real categories
+  const passed = udpOk && retryOk && teardownOk && behaviorOk && cvOk && skewOk && outlierOk && modelScoreOk && coverConnOk && medianOk && p95Ok && anomaliesOk && startDelayOk && iqrOk && outlierPctOk && provenanceOk;
   const detailParts = passed ? [
     `udpTimeout=${ft.udpTimeoutMs}ms`,
     `retryDelay=${ft.retryDelayMs||0}ms`,
@@ -1160,9 +1169,17 @@ export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
     !coverConnOk && 'insufficient cover connections',
     !medianOk && 'median out of range',
     !p95Ok && 'p95 out of range',
-    !anomaliesOk && 'unexpected anomaly codes'
+    !anomaliesOk && 'unexpected anomaly codes',
+    !startDelayOk && 'cover start delay out of range',
+    !iqrOk && 'teardown iqr excessive',
+    !outlierPctOk && 'outlier pct excessive',
+    !provenanceOk && 'insufficient provenance categories'
   ].filter(Boolean) : [];
-  const details = passed ? `✅ ${detailParts.join(' ')}` : `❌ Fallback timing issues: ${missingList(failReasons)}`;
+  const failureCodes: string[] = [];
+  if (!coverConnOk) failureCodes.push('COVER_INSUFFICIENT');
+  if (!startDelayOk || !retryOk) failureCodes.push('COVER_DELAY_OUT_OF_RANGE');
+  if (!teardownOk || !iqrOk || !outlierPctOk) failureCodes.push('TEARDOWN_VARIANCE_EXCESS');
+  const details = passed ? `✅ ${detailParts.join(' ')}` : `❌ Fallback timing issues: ${missingList(failReasons)} codes=[${failureCodes.join(',')}]`;
   return { id: 25, name: 'Fallback Timing Policy', description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
     }
   },
