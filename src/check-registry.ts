@@ -566,22 +566,64 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
       const ev: any = (analyzer as any).evidence;
-      const n = ev?.noiseTranscriptDynamic || ev?.noiseExtended;
+      // Normalize evidence: prefer new noiseTranscript structure, fallback to legacy noiseTranscriptDynamic / noiseExtended
+      const n = ev?.noiseTranscript || ev?.noiseTranscriptDynamic || ev?.noiseExtended;
       let passed = false;
       let details = '❌ No dynamic transcript evidence';
-      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
-      if (ev?.noiseTranscriptDynamic) evidenceType = 'dynamic-protocol';
-      else if (ev?.noiseExtended) evidenceType = 'dynamic-protocol';
+      const failureCodes: string[] = [];
+      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = n ? 'dynamic-protocol' : 'heuristic';
       if (n) {
-        const bytesOk = !n.rekeyTriggers?.bytes || n.rekeyTriggers.bytes >= (8 * 1024 * 1024 * 1024);
-        const timeOk = !n.rekeyTriggers?.timeMinSec || n.rekeyTriggers.timeMinSec >= 3600;
-        const framesOk = !n.rekeyTriggers?.frames || n.rekeyTriggers.frames >= 65536;
-        const pqDateOk = n.pqDateOk !== false; // must be true or undefined
-        const transcriptOk = n.expectedSequenceOk !== false && n.patternVerified !== false;
-        passed = (n.rekeysObserved || 0) >= 1 && bytesOk && timeOk && framesOk && pqDateOk && transcriptOk;
+        // Extract messages pattern (legacy messagesObserved array vs new messages objects)
+        let msgs: string[] = [];
+        if (Array.isArray(n.messages)) {
+          msgs = n.messages.map((m: any) => (typeof m === 'string' ? m : m?.type)).filter((x: any)=>typeof x === 'string');
+        } else if (Array.isArray(n.messagesObserved)) {
+          msgs = [...n.messagesObserved];
+        }
+        // Expected Noise XK initial handshake message sequence (client perspective): e, ee, s, es
+  const expectedPrefix = ['e','ee','s','es'];
+  const prefix = msgs.slice(0, expectedPrefix.length);
+  let patternOk = expectedPrefix.every((v,i)=>prefix[i]===v);
+  // Backward compatibility: if no explicit messages provided but legacy pattern flag present, accept pattern
+  if (msgs.length === 0 && n.pattern === 'XK') patternOk = true;
+  if (!patternOk) failureCodes.push('MSG_PATTERN_MISMATCH');
+        // Rekey detection
+        const rekeysObserved = n.rekeysObserved || (n.rekeyEvents?.length || 0);
+        if (rekeysObserved < 1) failureCodes.push('NO_REKEY');
+        // Nonce overuse / duplication detection (if nonce fields present)
+        let nonceOveruse = false;
+        if (Array.isArray(n.messages)) {
+          const nonces: number[] = n.messages.map((m: any)=>m && typeof m.nonce === 'number' ? m.nonce : undefined).filter((x: any)=>x!==undefined);
+          if (nonces.length) {
+            const seen = new Set<number>();
+            for (let i=0;i<nonces.length;i++) {
+              const cur = nonces[i];
+              if (seen.has(cur)) { nonceOveruse = true; break; }
+              seen.add(cur);
+              if (i>0 && nonces[i-1] > cur) { nonceOveruse = true; break; }
+            }
+          }
+        }
+        if (nonceOveruse) failureCodes.push('NONCE_OVERUSE');
+        // Trigger thresholds validation (bytes/time/frames) - must meet at least one if rekey occurred
+  const triggers = n.rekeyTriggers || {};
+  const bytesDefined = triggers.bytes !== undefined;
+  const timeDefined = triggers.timeMinSec !== undefined;
+  const framesDefined = triggers.frames !== undefined;
+  const bytesOk = bytesDefined && triggers.bytes >= (8 * 1024 * 1024 * 1024);
+  const timeOk = timeDefined && triggers.timeMinSec >= 3600;
+  const framesOk = framesDefined && triggers.frames >= 65536;
+  const anyDefined = bytesDefined || timeDefined || framesDefined;
+  // Require at least one defined trigger to meet its threshold when a rekey occurred
+  const triggerOk = anyDefined ? (bytesOk || timeOk || framesOk) : true;
+        if (rekeysObserved >=1 && !triggerOk) failureCodes.push('REKEY_TRIGGER_INVALID');
+        // PQ date and legacy flags (retain backwards compatibility)
+        const pqDateOk = n.pqDateOk !== false;
+        if (!pqDateOk) failureCodes.push('PQ_DATE_INVALID');
+        passed = failureCodes.length === 0;
         details = passed
-          ? `✅ rekeysObserved=${n.rekeysObserved} pqDateOk=${pqDateOk} transcriptOk=${transcriptOk}`
-          : `❌ Rekey policy insufficient: rekeysObserved=${n.rekeysObserved||0} pqDateOk=${pqDateOk} transcriptOk=${transcriptOk}`;
+          ? `✅ Noise transcript ok rekeys=${rekeysObserved} pattern=${patternOk} triggersOk=${triggerOk}`
+          : `❌ Noise rekey/transcript issues: ${failureCodes.join(',')}`;
       }
       return { id: 19, name: 'Noise Rekey Policy', description: 'Observes at least one rekey event and validates trigger thresholds (bytes/time/frames)', passed, details, severity: 'minor', evidenceType };
     }

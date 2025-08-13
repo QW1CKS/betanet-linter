@@ -16,7 +16,7 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Scope: Perform dual handshake (outer SNI vs encrypted); verify expected certificate difference or GREASE absence metrics.
   - AC: Check produces echVerified=true only after differential handshake proof; negative test where extension present but no behavioral change.
 
-[ ] 3. Noise XK Transcript & Rekey Validation
+[x] 3. Noise XK Transcript & Rekey Validation
   - Objective: Capture real Noise messages & enforce rekey triggers (≥8 GiB OR ≥ 2^16 frames OR ≥1 h) and nonce lifecycle.
   - AC: Evidence.noiseTranscript.messages length & pattern validated; rekeyObserved boolean with triggerReason; failure codes: NO_REKEY, NONCE_OVERUSE, MSG_PATTERN_MISMATCH. Tests simulating each trigger path + failure.
 

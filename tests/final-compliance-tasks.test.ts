@@ -100,7 +100,92 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   // ----------------------------
   // Task 3: Noise XK Transcript & Rekey Validation (placeholder)
   // ----------------------------
-  test.todo('Task 3: Implement positive + negative tests validating noiseTranscript.messages pattern, rekeyObserved triggers (≥8GiB OR ≥2^16 frames OR ≥1h), and failure codes NO_REKEY / NONCE_OVERUSE / MSG_PATTERN_MISMATCH.');
+  describe('Task 3: Noise XK Transcript & Rekey Validation (Check 19 extension)', () => {
+    function analyzerForNoise(noise: any) {
+      return {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['noise','xk','rekey'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true, hasPoly1305: true, hasX25519: true, hasKyber768: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        evidence: { noiseTranscript: noise }
+      } as any;
+    }
+
+    it('passes with correct XK prefix, one rekey, large byte trigger', async () => {
+      const noise = {
+        messages: [
+          { type: 'e', nonce: 0 },
+          { type: 'ee', nonce: 1 },
+            { type: 's', nonce: 2 },
+          { type: 'es', nonce: 3 },
+          { type: 'rekey', nonce: 4 }
+        ],
+        rekeysObserved: 1,
+        rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024 },
+        pqDateOk: true
+      };
+      const result = await runWithAnalyzer(analyzerForNoise(noise));
+      const check19 = result.checks.find(c => c.id === 19)!;
+      expect(check19.passed).toBe(true);
+      expect(check19.details).toMatch(/Noise transcript ok/);
+    });
+
+    it('fails with NO_REKEY when no rekey events observed', async () => {
+      const noise = {
+        messages: [ { type: 'e', nonce: 0 }, { type: 'ee', nonce: 1 }, { type: 's', nonce: 2 }, { type: 'es', nonce: 3 } ],
+        rekeysObserved: 0,
+        rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024 },
+        pqDateOk: true
+      };
+      const result = await runWithAnalyzer(analyzerForNoise(noise));
+      const check19 = result.checks.find(c => c.id === 19)!;
+      expect(check19.passed).toBe(false);
+      expect(check19.details).toMatch(/NO_REKEY/);
+    });
+
+    it('fails with MSG_PATTERN_MISMATCH when prefix deviates', async () => {
+      const noise = {
+        messages: [ { type: 'ee', nonce: 0 }, { type: 'e', nonce: 1 }, { type: 's', nonce: 2 }, { type: 'es', nonce: 3 }, { type: 'rekey', nonce: 4 } ],
+        rekeysObserved: 1,
+        rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024 },
+        pqDateOk: true
+      };
+      const result = await runWithAnalyzer(analyzerForNoise(noise));
+      const check19 = result.checks.find(c => c.id === 19)!;
+      expect(check19.passed).toBe(false);
+      expect(check19.details).toMatch(/MSG_PATTERN_MISMATCH/);
+    });
+
+    it('fails with NONCE_OVERUSE when nonce reused', async () => {
+      const noise = {
+        messages: [ { type: 'e', nonce: 0 }, { type: 'ee', nonce: 0 }, { type: 's', nonce: 1 }, { type: 'es', nonce: 2 }, { type: 'rekey', nonce: 3 } ],
+        rekeysObserved: 1,
+        rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024 },
+        pqDateOk: true
+      };
+      const result = await runWithAnalyzer(analyzerForNoise(noise));
+      const check19 = result.checks.find(c => c.id === 19)!;
+      expect(check19.passed).toBe(false);
+      expect(check19.details).toMatch(/NONCE_OVERUSE/);
+    });
+
+    it('fails with REKEY_TRIGGER_INVALID when rekey but trigger thresholds unmet', async () => {
+      const noise = {
+        messages: [ { type: 'e', nonce: 0 }, { type: 'ee', nonce: 1 }, { type: 's', nonce: 2 }, { type: 'es', nonce: 3 }, { type: 'rekey', nonce: 4 } ],
+        rekeysObserved: 1,
+        rekeyTriggers: { bytes: 1024 }, // too small
+        pqDateOk: true
+      };
+      const result = await runWithAnalyzer(analyzerForNoise(noise));
+      const check19 = result.checks.find(c => c.id === 19)!;
+      expect(check19.passed).toBe(false);
+      expect(check19.details).toMatch(/REKEY_TRIGGER_INVALID/);
+    });
+  });
 
   // Task 4: Voucher Aggregated Signature Cryptographic Verification
   test.todo('Task 4: Implement tests for Check 31 upgraded cryptographic verification (valid signature, altered signature fails, failure codes FROST_PARAMS_INVALID / AGG_SIG_INVALID / INSUFFICIENT_KEYS).');
