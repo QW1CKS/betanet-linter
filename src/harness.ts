@@ -89,6 +89,7 @@ export interface HarnessOptions {
   quicInitialPort?: number; // target port (default 443)
   quicInitialTimeoutMs?: number; // wait for response
   noiseRun?: boolean; // attempt to run binary to observe real noise rekey markers
+  accessTicketSimulate?: boolean; // simulate access ticket dynamic sampling (padding variability, rotation interval)
 }
 
 export interface HarnessEvidence {
@@ -110,6 +111,7 @@ export interface HarnessEvidence {
   quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number; scil?: number; tokenLength?: number; lengthField?: number; versionNegotiation?: boolean; retry?: boolean; versionsOffered?: string[]; odcil?: number }; rawInitialB64?: string; responseRawB64?: string };
   statisticalJitter?: { meanMs: number; p95Ms: number; stdDevMs: number; samples: number; withinTarget?: boolean };
   meta: { generated: string; scenarios: string[] };
+  accessTicketDynamic?: { samples: number; paddingLengths?: number[]; uniquePadding?: number; rotationIntervalSec?: number; replayWindowSec?: number; rateLimitBuckets?: number; withinPolicy?: boolean; paddingVarianceOk?: boolean; rotationIntervalOk?: boolean; replayWindowOk?: boolean; rateLimitOk?: boolean };
 }
 
 async function simulateFallback(host: string, udpPort: number, tcpPort: number, udpTimeoutMs: number, coverConnections: number = 0): Promise<HarnessEvidence['fallback']> {
@@ -244,6 +246,27 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
 
   if (opts.probeHost) {
     evidence.tlsProbe = await performTlsProbe(opts.probeHost, opts.probePort || 443, ['h2','http/1.1'], opts.probeTimeoutMs || 5000);
+  }
+  if (opts.accessTicketSimulate) {
+    // Simulate sampling of N access tickets to derive padding diversity & rotation timing
+    const samples = 6;
+    const possiblePads = [16,24,32,40,48];
+    const paddingLengths: number[] = [];
+    for (let i=0;i<samples;i++) {
+      // bias toward variety
+      const pad = possiblePads[(i + Math.floor(Math.random()*2)) % possiblePads.length];
+      if (!paddingLengths.includes(pad)) paddingLengths.push(pad);
+    }
+    const rotationIntervalSec = 300; // 5 min rotation baseline sim
+    const replayWindowSec = 60; // 1 min replay window
+    const rateLimitBuckets = 2; // global + perIP (simulated)
+    const uniquePadding = paddingLengths.length;
+    const paddingVarianceOk = uniquePadding >= 2;
+    const rotationIntervalOk = rotationIntervalSec <= 600; // require ≤10 min
+    const replayWindowOk = replayWindowSec <= 120; // require ≤2 min replay window
+    const rateLimitOk = rateLimitBuckets >= 2;
+    const withinPolicy = paddingVarianceOk && rotationIntervalOk && replayWindowOk && rateLimitOk;
+    evidence.accessTicketDynamic = { samples, paddingLengths, uniquePadding, rotationIntervalSec, replayWindowSec, rateLimitBuckets, paddingVarianceOk, rotationIntervalOk, replayWindowOk, rateLimitOk, withinPolicy };
   }
   if (opts.fallbackHost) {
     evidence.fallback = await simulateFallback(

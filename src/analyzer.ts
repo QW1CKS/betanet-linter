@@ -159,6 +159,7 @@ export class BinaryAnalyzer {
         if (this.staticPatterns?.accessTicket) {
           anySelf.evidence.accessTicket = this.staticPatterns.accessTicket;
         }
+  // accessTicketDynamic is provided only via external harness evidence ingestion; analyzer itself does not simulate it here.
         if (this.staticPatterns?.voucherCrypto) {
           anySelf.evidence.voucherCrypto = this.staticPatterns.voucherCrypto;
         }

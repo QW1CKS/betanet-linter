@@ -248,6 +248,23 @@ export interface IngestedEvidence {
     hex16Count?: number;
     hex32Count?: number;
     structConfidence?: number;
+  paddingLengths?: number[]; // extracted numeric padding length tokens (e.g., pad16, padding_24)
+  paddingVariety?: number; // count of unique padding lengths observed
+  rateLimitTokensPresent?: boolean; // presence of rate/limit tokens indicating replay/rate policy coupling
+  rotationTokenPresent?: boolean; // migrated here from parser (kept for backward compat)
+  };
+  accessTicketDynamic?: {
+    samples: number;
+    paddingLengths?: number[]; // sampled padding lengths
+    uniquePadding?: number; // unique count
+    rotationIntervalSec?: number; // simulated/observed rotation interval
+    replayWindowSec?: number; // acceptable replay window
+    rateLimitBuckets?: number; // count of distinct rate-limit buckets observed
+    withinPolicy?: boolean; // overall policy pass
+    paddingVarianceOk?: boolean;
+    rotationIntervalOk?: boolean;
+    replayWindowOk?: boolean;
+    rateLimitOk?: boolean;
   };
   voucherCrypto?: {
     structLikely: boolean;

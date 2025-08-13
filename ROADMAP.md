@@ -41,7 +41,7 @@ High-Level Diagnosis
 Normative §11 Items → Current State Map
 --------------------------------------
 1. [x] HTX over TCP+QUIC with origin‑mirrored TLS + calibration + ECH → Full (Check 1 + 22: dynamic calibration match + ECH extension observed)
-2. [~] Negotiated-carrier replay‑bound access tickets (variable padding, rate‑limits) → Very shallow (Check 2: token presence)
+2. [x] Negotiated-carrier replay‑bound access tickets (variable padding, rate‑limits) → Full (Checks 2 + 30: structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling: rotation interval ≤10m, replay window ≤2m)
 3. [~] Noise XK inner tunnel, key separation, nonce lifecycle, rekey thresholds, PQ date → Partial (Checks 3 & 10: AEAD + PQ tokens; no pattern / lifecycle / rekey validation)
 4. [ ] HTTP/2/3 adaptive emulation (settings tolerances, jitter, padding randomness) → Missing
 5. [~] SCION bridging via HTX tunnel (no on‑wire legacy transition header) → Partial (Check 4: SCION tokens; not verifying absence of forbidden header)

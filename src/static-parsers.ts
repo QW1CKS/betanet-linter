@@ -39,6 +39,9 @@ export interface AccessTicketStatic {
   hex32Count?: number;
   structConfidence?: number; // 0..1 heuristic confidence
   rotationTokenPresent?: boolean; // presence of rotation related token for policy check
+  paddingLengths?: number[]; // discovered numeric padding indicators
+  paddingVariety?: number; // unique count
+  rateLimitTokensPresent?: boolean; // presence of rate-limit tokens
 }
 
 export interface VoucherCryptoStatic {
@@ -152,7 +155,19 @@ export function extractStaticPatterns(strings: string[], binary?: Buffer): Stati
     const hex32 = strings.filter(s => /^[0-9a-fA-F]{32}$/.test(s)).length;
     const confidence = Math.min(1, (fieldsPresent.length / 7) * 0.6 + Math.min(1, (hex16+hex32)/4) * 0.4);
   const rotationTokenPresent = lower.some(s => s.includes('rotation') || s.includes('rotate'));
-  result.accessTicket = { detected: true, fieldsPresent, hex16Count: hex16, hex32Count: hex32, structConfidence: Number(confidence.toFixed(2)), rotationTokenPresent };
+    // Extract padding length indicators like pad16, padding_24, pad_32 etc.
+    const padRegex = /pad(?:ding)?[_-]?(\d{1,3})/i;
+    const paddingLengths: number[] = [];
+    for (const s of strings) {
+      const m = s.match(padRegex);
+      if (m) {
+        const val = parseInt(m[1],10);
+        if (!isNaN(val) && !paddingLengths.includes(val)) paddingLengths.push(val);
+      }
+    }
+    // Rate-limit token presence
+    const rateLimitTokensPresent = lower.some(s => /rate[_-]?limit|rl_bucket|quota/.test(s));
+    result.accessTicket = { detected: true, fieldsPresent, hex16Count: hex16, hex32Count: hex32, structConfidence: Number(confidence.toFixed(2)), rotationTokenPresent, paddingLengths, paddingVariety: paddingLengths.length, rateLimitTokensPresent };
   }
   // Voucher crypto extraction (base64 components near voucher tokens)
   if (voucher) {

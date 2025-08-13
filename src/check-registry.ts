@@ -103,19 +103,35 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       const symbols = analysis.symbols.join(' ').toLowerCase();
       const hasTickets = strings.includes('ticket') || strings.includes('access') || symbols.includes('ticket');
       const hasRotation = strings.includes('rotation') || strings.includes('rotate') || symbols.includes('rotate');
-      const passed = hasTickets && hasRotation;
-      return {
-        id: 2,
-        name: 'Rotating Access Tickets',
-        description: 'Uses rotating access tickets (§5.2)',
-        passed,
-        details: passed ? '✅ Found access ticket and rotation support' : `❌ Missing: ${missingList([
+      // Attempt structural evidence from accessTicket (static parser)
+      await analyzer.getStaticPatterns?.();
+      const ev: any = (analyzer as any).evidence || {};
+      const at = ev.accessTicket;
+      let evidenceType: 'heuristic' | 'static-structural' = 'heuristic';
+      let passed = hasTickets && hasRotation;
+      let details: string;
+      if (at && at.detected) {
+        evidenceType = 'static-structural';
+        const fieldsOk = Array.isArray(at.fieldsPresent) && at.fieldsPresent.includes('ticket') && at.fieldsPresent.includes('nonce') && at.fieldsPresent.includes('exp') && at.fieldsPresent.includes('sig');
+        const rotationOk = at.rotationTokenPresent === true || hasRotation;
+        const paddingOk = (at.paddingVariety || 0) >= 2; // require ≥2 distinct padding lengths
+        const rateLimitOk = at.rateLimitTokensPresent === true; // presence of rate/limit tokens
+        const confidenceOk = (at.structConfidence || 0) >= 0.4;
+        passed = fieldsOk && rotationOk && paddingOk && rateLimitOk && confidenceOk;
+        details = passed ? `✅ accessTickets structural fields=${at.fieldsPresent.length} padVar=${at.paddingVariety} rateLimit=${rateLimitOk}` : `❌ Missing: ${missingList([
+          !fieldsOk && 'core fields',
+          !rotationOk && 'rotation token',
+          !paddingOk && 'padding variety (≥2)',
+          !rateLimitOk && 'rate-limit tokens',
+          !confidenceOk && 'struct confidence'
+        ])}`;
+      } else {
+        details = passed ? '✅ Found access ticket and rotation support' : `❌ Missing: ${missingList([
           !hasTickets && 'access tickets',
           !hasRotation && 'ticket rotation'
-        ])}`,
-        severity: 'major',
-        evidenceType: 'heuristic'
-      };
+        ])}`;
+      }
+      return { id: 2, name: 'Rotating Access Tickets', description: 'Uses rotating access tickets (§5.2)', passed, details, severity: 'major', evidenceType };
     }
   },
   {
@@ -1073,19 +1089,32 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       await analyzer.getStaticPatterns?.();
       const ev = analyzer.evidence || {};
       const at = ev.accessTicket;
+  const atDyn = ev.accessTicketDynamic;
       if (!at) return { id: 30, name: 'Access Ticket Rotation Policy', description: 'Validates structural access ticket evidence (fields, hex IDs) & rotation token presence', passed: false, details: '❌ No accessTicket evidence', severity: 'minor', evidenceType: 'heuristic' };
       const fieldsOk = Array.isArray(at.fieldsPresent) && at.fieldsPresent.includes('ticket') && at.fieldsPresent.includes('nonce') && at.fieldsPresent.includes('exp') && at.fieldsPresent.includes('sig');
       const hexOk = (at.hex16Count || 0) + (at.hex32Count || 0) >= 1; // at least one identifier
       const rotationOk = at.rotationTokenPresent === true;
-      const confidenceOk = (at.structConfidence || 0) >= 0.4; // heuristic threshold
-      const passed = fieldsOk && hexOk && rotationOk && confidenceOk;
-      const details = passed ? `✅ accessTicket fields=${at.fieldsPresent.length} conf=${at.structConfidence} rotation=${rotationOk}` : `❌ Access ticket issues: ${missingList([
+      const paddingOk = (at.paddingVariety || 0) >= 2;
+      const rateLimitOk = at.rateLimitTokensPresent === true;
+      const confidenceOk = (at.structConfidence || 0) >= 0.5; // slightly higher threshold for dedicated policy check
+      let passed = fieldsOk && hexOk && rotationOk && paddingOk && rateLimitOk && confidenceOk;
+      let evidenceType: 'static-structural' | 'dynamic-protocol' = 'static-structural';
+      if (passed && atDyn) {
+        // Require dynamic policy window criteria to claim dynamic upgrade
+        const dynOk = atDyn.withinPolicy === true && (atDyn.uniquePadding || 0) >= 2 && (atDyn.rotationIntervalSec || 0) <= 600 && (atDyn.replayWindowSec || 0) <= 120;
+        if (dynOk) {
+          evidenceType = 'dynamic-protocol';
+        }
+      }
+      const details = passed ? `✅ accessTicket fields=${at.fieldsPresent.length} padVar=${at.paddingVariety} rateLimit=${rateLimitOk} conf=${at.structConfidence}${atDyn ? ` dynPadVar=${atDyn.uniquePadding} rotInt=${atDyn.rotationIntervalSec}s` : ''}` : `❌ Access ticket issues: ${missingList([
         !fieldsOk && 'core fields',
         !hexOk && 'hex IDs',
         !rotationOk && 'rotation token',
-        !confidenceOk && 'confidence<0.4'
+        !paddingOk && 'padding variety (≥2)',
+        !rateLimitOk && 'rate-limit tokens',
+        !confidenceOk && 'confidence<0.5'
       ])}`;
-      return { id: 30, name: 'Access Ticket Rotation Policy', description: 'Validates structural access ticket evidence (fields, hex IDs) & rotation token presence', passed, details, severity: 'minor', evidenceType: 'static-structural' };
+      return { id: 30, name: 'Access Ticket Rotation Policy', description: 'Validates structural access ticket evidence (fields, hex IDs) & rotation token presence', passed, details, severity: 'minor', evidenceType };
     }
   }
   ,

@@ -501,7 +501,15 @@ export class BetanetComplianceChecker {
           if (!check1Normative) reasons.push('transport-evidence-heuristic');
           return { full: haveDynamicCalibration && ech && check1Normative, reasons };
         }),
-        build(2, 'access-tickets', 'Negotiated Replay-Bound Access Tickets', [2,30], 1, () => ({ full: checks.find(c=>c.id===30)?.passed === true, reasons: checks.find(c=>c.id===30)?.passed ? [] : ['structural-evidence-missing'] })),
+        build(2, 'access-tickets', 'Negotiated Replay-Bound Access Tickets', [2,30], 1, ({ checks, evidence }) => {
+          const c30 = checks.find(c=>c.id===30);
+          const full = !!(c30 && c30.passed && c30.evidenceType !== 'heuristic' && c30.evidenceType !== 'static-structural' && evidence?.accessTicketDynamic?.withinPolicy);
+          const reasons: string[] = [];
+            if (!c30 || !c30.passed) reasons.push('access-ticket-check-failed');
+            if (c30 && c30.passed && c30.evidenceType === 'static-structural') reasons.push('missing-dynamic-sampling');
+            if (!evidence?.accessTicketDynamic?.withinPolicy) reasons.push('dynamic-policy-missing');
+          return { full, reasons };
+        }),
         build(3, 'noise-rekey', 'Noise XK Tunnel & Rekey Policy', [13,19], 1, ({ evidence }) => {
           const np = evidence?.noisePatternDetail; const rekey = evidence?.noiseExtended?.rekeysObserved >= 1; const reasons: string[] = [];
           if (!(np && np.hkdfLabelsFound>=2 && np.messageTokensFound>=2)) reasons.push('incomplete-static-noise-pattern');
