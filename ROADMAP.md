@@ -50,7 +50,7 @@ Normative §11 Items → Current State Map
 9. [x] Alias ledger finality 2-of-3 + Emergency Advance constraints + quorum cert validation → Full (Checks 7 & 16 artifact: quorumCertificatesValid + emergency advance gating)
 10. [x] Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Full (Check 8 artifact when voucherCrypto + powAdaptive + rateLimit present; Checks 14/29/31 voucher struct + FROST + aggregated signature)
 11. [x] Governance anti‑concentration caps & partition safety → Full (Check 15: AS/org caps + partitions + advanced diversity volatility/window/delta/avgTop3 thresholds)
-12. [~] Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Partial (Check 25 quantitative timing & cover distribution modeling; stricter numeric bounds pending)
+12. [x] Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Full (Check 25: strict numeric bounds retry<=25ms, udpTimeout 100–600ms, std<=450ms, cv<=1.2, model>=0.7, coverConn>=2, anomalies constrained)
 13. [x] Reproducible builds & SLSA 3 provenance artifacts → Full (Check 9 artifact: predicateType/builderId/digest match + DSSE signer counting + detached evidence signature verification)
 
 Strategic Phases

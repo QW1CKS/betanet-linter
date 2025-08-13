@@ -1015,14 +1015,15 @@ export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
       const ft = ev.fallbackTiming || ev.fallback; // allow harness legacy
   if (!ft) return { id: 25, name: 'Fallback Timing Policy', description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)', passed: false, details: '❌ No fallback timing evidence', severity: 'minor', evidenceType: 'heuristic' };
       const udpOk = typeof ft.udpTimeoutMs === 'number' && ft.udpTimeoutMs >= 100 && ft.udpTimeoutMs <= 600; // expected window
-      const retryOk = typeof ft.retryDelayMs === 'number' ? ft.retryDelayMs <= 30 : true; // near-immediate retry
+      // Stricter retry: must be <=25ms (elastic immediate) and non-negative
+      const retryOk = typeof ft.retryDelayMs === 'number' ? (ft.retryDelayMs >= 0 && ft.retryDelayMs <= 25) : true;
       let teardownStd = ft.teardownStdDevMs;
       if (!teardownStd && Array.isArray(ft.coverTeardownMs) && ft.coverTeardownMs.length >= 2) {
         const arr = ft.coverTeardownMs;
         const mean = arr.reduce((a:number,b:number)=>a+b,0)/arr.length;
         teardownStd = Math.sqrt(arr.reduce((a:number,b:number)=>a + Math.pow(b-mean,2),0)/arr.length);
       }
-  const teardownOk = typeof teardownStd !== 'number' || teardownStd <= 500; // dispersion limit
+  const teardownOk = typeof teardownStd !== 'number' || teardownStd <= 450; // tightened dispersion limit
   // Advanced metrics (Phase 7 quantitative modeling) if present
   const cv = ft.coverTeardownCv;
   const median = ft.coverTeardownMedianMs;
@@ -1032,11 +1033,20 @@ export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
   const anomalyCodes: string[] = ft.coverTeardownAnomalyCodes || [];
   const modelScore = ft.behaviorModelScore;
   const behaviorOk = ft.behaviorWithinPolicy !== false; // default pass unless explicitly false
-  const cvOk = typeof cv !== 'number' || cv <= 1.5;
+  const cvOk = typeof cv !== 'number' || cv <= 1.2; // tightened
   const skewOk = typeof skew !== 'number' || Math.abs(skew) <= 1.2;
-  const outlierOk = typeof outliers !== 'number' || outliers <= Math.ceil((ft.coverTeardownMs?.length || 0) * 0.25);
-  const modelScoreOk = typeof modelScore !== 'number' || modelScore >= 0.6;
-  const passed = udpOk && retryOk && teardownOk && behaviorOk && cvOk && skewOk && outlierOk && modelScoreOk;
+  const sampleLen = ft.coverTeardownMs?.length || 0;
+  const outlierOk = typeof outliers !== 'number' || outliers <= Math.ceil(sampleLen * 0.20); // tighten to 20%
+  const modelScoreOk = typeof modelScore !== 'number' || modelScore >= 0.7; // tighten
+  const coverConn = ft.coverConnections ?? ft.coverConnectionCount;
+  const coverConnOk = typeof coverConn !== 'number' || coverConn >= 2; // require at least 2 cover connections when provided
+  // Median & p95 sanity windows if present
+  const medianOk = typeof median !== 'number' || (median >= 200 && median <= 1200);
+  const p95Ok = typeof p95 !== 'number' || (p95 >= median && p95 <= 1800);
+  // Fail if unexpected anomaly codes beyond an allowlist
+  const allowedAnomalies = new Set(['NONE','EXPECTED_OUTLIER']);
+  const anomaliesOk = anomalyCodes.every(c => allowedAnomalies.has(c));
+  const passed = udpOk && retryOk && teardownOk && behaviorOk && cvOk && skewOk && outlierOk && modelScoreOk && coverConnOk && medianOk && p95Ok && anomaliesOk;
   const detailParts = passed ? [
     `udpTimeout=${ft.udpTimeoutMs}ms`,
     `retryDelay=${ft.retryDelayMs||0}ms`,
@@ -1046,7 +1056,8 @@ export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
     p95!==undefined?`p95=${p95}ms`:undefined,
     skew!==undefined?`skew=${(skew as number).toFixed? (skew as number).toFixed(2): skew}`:undefined,
     modelScore!==undefined?`model=${modelScore}`:undefined,
-    anomalyCodes.length?`anomalies=[${anomalyCodes.join(',')}]`:undefined
+    anomalyCodes.length?`anomalies=[${anomalyCodes.join(',')}]`:undefined,
+    coverConn!==undefined?`coverConn=${coverConn}`:undefined
   ].filter(Boolean) : [];
   const failReasons = !passed ? [
     !udpOk && 'udpTimeout out of range',
@@ -1056,7 +1067,11 @@ export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
     !cvOk && 'cv high',
     !skewOk && 'skew excessive',
     !outlierOk && 'outliers excessive',
-    !modelScoreOk && 'model score low'
+    !modelScoreOk && 'model score low',
+    !coverConnOk && 'insufficient cover connections',
+    !medianOk && 'median out of range',
+    !p95Ok && 'p95 out of range',
+    !anomaliesOk && 'unexpected anomaly codes'
   ].filter(Boolean) : [];
   const details = passed ? `✅ ${detailParts.join(' ')}` : `❌ Fallback timing issues: ${missingList(failReasons)}`;
   return { id: 25, name: 'Fallback Timing Policy', description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };

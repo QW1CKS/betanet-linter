@@ -105,12 +105,16 @@
 	},
 	"fallbackTiming": {
 		"udpTimeoutMs": 300,
-		"retryDelayMs": 10,
-		"teardownStdDevMs": 200,
+		"retryDelayMs": 12,
+		"teardownStdDevMs": 180,
 		"behaviorWithinPolicy": true,
-		"coverTeardownCv": 1.0,
-		"coverTeardownMedianMs": 500,
-		"coverTeardownP95Ms": 900
+		"coverTeardownCv": 0.95,
+		"coverTeardownMedianMs": 520,
+		"coverTeardownP95Ms": 890,
+		"coverConnections": 2,
+		"behaviorModelScore": 0.72,
+		"coverTeardownAnomalyCodes": ["NONE"],
+		"coverTeardownMs": [400,500,520,540,560,600]
 	},
 	"mix": {
 		"samples": 10,

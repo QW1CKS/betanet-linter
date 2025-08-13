@@ -58,7 +58,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Quorum certificates validated + emergency advance gating |
 | 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31 | static-structural + heuristic + artifact (partial) | Partial | Voucher struct heuristic + FROST & aggregated signature placeholders (cryptographic verification pending) |
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Advanced historical diversity (volatility, window share, delta share, avgTop3) thresholds enforced |
-|11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Partial | Quantitative modeling present; stricter numeric pass/fail thresholds pending |
+|11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Stricter numeric bounds (retry<=25ms, udpTimeout 100–600ms, std<=450ms, cv<=1.2, model>=0.7, coverConn>=2, anomalies constrained) enforced |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index enforced |
 |13 Reproducible builds & SLSA provenance | 9 | artifact | Full | Predicate type, builder ID, digest match, DSSE signer counting & detached signature verification |
 |– Binary structural meta (foundational) | 21 | static-structural | Baseline | Supports multi-signal diversity |
