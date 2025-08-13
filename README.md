@@ -44,7 +44,7 @@ Exit codes:
 
 JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCount`.
 
-### Compliance Matrix (Updated Through Phase 7 Continuation)
+### Compliance Matrix
 | Spec §11 Item | Related Checks | Dominant Evidence Types (current) | Status | Notes |
 |---------------|----------------|-----------------------------------|--------|-------|
 | 1 Transport presence + TLS/ECH + calibration | 1 (presence), 12 (static ClientHello), 22 (template + dynamic calibration match) | static-structural + dynamic-protocol + heuristic | Full | Dynamic calibration (ALPN & extension order) matched static template + ECH extension observed; raw JA4 & deep QUIC parse still pending |

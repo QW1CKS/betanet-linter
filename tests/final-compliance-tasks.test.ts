@@ -677,7 +677,34 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes
-  test.todo('Task 15: Implement tests injecting each forbidden token to trigger specific failure codes; clean binary passes with negative.forbiddenPresent=false.');
+  describe('Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes (Check 39)', () => {
+    function analyzerForForbidden(neg: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: ['legacy','hash'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        getDiagnostics: () => ({}),
+        evidence: { negative: neg }
+      } as any;
+    }
+    it('fails when no forbidden hash policy provided', async () => {
+      const result = await runWithAnalyzer(analyzerForForbidden({ detectedForbiddenHashes: [] }));
+      const check39 = result.checks.find(c => c.id === 39)!;
+      expect(check39.passed).toBe(false);
+      expect(check39.details).toMatch(/No forbidden hash policy/);
+    });
+    it('passes when policy provided and no forbidden detected', async () => {
+      const neg = { forbiddenHashes: ['deadbeef','abad1dea'], detectedForbiddenHashes: ['cafebabe'] };
+      const result = await runWithAnalyzer(analyzerForForbidden(neg));
+      const check39 = result.checks.find(c => c.id === 39)!;
+      expect(check39.passed).toBe(true);
+    });
+    it('fails with FORBIDDEN_HASH when detected forbidden value present', async () => {
+      const neg = { forbiddenHashes: ['deadbeef','abad1dea'], detectedForbiddenHashes: ['deadbeef','cafebabe'] };
+      const result = await runWithAnalyzer(analyzerForForbidden(neg));
+      const check39 = result.checks.find(c => c.id === 39)!;
+      expect(check39.passed).toBe(false);
+      expect(check39.details).toMatch(/FORBIDDEN_HASH/);
+    });
+  });
 
   // Task 16: Comprehensive Test & Fixture Expansion
   test.todo('Task 16: Implement meta-tests or coverage assertions ensuring ≥1 positive + ≥1 negative test per failure code & overall coverage ≥90%.');

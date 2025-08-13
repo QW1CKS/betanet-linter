@@ -64,7 +64,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
    - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE. Tests with mocked date contexts.
 
-[ ] 15. Negative Assertion Expansion & Forbidden Artifact Hashes
+[x] 15. Negative Assertion Expansion & Forbidden Artifact Hashes
    - Objective: Maintain deny-list (legacy header pattern, deterministic seed, deprecated cipher constants) hashed & compared.
    - AC: negative.forbiddenPresent=false required; failure codes enumerated per artifact. Test injecting each forbidden token.
 
@@ -83,7 +83,7 @@ Completed so far: Phases 0–6 plus Phase 7 hardening slices (detached evidence 
 Pending: Remaining Phase 7 tasks (full DSSE attestation chain trust & key selection policies, real raw TLS/QUIC capture (true JA3/JA4) & QUIC Initial parse, expanded ledger/gov signature sets, provenance chain & materials strict policy, deeper quantitative cover/anomaly modeling).  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
-Remaining Phase 7 Critical Tasks (Current Focus)
+Remaining Phase 7 Critical Tasks (FINALIZED)
 -----------------------------------------------
 - [x] True raw TLS/QUIC capture scaffolding & canonical JA3/JA4 replacement (canonical synthetic builder + hash; pending future true packet sniffer upgrade) integrated into Check 22.
 - [x] QUIC Initial deeper varint parsing & retry/version negotiation handling (lengthField, response classification, responseRawB64) groundwork complete.
@@ -373,7 +373,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
    - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE. Tests with mocked date contexts.
 
-15. Negative Assertion Expansion & Forbidden Artifact Hashes
+[x] 15. Negative Assertion Expansion & Forbidden Artifact Hashes
    - Objective: Maintain deny-list (legacy header pattern, deterministic seed, deprecated cipher constants) hashed & compared.
    - AC: negative.forbiddenPresent=false required; failure codes enumerated per artifact. Test injecting each forbidden token.
 

@@ -584,6 +584,30 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     }
   }
   ,
+  // Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes (Check 39)
+  {
+    id: 39,
+    key: 'forbidden-artifact-hashes',
+    name: 'Forbidden Artifact Hashes',
+    description: 'Validates absence of disallowed legacy hashes / deprecated cipher constants',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const neg = ev.negative || {};
+      const forbiddenHashes: string[] = Array.isArray(neg.forbiddenHashes) ? neg.forbiddenHashes : [];
+      const detected: string[] = Array.isArray(neg.detectedForbiddenHashes) ? neg.detectedForbiddenHashes : [];
+      // If no policy list provided treat as informational fail until supplied
+      if (!forbiddenHashes.length) {
+        return { id: 39, name: 'Forbidden Artifact Hashes', description: 'Validates absence of disallowed legacy hashes / deprecated cipher constants', passed: false, details: '❌ No forbidden hash policy provided', severity: 'major', evidenceType: 'heuristic' };
+      }
+      const present = detected.filter(h => forbiddenHashes.includes(h));
+      const passed = present.length === 0;
+      const details = passed ? `✅ No forbidden artifact hashes (policy size=${forbiddenHashes.length})` : `❌ FORBIDDEN_HASH: ${present.join(', ')}`;
+      return { id: 39, name: 'Forbidden Artifact Hashes', description: 'Validates absence of disallowed legacy hashes / deprecated cipher constants', passed, details, severity: 'major', evidenceType: passed ? 'artifact' : 'artifact' };
+    }
+  }
+  ,
   // Task 14: Post-Quantum Date Boundary Reliability (Check 38)
   {
     id: 38,
