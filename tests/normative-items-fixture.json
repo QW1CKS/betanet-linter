@@ -64,6 +64,54 @@
 		"beaconSetEntropySources": 3,
 		"deterministicSeedDetected": false
 	},
+	"powAdaptive": {
+		"difficultySamples": [22,22,21,22],
+		"targetBits": 22,
+		"monotonicTrend": true
+	},
+	"rateLimit": {
+		"buckets": [
+			{"name": "global", "capacity": 100, "refillPerSec": 5},
+			{"name": "perIP", "capacity": 20, "refillPerSec": 1}
+		]
+	},
+	"voucherCrypto": {
+		"structLikely": true,
+		"keysetIdB64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", 
+		"secretB64": "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=",
+		"aggregatedSigB64": "CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC", 
+		"signatureValid": true,
+		"frostThreshold": {"n": 5, "t": 3}
+	},
+	"ledger": {
+		"finalitySets": ["handshake", "filecoin", "raven-l2"],
+		"quorumCertificatesValid": true,
+		"emergencyAdvanceUsed": false
+	},
+	"governance": {
+		"asCapApplied": true,
+		"orgCapApplied": true,
+		"maxASShare": 0.18,
+		"maxOrgShare": 0.22,
+		"partitionsDetected": false
+	},
+	"governanceHistoricalDiversity": {
+		"stable": true,
+		"advancedStable": true,
+		"volatility": 0.02,
+		"maxWindowShare": 0.19,
+		"maxDeltaShare": 0.03,
+		"avgTop3": 0.21
+	},
+	"fallbackTiming": {
+		"udpTimeoutMs": 300,
+		"retryDelayMs": 10,
+		"teardownStdDevMs": 200,
+		"behaviorWithinPolicy": true,
+		"coverTeardownCv": 1.0,
+		"coverTeardownMedianMs": 500,
+		"coverTeardownP95Ms": 900
+	},
 	"mix": {
 		"samples": 10,
 		"uniqueHopSets": 9,

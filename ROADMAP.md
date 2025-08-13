@@ -5,8 +5,8 @@ This document is the single authoritative roadmap & progress tracker. (Historica
 
 Progress Summary
 ----------------
-Completed so far: Phases 0–6 plus Phase 7 hardening slices (detached evidence signature verification, fallback timing policy & jitter variance, DSSE signer counting, basic DSSE verification, multi-signer bundle hashing, advanced mix variance entropy/stddev, HTTP/3 adaptive jitter simulation, heuristic JA3 derivation + ja3Hash MD5, advanced fallback behavior modeling with mean/stddev/CV policy gate) delivering 28 checks (1–28) and multi-signal anti-evasion.  
-Pending: Remaining Phase 7 tasks (full DSSE attestation chain trust & key selection policies, real raw TLS/QUIC capture (true JA3/JA4) & QUIC Initial parse, expanded ledger/gov signature sets, voucher cryptographic validation, provenance chain & materials strict policy, deeper quantitative cover/anomaly modeling).  
+Completed so far: Phases 0–6 plus Phase 7 hardening slices (detached evidence signature verification, fallback timing policy & jitter variance, DSSE signer counting, basic DSSE verification, multi-signer bundle hashing, advanced mix variance entropy/stddev, HTTP/3 adaptive jitter simulation, heuristic JA3 derivation + ja3Hash MD5, advanced fallback behavior modeling with mean/stddev/CV policy gate, full Payment System artifact enforcement) delivering 28 checks (1–28) and multi-signal anti-evasion.  
+Pending: Remaining Phase 7 tasks (full DSSE attestation chain trust & key selection policies, real raw TLS/QUIC capture (true JA3/JA4) & QUIC Initial parse, expanded ledger/gov signature sets, provenance chain & materials strict policy, deeper quantitative cover/anomaly modeling).  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
 Remaining Phase 7 Critical Tasks (Current Focus)
@@ -40,7 +40,6 @@ High-Level Diagnosis
 
 Normative §11 Items → Current State Map
 --------------------------------------
-1. [x] HTX over TCP+QUIC with origin‑mirrored TLS + calibration + ECH → Full (Check 1 + 22: dynamic calibration match + ECH extension observed)
 2. [x] Negotiated-carrier replay‑bound access tickets (variable padding, rate‑limits) → Full (Checks 2 + 30: structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling: rotation interval ≤10m, replay window ≤2m)
 3. [x] Noise XK inner tunnel, key separation, nonce lifecycle, rekey thresholds, PQ date → Full (Checks 13 & 19: static pattern + dynamic transcript, rekey triggers, PQ date enforced)
 4. [x] HTTP/2/3 adaptive emulation (settings tolerances, jitter, padding randomness, stddev, randomnessOk, Full dynamic evidence) → Full
@@ -49,8 +48,8 @@ Normative §11 Items → Current State Map
 7. [x] Rotating rendezvous bootstrap (BeaconSet, PoW, multi-bucket rate-limits, no deterministic seeds) → Full (Check 6 artifact: ≥2 rotationEpochs, ≥2 entropy sources, no legacy deterministic seed)
 8. [x] Mixnode selection (BeaconSet + per‑stream entropy + diversity + hop policy) → Full (Checks 11 & 17 dynamic: strict hop depth + uniqueness ≥80%, diversityIndex ≥0.4; advanced variance pending in 27)
 9. [x] Alias ledger finality 2-of-3 + Emergency Advance constraints + quorum cert validation → Full (Checks 7 & 16 artifact: quorumCertificatesValid + emergency advance gating)
-10. [~] Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Partial (Check 8 + 29 + 31; voucher struct heuristic + FROST threshold & aggregated signature placeholders)
-11. [ ] Governance anti‑concentration caps & partition safety → Pending (advanced historical diversity tightening next focus)
+10. [x] Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Full (Check 8 artifact when voucherCrypto + powAdaptive + rateLimit present; Checks 14/29/31 voucher struct + FROST + aggregated signature)
+11. [x] Governance anti‑concentration caps & partition safety → Full (Check 15: AS/org caps + partitions + advanced diversity volatility/window/delta/avgTop3 thresholds)
 12. [~] Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Partial (Check 25 quantitative timing & cover distribution modeling; stricter numeric bounds pending)
 13. [x] Reproducible builds & SLSA 3 provenance artifacts → Full (Check 9 artifact: predicateType/builderId/digest match + DSSE signer counting + detached evidence signature verification)
 

@@ -95,33 +95,40 @@ describe('Normative §11 Items Compliance', () => {
   it('Alias ledger finality & quorum certificates', async () => {
     const checker = new BetanetComplianceChecker();
     const result = await checker.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
-    const check = result.checks.find(c => c.id === 16); // ledger finality observation
-    // Evidence may be absent in fixture; test ensures framework does not crash
-    expect(check).toBeDefined();
+  const check = result.checks.find(c => c.id === 16); // ledger finality observation
+  expect(check).toBeDefined();
+  expect(check?.passed).toBe(true);
   });
 
   it('Cashu vouchers, FROST threshold, PoW, rate-limits', async () => {
     const checker = new BetanetComplianceChecker();
     const result = await checker.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
-    const check = result.checks.find(c => c.id === 8); // payment system
-    expect(check).toBeDefined();
+  const payment = result.checks.find(c => c.id === 8);
+  expect(payment).toBeDefined();
+  expect(payment?.passed).toBe(true);
+  // Voucher struct & crypto checks
+  const voucherStruct = result.checks.find(c => c.id === 14);
+  const voucherCrypto = result.checks.find(c => c.id === 29);
+  const voucherSig = result.checks.find(c => c.id === 31);
+  if (voucherStruct) expect(voucherStruct.passed).toBe(true);
+  if (voucherCrypto) expect(voucherCrypto.passed).toBe(true);
+  if (voucherSig) expect(voucherSig.passed).toBe(true);
   });
 
   it('Governance anti-concentration caps & partition safety', async () => {
     const checker = new BetanetComplianceChecker();
     const result = await checker.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
-    const check = result.checks.find(c => c.id === 15); // governance anti-concentration
-    if (check) {
-      // We allow partial since fixture may not include governance
-      expect(check.passed === true || check.passed === false).toBe(true);
-    }
+  const check = result.checks.find(c => c.id === 15); // governance anti-concentration
+  expect(check).toBeDefined();
+  expect(check?.passed).toBe(true);
   });
 
   it('Anti-correlation fallback timing & cover connections', async () => {
     const checker = new BetanetComplianceChecker();
     const result = await checker.checkCompliance(tmpBin, { evidenceFile: evidencePath, allowHeuristic: true });
-    const check = result.checks.find(c => c.id === 25); // fallback timing policy
-    if (check) expect(check.passed === true || check.passed === false).toBe(true);
+  const check = result.checks.find(c => c.id === 25); // fallback timing policy
+  expect(check).toBeDefined();
+  expect(check?.passed).toBe(true);
   });
 
   it('Reproducible builds & SLSA 3 provenance artifacts', async () => {

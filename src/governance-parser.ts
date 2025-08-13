@@ -120,22 +120,37 @@ export function evaluateHistoricalDiversity(series: { timestamp: string; asShare
 }
 
 export function evaluateHistoricalDiversityAdvanced(series: { timestamp: string; asShares: Record<string, number> }[], cap = 0.2, window = 3) {
-  if (!series || !series.length) return { advancedStable: false, volatility: 1, maxWindowShare: 1 };
+  if (!series || !series.length) return { advancedStable: false, volatility: 1, maxWindowShare: 1, maxDeltaShare: 1 };
   const windows: number[] = [];
+  let maxDeltaShare = 0;
+  // Track per-AS previous share to compute deltas
+  let prevPoint: Record<string, number> | undefined;
   for (let i = 0; i < series.length; i++) {
+    const point = series[i];
     const slice = series.slice(Math.max(0, i - window + 1), i + 1);
     let localMax = 0;
-    for (const point of slice) {
-      const shares = Object.values(point.asShares || {});
+    for (const p of slice) {
+      const shares = Object.values(p.asShares || {});
       if (!shares.length) continue;
       localMax = Math.max(localMax, Math.max(...shares));
     }
     windows.push(localMax);
+    // Delta computation
+    if (prevPoint) {
+      const asKeys = new Set([...Object.keys(prevPoint), ...Object.keys(point.asShares || {})]);
+      for (const k of asKeys) {
+        const prev = prevPoint[k] || 0;
+        const curr = (point.asShares || {})[k] || 0;
+        maxDeltaShare = Math.max(maxDeltaShare, Math.abs(curr - prev));
+      }
+    }
+    prevPoint = { ...(point.asShares || {}) };
   }
   const maxWindowShare = Math.max(...windows, 0);
   const mean = windows.reduce((a,b)=>a+b,0)/windows.length;
   const variance = windows.reduce((a,b)=>a+Math.pow(b-mean,2),0)/windows.length;
   const volatility = Math.sqrt(variance);
-  const advancedStable = maxWindowShare <= cap && volatility <= 0.05;
-  return { advancedStable, volatility, maxWindowShare };
+  // Advanced stability now requires low concentration, low volatility AND controlled per-interval delta (<=5%)
+  const advancedStable = maxWindowShare <= cap && volatility <= 0.05 && maxDeltaShare <= 0.05;
+  return { advancedStable, volatility, maxWindowShare, maxDeltaShare };
 }

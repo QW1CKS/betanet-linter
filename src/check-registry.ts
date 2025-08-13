@@ -317,22 +317,23 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Payment System',
     description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)',
     severity: 'major',
-  introducedIn: '1.0',
-  mandatoryIn: '1.0',
+    introducedIn: '1.0',
+    mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const paymentSupport = await analyzer.checkPaymentSupport();
       const ev: any = (analyzer as any).evidence;
       const pow = ev?.powAdaptive;
+      const voucherCrypto = ev?.voucherCrypto;
+      const rateLimit = ev?.rateLimit;
       let passed = paymentSupport.hasCashu && paymentSupport.hasLightning && paymentSupport.hasFederation;
       let powDetail = '';
       if (pow && Array.isArray(pow.difficultySamples) && pow.difficultySamples.length >= 3) {
-        // Simple evolution validation: ensure samples converge within ±2 bits of target and no single backward jump >4 bits
         const target = pow.targetBits || 22;
-  const withinBand = pow.difficultySamples.every((b: number) => Math.abs(b - target) <= 2);
+        const withinBand = pow.difficultySamples.every((b: number) => Math.abs(b - target) <= 2);
         let maxDrop = 0;
-        for (let i=1;i<pow.difficultySamples.length;i++) {
+        for (let i = 1; i < pow.difficultySamples.length; i++) {
           const drop = pow.difficultySamples[i-1] - pow.difficultySamples[i];
-            if (drop > maxDrop) maxDrop = drop;
+          if (drop > maxDrop) maxDrop = drop;
         }
         const noLargeDrop = maxDrop <= 4;
         const monotonicApprox = pow.monotonicTrend === true || pow.difficultySamples[pow.difficultySamples.length-1] >= pow.difficultySamples[0] - 2;
@@ -340,12 +341,28 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         passed = passed && powOk;
         powDetail = ` powDiff=[${pow.difficultySamples.join('>')}] target=${target} maxDrop=${maxDrop}` + (powOk ? '' : ' pow-evolution-fail');
       }
+      // Artifact escalation conditional: only when ALL artifact evidences present
+      const haveAllArtifact = !!(voucherCrypto && pow && rateLimit);
+      let evidenceType: 'heuristic' | 'artifact' = haveAllArtifact ? 'artifact' : 'heuristic';
+      const artifactIssues: string[] = [];
+      if (haveAllArtifact) {
+        const frost = voucherCrypto.frostThreshold || {};
+        if (!(voucherCrypto.signatureValid === true)) artifactIssues.push('voucher signature');
+        if (!((frost.n || 0) >= 5 && (frost.t || 0) === 3)) artifactIssues.push('FROST n>=5 t=3');
+        const buckets = Array.isArray(rateLimit.buckets) ? rateLimit.buckets : [];
+        const names = new Set(buckets.map((b: any) => (b.name||'').toLowerCase()));
+        const hasGlobal = [...names].some(n => n === 'global');
+        if (!(buckets.length >= 2 && hasGlobal)) artifactIssues.push('rateLimit global+scoped');
+        if (artifactIssues.length) passed = false;
+      }
       let details: string;
       if (passed) {
-        details = '✅ Found Cashu, Lightning, and federation support' +
+        details = '✅ Payment system' +
           (paymentSupport.hasVoucherFormat ? ' + voucher format' : '') +
           (paymentSupport.hasFROST ? ' + FROST group' : '') +
-          (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '') + powDetail;
+          (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '') +
+          (voucherCrypto ? ' + voucherCrypto' : '') +
+          (rateLimit ? ' + rateLimit' : '') + powDetail;
       } else {
         const missingParts = [
           !paymentSupport.hasCashu && 'Cashu support',
@@ -354,13 +371,15 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         ];
         const baseMissing = missingList(missingParts as any);
         const noBaseMissing = missingParts.filter(Boolean).length === 0;
-        if (pow && powDetail.includes('pow-evolution-fail') && noBaseMissing) {
+        if (haveAllArtifact && artifactIssues.length && noBaseMissing) {
+          details = `❌ Missing artifact: ${artifactIssues.join(', ')}`;
+        } else if (pow && powDetail.includes('pow-evolution-fail') && noBaseMissing) {
           details = `❌ PoW evolution invalid ${powDetail.trim()}`;
         } else {
           details = `❌ Missing: ${baseMissing}${pow ? powDetail : ''}`;
         }
       }
-      return { id: 8, name: 'Payment System', description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)', passed, details, severity: 'major', evidenceType: pow ? 'artifact' : 'heuristic' };
+      return { id: 8, name: 'Payment System', description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)', passed, details, severity: 'major', evidenceType };
     }
   },
   {
@@ -650,13 +669,17 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const patterns = await (analyzer as any).getStaticPatterns?.();
       const voucher = patterns?.voucher;
+  const ev: any = (analyzer as any).evidence;
+  // Allow external voucherCrypto evidence to satisfy structLikely when static tokens absent
+  const voucherCrypto = ev?.voucherCrypto;
+  const structLikely = voucher?.structLikely || voucherCrypto?.structLikely;
       const passed = !!(voucher && voucher.structLikely);
       return {
         id: 14,
         name: 'Voucher Struct Heuristic',
         description: 'Detects presence of 128B voucher struct token triad',
-        passed,
-  details: voucher ? (voucher.structLikely ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}`) : '❌ No voucher struct tokens',
+    passed: structLikely === true,
+  details: structLikely ? (voucher ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : '✅ Struct evidence (voucherCrypto)') : (voucher ? `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : '❌ No voucher struct tokens'),
         severity: 'minor',
         evidenceType: 'static-structural'
       };
@@ -690,16 +713,36 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         // Integrate historical diversity stability if present
         const hist = (analyzer as any).evidence?.governanceHistoricalDiversity;
         const { asCapApplied, orgCapApplied, maxASShare, maxOrgShare, partitionsDetected } = gov;
-        // Historical diversity now requires BOTH basic stability and (if present) advancedStable not false
-        const histStable = hist ? (hist.stable === true && (hist.advancedStable !== false)) : true;
-        passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && histStable);
-        details = passed ? `✅ Caps enforced (AS<=${maxASShare} org<=${maxOrgShare}) no partitions${hist ? ' diversityStable=' + hist.stable : ''}` : `❌ Governance issues: ${missingList([
+        // Advanced historical diversity enforcement
+        // Require: (a) basic stability, (b) advancedStable true, (c) volatility <=0.05, (d) maxWindowShare <=0.2, (e) maxDeltaShare <=0.05, (f) avgTop3 <=0.24
+        let diversityOk = true;
+        let diversityReasons: string[] = [];
+        if (hist) {
+          const stableBasic = hist.stable === true;
+          const adv = typeof hist.advancedStable === 'boolean' ? hist.advancedStable : true;
+          // Some older evidence may lack advanced metrics; treat absence as soft-fail until metrics present
+          const hasAdvMetrics = ('volatility' in hist) || ('maxWindowShare' in hist) || ('maxDeltaShare' in hist) || ('avgTop3' in hist);
+          const volatilityOk = hist.volatility === undefined || hist.volatility <= 0.05;
+          const windowOk = hist.maxWindowShare === undefined || hist.maxWindowShare <= 0.2;
+          const deltaOk = hist.maxDeltaShare === undefined || hist.maxDeltaShare <= 0.05;
+          const avgTop3Ok = hist.avgTop3 === undefined || hist.avgTop3 <= 0.24; // 20% cap * 1.2 = 0.24
+          diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok;
+          if (!stableBasic) diversityReasons.push('historical basic instability');
+          if (!adv) diversityReasons.push('advancedStable=false');
+          if (!volatilityOk) diversityReasons.push(`volatility=${hist.volatility}`);
+            if (!windowOk) diversityReasons.push(`maxWindowShare=${hist.maxWindowShare}`);
+          if (!deltaOk) diversityReasons.push(`maxDeltaShare=${hist.maxDeltaShare}`);
+          if (!avgTop3Ok) diversityReasons.push(`avgTop3=${hist.avgTop3}`);
+          if (!hasAdvMetrics) diversityReasons.push('adv-metrics-missing');
+        }
+        passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && diversityOk);
+        details = passed ? `✅ Caps enforced (AS=${(maxASShare??0).toFixed(3)} org=${(maxOrgShare??0).toFixed(3)}) partitions=none diversity=stable` : `❌ Governance issues: ${missingList([
           !asCapApplied && 'AS caps not applied',
           !orgCapApplied && 'Org caps not applied',
           (maxASShare > 0.2) && `AS share ${maxASShare}`,
           (maxOrgShare > 0.25) && `Org share ${maxOrgShare}`,
           partitionsDetected === true && 'partitions detected',
-          hist && !histStable && 'historical diversity unstable (basic or advanced)'
+          (!diversityOk) && `diversity ${diversityReasons.join(',')}`
         ])}`;
       }
       return { id: 15, name: 'Governance Anti-Concentration', description: 'Validates AS/org caps & partition safety (evidence-based)', passed, details, severity: 'major', evidenceType: gov ? 'artifact' : 'heuristic' };
