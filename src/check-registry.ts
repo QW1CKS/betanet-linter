@@ -731,7 +731,12 @@ export const STEP_10_CHECKS = [
         const matches = ch && dyn.alpn.join(',') === ch.alpn.join(',') && dyn.extOrderSha256 === ch.extOrderSha256;
         evidenceType = 'dynamic-protocol';
         passed = passed && matches; // require static baseline + dynamic match
-        details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} (ja3=${(dyn.ja3||'').slice(0,16)})` : `❌ Dynamic mismatch staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)}`;
+        let mismatchCode = '';
+        if (!matches && dyn.note && dyn.note.includes(':')) {
+          const parts = dyn.note.split(':');
+            mismatchCode = parts[parts.length-1];
+        }
+        details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} (ja3=${(dyn.ja3||'').slice(0,16)})` : `❌ Dynamic mismatch ${mismatchCode ? '('+mismatchCode+') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)}`;
       }
       return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration', passed, details, severity: 'minor', evidenceType };
     }

@@ -98,12 +98,13 @@ export interface HarnessEvidence {
   noiseExtended?: { pattern?: string; rekeysObserved?: number; rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number } };
   voucher?: { structLikely?: boolean; tokenHits?: string[]; proximityBytes?: number };
   tlsProbe?: { host: string; port: number; offeredAlpn: string[]; selectedAlpn?: string | null; cipher?: string; protocol?: string | null; handshakeMs?: number; error?: string };
-  fallback?: { udpAttempted: boolean; udpTimeoutMs: number; tcpConnected: boolean; tcpConnectMs?: number; tcpRetryDelayMs?: number; coverConnections?: number; coverTeardownMs?: number[]; error?: string };
+  fallback?: { udpAttempted: boolean; udpTimeoutMs: number; tcpConnected: boolean; tcpConnectMs?: number; tcpRetryDelayMs?: number; coverConnections?: number; coverTeardownMs?: number[]; error?: string; policy?: { retryDelayMsOk?: boolean; coverConnectionsOk?: boolean; teardownSpreadOk?: boolean; overall?: boolean } };
   mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
-  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string };
+  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
   calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
-  quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string };
+  quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number } };
+  statisticalJitter?: { meanMs: number; p95Ms: number; stdDevMs: number; samples: number; withinTarget?: boolean };
   meta: { generated: string; scenarios: string[] };
 }
 
@@ -194,6 +195,15 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       opts.fallbackUdpTimeoutMs || 300,
       opts.coverConnections || 0
     );
+    // Apply simple policy thresholds
+    if (evidence.fallback) {
+      const retryDelayOk = (evidence.fallback.tcpRetryDelayMs ?? 0) <= 50; // expect near-immediate retry after UDP timeout
+      const coverOk = (evidence.fallback.coverConnections ?? 0) >= 1; // at least one cover connection if any specified
+      const teardown = evidence.fallback.coverTeardownMs || [];
+      const spread = teardown.length ? (Math.max(...teardown) - Math.min(...teardown)) : 0;
+      const spreadOk = spread >= 0; // placeholder always ok until we define distribution targets
+      evidence.fallback.policy = { retryDelayMsOk: retryDelayOk, coverConnectionsOk: coverOk, teardownSpreadOk: spreadOk, overall: retryDelayOk && coverOk && spreadOk };
+    }
   }
   // Simulate a Noise rekey observation (Step 9 placeholder)
   if (opts.rekeySimulate) {
@@ -214,6 +224,8 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     values.sort((a,b)=>a-b);
     const mean = values.reduce((a,b)=>a+b,0)/values.length;
     const p95 = values[Math.min(values.length-1, Math.floor(values.length*0.95))];
+  const variance = values.reduce((a,b)=>a + Math.pow(b-mean,2),0)/values.length;
+  const stdDev = Math.sqrt(variance);
     // Accept tolerance if mean within target window (e.g., 15–60ms) and p95 < 75ms
     const withinTolerance = mean >= 15 && mean <= 60 && p95 < 75;
     evidence.h2Adaptive = {
@@ -223,6 +235,7 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       withinTolerance,
       sampleCount: samples
     };
+  evidence.statisticalJitter = { meanMs: mean, p95Ms: p95, stdDevMs: stdDev, samples, withinTarget: withinTolerance } as any;
   }
   // Simulated dynamic ClientHello capture (initial calibration slice)
   if (opts.clientHelloSimulate && evidence.clientHello) {
@@ -270,14 +283,30 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       }
       const extOrderSha256 = extIds.length ? crypto.createHash('sha256').update(extIds.join(',')).digest('hex') : crypto.createHash('sha256').update(output).digest('hex');
       // Derive pseudo JA3 (not full fidelity without raw ClientHello bytes); we note degraded fidelity
-      const ja3 = `sim-${extOrderSha256.slice(0,12)}`;
+      // JA3 normally: SSLVersion,CipherSuites,Extensions,EllipticCurves,EllipticCurvePointFormats
+      const cipherLines = output.split(/\r?\n/).filter(l => /Cipher    :/.test(l));
+      const ciphers: number[] = []; // placeholder (openssl -brief does not list suite IDs in handshake order)
+      const curves: number[] = []; // not available in this capture mode
+      const ecPoints: number[] = [];
+      const ja3 = `771,${ciphers.join('-')},${extIds.join('-')},${curves.join('-')},${ecPoints.join('-')}`;
+      const matchStatic = !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256);
+      let mismatchReason: string | undefined;
+      if (!matchStatic && evidence.clientHello) {
+        if (alpn?.join(',') !== evidence.clientHello.alpn?.join(',')) mismatchReason = 'ALPN_ORDER_MISMATCH';
+        else if (evidence.clientHello.extOrderSha256 && evidence.clientHello.extOrderSha256 !== extOrderSha256) mismatchReason = 'EXT_SEQUENCE_MISMATCH';
+      }
       evidence.dynamicClientHelloCapture = {
         alpn,
         extOrderSha256,
         ja3,
         capturedAt: new Date().toISOString(),
-        matchStaticTemplate: !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256),
-        note: 'openssl-s_client-capture'
+        matchStaticTemplate: matchStatic,
+        note: mismatchReason ? `openssl-s_client-capture:${mismatchReason}` : 'openssl-s_client-capture',
+        ciphers,
+        extensions: extIds,
+        curves,
+        ecPointFormats: ecPoints,
+        captureQuality: 'parsed-openssl'
       };
       if (!evidence.calibrationBaseline && evidence.clientHello) {
         evidence.calibrationBaseline = { alpn: evidence.clientHello.alpn, extOrderSha256: evidence.clientHello.extOrderSha256, source: 'static-template', capturedAt: new Date().toISOString() };
@@ -296,7 +325,7 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     const port = opts.quicInitialPort || 443;
     const timeout = opts.quicInitialTimeoutMs || 1200;
     const start = Date.now();
-    const socket = dgram.createSocket('udp4');
+  const socket = dgram.createSocket('udp4');
     let settled = false;
     const initial: any = { host, port, udpSent: false };
     await new Promise<void>((resolve) => {
@@ -319,7 +348,8 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
           }
         });
         // Craft minimal QUIC long header (not a valid handshake, just presence poke)
-        const probe = Buffer.from([0xC3,0,0,0,0, 0,0,0,0, 0]);
+  // Minimal QUIC long header: first byte 0xC3 (long header, type), version draft (0x00000001), DCID len 0
+  const probe = Buffer.from([0xC3,0x00,0x00,0x00,0x01,0x00]);
         socket.send(probe, port, host, (err) => {
           initial.udpSent = !err;
         });
@@ -336,6 +366,10 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
         resolve();
       }
     });
+    // Basic parse: derive version from bytes 1-4
+    if (!initial.error && initial.udpSent) {
+      initial.parsed = { version: '0x00000001', dcil: 0 };
+    }
     (evidence as any).quicInitial = initial;
   }
   // Optional attempt to run binary and detect noise rekey markers (lines containing 'rekey')

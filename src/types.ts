@@ -155,7 +155,12 @@ export interface IngestedEvidence {
     ja3?: string; // optional JA3/JA4 style fingerprint string (simulated until real capture integrated)
     capturedAt?: string; // ISO timestamp of capture
     matchStaticTemplate?: boolean; // analyzer/harness comparison result against static template
-    note?: string; // free-form note / simulation marker
+  note?: string; // free-form note / simulation marker
+  ciphers?: number[]; // parsed cipher suite IDs (for JA3 computation)
+  extensions?: number[]; // parsed extension IDs (ordered)
+  curves?: number[]; // supported groups IDs
+  ecPointFormats?: number[]; // EC point formats
+  captureQuality?: 'simulated' | 'parsed-openssl';
   };
   calibrationBaseline?: {
     alpn?: string[];
@@ -163,6 +168,7 @@ export interface IngestedEvidence {
     source?: string; // e.g. 'origin-probe', 'manual', 'simulated'
     capturedAt?: string;
   };
+  statisticalJitter?: { meanMs: number; p95Ms: number; stdDevMs: number; samples: number; withinTarget?: boolean };
   noisePatternDetail?: {
     pattern?: string;
     hkdfLabelsFound?: number;
@@ -181,4 +187,13 @@ export interface EvidenceMeta {
   scenarios: string[];
   hashes?: { [key: string]: string }; // sha256 over JSON string of each evidence section (integrity aid)
   tooling?: { opensslAvailable?: boolean }; // capture presence of external tools used for dynamic capture
+}
+
+export interface SignedEvidence {
+  algorithm: string; // e.g. ed25519-sha256
+  signature: string; // base64
+  publicKey?: string; // base64 or PEM (public)
+  keyId?: string; // optional key identifier
+  canonicalHash?: string; // sha256 of canonicalized evidence JSON
+  created: string; // ISO timestamp
 }

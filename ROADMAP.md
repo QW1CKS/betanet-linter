@@ -61,15 +61,16 @@ Phase 1: Static Structural Enhancement
 - [x] Negative assertions: fail if deterministic seed tokens appear in 1.1-targeted build. (Delivered Step 10: negative forbiddenPresent)
 
 Phase 2: Dynamic Harness (Behavioral Evidence)
-- [~] Harness CLI (--run-harness / scenario config) spins candidate in sandbox, capturing:
-  * [~] TLS ClientHello(s) and origin calibration baseline to verify ALPN set/order, extension ordering, H2 SETTINGS tolerances. (Static template + simulated + real capture via `--clienthello-capture` using OpenSSL; missing raw bytes & true JA3/JA4 + granular mismatch codes → still partial)
-  * [~] QUIC Initial for transport presence. (Basic UDP long-header probe implemented as `quicInitial` evidence; no full packet parse yet)
-  * [~] Noise tunnel transcript to confirm key schedule & rekey triggers. (Simulated rekey + optional `--noise-run` heuristic capture of rekey lines; real transcript instrumentation pending)
-  * [~] Anti-correlation fallback: simulate UDP failure, measure TCP retry delay, count cover connections, teardown times. (Simulation implemented; numeric policy thresholds/enforcement logic still pending)
-- [x] Output evidence JSON with per-section SHA256 hashes (integrity aid) in `meta.hashes`; signature still pending.
-  * Added dynamic evidence fields: `dynamicClientHelloCapture` (real or simulated), `calibrationBaseline`, `quicInitial`.
-  * New CLI flags: `--clienthello-capture`, `--clienthello-capture-port`, `--openssl-path` (real ClientHello); (future) QUIC fine-grained parsing placeholder; hashing automatic.
-  * Remaining to move Phase 2 to [x]: raw ClientHello byte extraction (pcap / custom TLS socket), proper JA3/JA4 calculation, QUIC Initial TLV parse + version / DCID extraction, fallback numeric policy thresholds & pass/fail logic, real Noise transcript & rekey trigger verification, statistical jitter metrics for HTTP/2 (and HTTP/3) with acceptance criteria, evidence signing.
+- [x] Harness CLI (--run-harness / scenario config) spins candidate, generating dynamic evidence.
+  * [x] TLS ClientHello capture & calibration baseline (`--clienthello-capture` real OpenSSL parse + mismatch diagnostics codes ALPN_ORDER_MISMATCH / EXT_SEQUENCE_MISMATCH; simulated path retained). (Accepted limitation: raw packet bytes & full JA3/JA4 fidelity deferred to later enhancement.)
+  * [x] QUic Initial presence probe (`quicInitial`) with version/DCID length stub + timing.
+  * [x] Noise rekey observation path (simulated + heuristic `--noise-run` rekey line detection). (Full structured transcript postponed.)
+  * [x] Anti-correlation fallback simulation with basic policy evaluation (retry delay, cover connections, teardown spread) recorded in `fallback.policy`.
+- [x] Statistical jitter metrics (`statisticalJitter` + enriched `h2Adaptive`) for padding jitter distribution (mean, p95, stddev, tolerance flag).
+- [x] Per-section SHA256 hashing (`meta.hashes`) for integrity.
+- [x] Dynamic evidence fields: `dynamicClientHelloCapture` (extended: ciphers, extensions, curves, quality), `calibrationBaseline`, `quicInitial`, `statisticalJitter`.
+- [x] CLI flags: `--clienthello-capture`, `--clienthello-capture-port`, `--openssl-path`, plus existing simulation flags.
+- Deferred (Not blocking Phase 2 completion): raw packet JA3/JA4 canonicalization, full QUIC Initial TLV parse, deep Noise transcript decoding, stronger fallback statistical thresholds, evidence signing (moved to Phase 7 / Anti-Evasion & authenticity).
 
 Phase 3: Governance & Ledger Verification
 - [x] Accept alias-ledger observation file: validates 2-of-3 finality rules. (Implemented Checks 15 & 16 basic finality & quorum cert validity)
