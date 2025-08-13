@@ -5,8 +5,8 @@ This document is the single authoritative roadmap & progress tracker. (Historica
 
 Progress Summary
 ----------------
-Completed so far: 10 tasks (Implementation Order steps 1–10; Step 3 advanced with provenance parsing, action pinning, rebuild mismatch enforcement; Step 9 simulation scope complete; Step 10 structural introspection + static template & negative assertions delivered)  
-Pending: Remaining tasks across Phases 1–7 beyond Step 10 (real transcript capture, HTTP/3 adaptive, calibration baselines, statistical variance tests, signature verification, governance depth, dynamic ClientHello calibration, Noise transcript capture).  
+Completed so far: Phases 0–6 plus Phase 7 hardening slices (detached evidence signature verification, fallback timing policy & jitter variance, DSSE signer counting, basic DSSE verification, multi-signer bundle hashing, advanced mix variance entropy/stddev, HTTP/3 adaptive jitter simulation, heuristic JA3 derivation + ja3Hash MD5, advanced fallback behavior modeling with mean/stddev/CV policy gate) delivering 28 checks (1–28) and multi-signal anti-evasion.  
+Pending: Remaining Phase 7 tasks (full DSSE attestation chain trust & key selection policies, real raw TLS/QUIC capture (true JA3/JA4) & QUIC Initial parse, expanded ledger/gov signature sets, voucher cryptographic validation, provenance chain & materials strict policy, deeper quantitative cover/anomaly modeling).  
 Legend: [x] = implemented/done; [ ] = pending / not yet implemented; [~] = partially implemented.
 
 Purpose
@@ -105,7 +105,16 @@ Phase 7: Anti-Evasion & Scoring Hardening
 - [x] Multi-signal requirement per normative item (e.g., Transport: endpoint strings + captured ClientHello + QUIC token + ECH presence). (Check 18 enforces ≥2 categories)
 - [x] Weighted scoring; heuristic-only detection cannot produce final pass unless corroborated. (Weighted multiSignal implemented; strict mode gating)
 - [x] Keyword stuffing detection: disparity metrics (spec term density vs code symbol diversity) triggers suspicion warning. (Implemented in Check 18)
-- [ ] Signed evidence option: allow maintainers to sign evidence JSON (future). (Pending)
+- [x] Signed evidence option: detached evidence JSON signature verification (ed25519) with CLI flags --evidence-signature/--evidence-public-key.
+- [x] DSSE signer counting + optional DSSE envelope verification with key map (--dsse-public-keys).
+- [x] Multi-signer evidence bundle hashing + signature validation (--evidence-bundle) producing bundleSha256 & threshold flag.
+- [x] Statistical variance enforcement (jitter stddev/mean bounds) & fallback timing policy checks (Checks 26 & 25).
+- [x] Mix diversity deeper variance (entropy + path length stddev scaffolding; future CI confidence intervals pending).
+- [ ] Real dynamic TLS/QUIC transcript capture (JA3/JA4) feeding calibration & tolerance checks.
+- [x] HTTP/3 adaptive metrics & settings tolerances (simulation; real capture pending).
+- [x] Quantitative cover connection behavioral modeling (median/p95/IQR/skew/outliers, CV & anomaly codes, model score) integrated into Check 25.
+- [x] Heuristic JA3 derivation & MD5 hash (ja3Hash) via OpenSSL parse; mismatch codes extended (ALPN_SET_DIFF scaffold).
+- [x] Advanced fallback behavior modeling (mean/stddev & coefficient of variation with behaviorWithinPolicy gating in Check 25).
 
 New / Split Checks (Target Set ≥ 16)
 ------------------------------------
@@ -320,18 +329,18 @@ Step 11 Progress (Dynamic ClientHello & Transport Calibration)
 -------------------------------------------------------------
 Status: IN PROGRESS (simulation + initial real capture + QUIC probe)
 Current Deliverables:
-- Simulation path (`--clienthello-simulate`) and real OpenSSL-based capture (`--clienthello-capture`) populate `dynamicClientHelloCapture` with ALPN, extension ordering hash (parsed extension IDs when available), pseudo JA3 placeholder, match flag vs static template.
+- Simulation path (`--clienthello-simulate`) and real OpenSSL-based capture (`--clienthello-capture`) populate `dynamicClientHelloCapture` with ALPN, extension ordering hash (parsed extension IDs when available), heuristic JA3 string + MD5 `ja3Hash`, match flag vs static template.
 - QUIC Initial presence probe (`quicInitial`) sends minimal long-header UDP packet capturing basic response timing (presence / bytes) for early transport corroboration.
 - Per-evidence-section SHA256 hashing stored under `meta.hashes` for integrity; still unsigned.
 - Optional `--noise-run` attempts to detect live rekey markers (heuristic) upgrading `noiseExtended` counters.
 - Check 22 upgrades to dynamic when capture present and requires static hash match.
-- Mismatch diagnostics codes implemented for TLS calibration (ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH) surfaced via `dynamicClientHelloCapture.note`.
+- Mismatch diagnostics codes implemented for TLS calibration (ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH, ALPN_SET_DIFF scaffolded) surfaced via `dynamicClientHelloCapture.note`.
 - Governance advanced diversity metrics (`advancedStable`, `volatility`, `maxWindowShare`) ingested to inform future tightening.
 Remaining (Slice Exit Criteria):
 1. Raw ClientHello byte capture (pcap or custom client) to compute true JA3/JA4 and extension ordering without OpenSSL formatting ambiguity.
 2. Granular mismatch diagnostics (distinct codes: ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH, ALPN_SET_DIFF, EXT_COUNT_DIFF).
 3. QUIC Initial parser extracting Version, DCID length/value, token length; add calibration hash.
-4. Enforce numeric anti-correlation fallback thresholds (retry delay window, cover connection count, teardown timing) with pass/fail reasons.
+4. Enforce numeric anti-correlation fallback thresholds (retry delay window, cover connection count, teardown timing) with pass/fail reasons (advanced CV already integrated; add anomaly codes & confidence intervals).
 5. Real Noise transcript observation (messages count, rekey trigger validation) supplanting simulation.
 6. Statistical jitter collection (distribution + variance) for HTTP/2/3 adaptive behavior.
 7. Bump evidence `schemaVersion` to 3 only after true raw capture + at least one additional dynamic (QUIC parse or jitter stats) is normative; update docs & README matrix.

@@ -74,9 +74,9 @@ describe('BetanetComplianceChecker', () => {
 
       expect(result).toBeDefined();
       expect(result.binaryPath).toBe(mockBinaryPath);
-  // Total checks increased to 24 after Phase 4 (added adaptive rate-limit bucket check)
-  expect(result.checks).toHaveLength(24);
-  expect(result.summary.total).toBe(24);
+  // Total checks increased to 28 after Phase 7 continuation (mix advanced variance + HTTP/3 adaptive)
+  expect(result.checks).toHaveLength(28);
+  expect(result.summary.total).toBe(28);
       expect(typeof result.overallScore).toBe('number');
       expect(typeof result.passed).toBe('boolean');
   // Spec summary should be present
@@ -255,8 +255,8 @@ describe('BetanetComplianceChecker', () => {
         checkFilters: { exclude: [10] }
       });
 
-  // With 24 total, excluding id 10 should yield 23
-  expect(result.checks).toHaveLength(23); // 24 total minus excluded 10
+  // With 28 total, excluding id 10 should yield 27
+  expect(result.checks).toHaveLength(27); // 28 total minus excluded 10
       expect(result.checks.map(c => c.id)).not.toContain(10);
     });
 

@@ -80,6 +80,7 @@ export interface HarnessOptions {
   mixDeterministic?: boolean; // if true, use seeded patterns for reproducibility
   rekeySimulate?: boolean; // simulate observing a Noise rekey event
   h2AdaptiveSimulate?: boolean; // simulate HTTP/2 adaptive padding/jitter metrics
+  h3AdaptiveSimulate?: boolean; // simulate HTTP/3 adaptive padding/jitter metrics
   jitterSamples?: number; // number of jitter samples to simulate
   clientHelloSimulate?: boolean; // simulate dynamic ClientHello capture (Step 11 initial slice)
   clientHelloCapture?: { host: string; port?: number; opensslPath?: string }; // real capture target
@@ -101,7 +102,9 @@ export interface HarnessEvidence {
   fallback?: { udpAttempted: boolean; udpTimeoutMs: number; tcpConnected: boolean; tcpConnectMs?: number; tcpRetryDelayMs?: number; coverConnections?: number; coverTeardownMs?: number[]; error?: string; policy?: { retryDelayMsOk?: boolean; coverConnectionsOk?: boolean; teardownSpreadOk?: boolean; overall?: boolean } };
   mix?: { samples: number; uniqueHopSets: number; hopSets: string[][]; minHopsBalanced: number; minHopsStrict: number };
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
-  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
+  h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
+  dynamicClientHelloCapture?: { alpn?: string[]; extOrderSha256?: string; ja3?: string; ja3Hash?: string; capturedAt?: string; matchStaticTemplate?: boolean; note?: string; ciphers?: number[]; extensions?: number[]; curves?: number[]; ecPointFormats?: number[]; captureQuality?: string };
+  // (Phase 7 extension) ja3Hash added to dynamicClientHelloCapture; keep interface loose via index signature if needed
   calibrationBaseline?: { alpn?: string[]; extOrderSha256?: string; source?: string; capturedAt?: string };
   quicInitial?: { host: string; port: number; udpSent: boolean; responseBytes?: number; responseWithinMs?: number; error?: string; parsed?: { version?: string; dcil?: number } };
   statisticalJitter?: { meanMs: number; p95Ms: number; stdDevMs: number; samples: number; withinTarget?: boolean };
@@ -169,6 +172,60 @@ async function simulateFallback(host: string, udpPort: number, tcpPort: number, 
     }
     fallback.coverConnections = coverConnections;
     fallback.coverTeardownMs = teardown;
+    // Advanced cover behavior metrics (Phase 7 quantitative modeling)
+    if (teardown.length >= 2) {
+      const sorted = [...teardown].sort((a,b)=>a-b);
+      const mean = teardown.reduce((a,b)=>a+b,0)/teardown.length;
+      const variance = teardown.reduce((a,b)=>a + Math.pow(b-mean,2),0)/teardown.length;
+      const std = Math.sqrt(variance);
+      const cv = mean ? std/mean : 0;
+      const median = sorted.length % 2 ? sorted[(sorted.length-1)/2] : (sorted[sorted.length/2 - 1] + sorted[sorted.length/2]) / 2;
+      const p95Index = Math.min(sorted.length-1, Math.floor(sorted.length * 0.95));
+      const p95 = sorted[p95Index];
+      const q1 = sorted[Math.floor(sorted.length * 0.25)];
+      const q3 = sorted[Math.floor(sorted.length * 0.75)];
+      const iqr = q3 - q1;
+      // Fisher-Pearson skewness (unbiased) if std > 0
+      let skew = 0;
+      if (std > 0) {
+        const n = teardown.length;
+        const m3 = teardown.reduce((a,b)=>a + Math.pow(b-mean,3),0)/n;
+        const g1 = m3 / Math.pow(std,3);
+        // Adjusted Fisher-Pearson
+        skew = Math.sqrt(n*(n-1)) / (n-2 > 0 ? (n-2) : 1) * g1;
+      }
+      // Outlier detection using 1.5*IQR rule
+      const lowerFence = q1 - 1.5 * iqr;
+      const upperFence = q3 + 1.5 * iqr;
+      const outliers = teardown.filter(v => v < lowerFence || v > upperFence);
+      const outlierCount = outliers.length;
+      const anomalies: string[] = [];
+      if (cv > 1.5) anomalies.push('HIGH_CV');
+      if (Math.abs(skew) > 1.2) anomalies.push('SKEW_EXCESS');
+      if (outlierCount > Math.ceil(teardown.length * 0.25)) anomalies.push('OUTLIER_EXCESS');
+      if (teardown.length < 3) anomalies.push('SAMPLE_TOO_SMALL');
+      // Model score: proportion of core criteria satisfied
+      const criteria = {
+        cvOk: cv <= 1.5,
+        skewOk: Math.abs(skew) <= 1.2,
+        outlierOk: outlierCount <= Math.ceil(teardown.length * 0.25),
+        sampleSizeOk: teardown.length >= 3
+      } as const;
+      const satisfied = Object.values(criteria).filter(Boolean).length;
+      const behaviorModelScore = satisfied / Object.keys(criteria).length; // 0..1
+      const behaviorWithinPolicy = behaviorModelScore >= 0.6 && !anomalies.includes('HIGH_CV');
+      (fallback as any).coverTeardownMeanMs = Number(mean.toFixed(2));
+      (fallback as any).teardownStdDevMs = Number(std.toFixed(2));
+      (fallback as any).coverTeardownCv = Number(cv.toFixed(4));
+      (fallback as any).coverTeardownMedianMs = median;
+      (fallback as any).coverTeardownP95Ms = p95;
+      (fallback as any).coverTeardownIqrMs = iqr;
+      (fallback as any).coverTeardownSkewness = Number(skew.toFixed(4));
+      (fallback as any).coverTeardownOutlierCount = outlierCount;
+      (fallback as any).coverTeardownAnomalyCodes = anomalies;
+      (fallback as any).behaviorModelScore = Number(behaviorModelScore.toFixed(3));
+      (fallback as any).behaviorWithinPolicy = behaviorWithinPolicy;
+    }
   }
   return fallback;
 }
@@ -237,6 +294,25 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     };
   evidence.statisticalJitter = { meanMs: mean, p95Ms: p95, stdDevMs: stdDev, samples, withinTarget: withinTolerance } as any;
   }
+  // Simulate HTTP/3 adaptive jitter (QUIC padding behavior analogue) if requested
+  if (opts.h3AdaptiveSimulate) {
+    const samples = Math.max(5, opts.jitterSamples || 20);
+    const values: number[] = [];
+    for (let i = 0; i < samples; i++) values.push(15 + Math.floor(Math.random() * 40)); // 15–55ms
+    values.sort((a,b)=>a-b);
+    const mean = values.reduce((a,b)=>a+b,0)/values.length;
+    const p95 = values[Math.min(values.length-1, Math.floor(values.length*0.95))];
+    const variance = values.reduce((a,b)=>a + Math.pow(b-mean,2),0)/values.length;
+    const stdDev = Math.sqrt(variance);
+    const withinTolerance = mean >= 10 && mean <= 70 && p95 < 90;
+    (evidence as any).h3Adaptive = { qpackTableSize: 4096, paddingJitterMeanMs: mean, paddingJitterP95Ms: p95, withinTolerance, sampleCount: samples };
+    (evidence as any).statisticalVariance = (evidence as any).statisticalVariance || {};
+    if (!(evidence as any).statisticalVariance.jitterStdDevMs) {
+      (evidence as any).statisticalVariance.jitterStdDevMs = stdDev;
+      (evidence as any).statisticalVariance.jitterMeanMs = mean;
+      (evidence as any).statisticalVariance.sampleCount = samples;
+    }
+  }
   // Simulated dynamic ClientHello capture (initial calibration slice)
   if (opts.clientHelloSimulate && evidence.clientHello) {
     // Derive a pseudo JA3 fingerprint from ALPN + ext hash (placeholder)
@@ -282,23 +358,56 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
         if (m) extIds.push(parseInt(m[1],10));
       }
       const extOrderSha256 = extIds.length ? crypto.createHash('sha256').update(extIds.join(',')).digest('hex') : crypto.createHash('sha256').update(output).digest('hex');
-      // Derive pseudo JA3 (not full fidelity without raw ClientHello bytes); we note degraded fidelity
-      // JA3 normally: SSLVersion,CipherSuites,Extensions,EllipticCurves,EllipticCurvePointFormats
-      const cipherLines = output.split(/\r?\n/).filter(l => /Cipher    :/.test(l));
-      const ciphers: number[] = []; // placeholder (openssl -brief does not list suite IDs in handshake order)
-      const curves: number[] = []; // not available in this capture mode
-      const ecPoints: number[] = [];
+      // Attempt to derive JA3 style fingerprint.
+      // JA3 format: SSLVersion,CipherSuites,Extensions,EllipticCurves,EllipticCurvePointFormats
+      // We only have server negotiated cipher & extension listing; OpenSSL s_client does not expose all offered cipher IDs in order.
+      // Heuristic: parse lines starting with 'Shared ciphers' or 'Cipher    :' and map to IANA hex codes if possible.
+      const ciphers: number[] = [];
+      const cipherMapRegex = /Cipher\s*: ([-A-Z0-9_]+)/i;
+      const cipherLine = output.split(/\r?\n/).find(l => cipherMapRegex.test(l));
+      if (cipherLine) {
+        const m = cipherLine.match(cipherMapRegex);
+        if (m) {
+          // We only have the single negotiated cipher; include as solitary list element using a stable pseudo-ID hash (not ideal, but deterministic)
+          const pseudo = crypto.createHash('md5').update(m[1]).digest('hex').slice(0,4);
+          ciphers.push(parseInt(pseudo,16));
+        }
+      }
+      // Supported groups (elliptic curves) sometimes appear as 'Supported Elliptic Groups:' in verbose output (not always with tlsextdebug)
+      const curves: number[] = [];
+      const curveLine = output.split(/\r?\n/).find(l => /Supported Elliptic Groups/i.test(l));
+      if (curveLine) {
+        const parts = curveLine.split(':')[1]?.split(',') || [];
+        parts.forEach(p => {
+          const trimmed = p.trim();
+          if (trimmed) {
+            const pseudo = crypto.createHash('md5').update(trimmed).digest('hex').slice(0,4);
+            curves.push(parseInt(pseudo,16));
+          }
+        });
+      }
+      const ecPoints: number[] = []; // rarely exposed; leave empty
       const ja3 = `771,${ciphers.join('-')},${extIds.join('-')},${curves.join('-')},${ecPoints.join('-')}`;
+      const ja3Hash = crypto.createHash('md5').update(ja3).digest('hex');
       const matchStatic = !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256);
       let mismatchReason: string | undefined;
       if (!matchStatic && evidence.clientHello) {
-        if (alpn?.join(',') !== evidence.clientHello.alpn?.join(',')) mismatchReason = 'ALPN_ORDER_MISMATCH';
-        else if (evidence.clientHello.extOrderSha256 && evidence.clientHello.extOrderSha256 !== extOrderSha256) mismatchReason = 'EXT_SEQUENCE_MISMATCH';
+        if (alpn && evidence.clientHello.alpn) {
+          const orderDiff = alpn.join(',') !== evidence.clientHello.alpn.join(',');
+          const setDiff = [...new Set(alpn)].sort().join(',') !== [...new Set(evidence.clientHello.alpn)].sort().join(',');
+          if (orderDiff) mismatchReason = 'ALPN_ORDER_MISMATCH';
+          if (!mismatchReason && setDiff) mismatchReason = 'ALPN_SET_DIFF';
+        }
+        if (!mismatchReason && evidence.clientHello.extOrderSha256 && evidence.clientHello.extOrderSha256 !== extOrderSha256) {
+          mismatchReason = 'EXT_SEQUENCE_MISMATCH';
+        }
+  // EXT_COUNT_DIFF requires static template extension count; we only have hash, so skip unless future field added
       }
       evidence.dynamicClientHelloCapture = {
         alpn,
         extOrderSha256,
         ja3,
+        ja3Hash,
         capturedAt: new Date().toISOString(),
         matchStaticTemplate: matchStatic,
         note: mismatchReason ? `openssl-s_client-capture:${mismatchReason}` : 'openssl-s_client-capture',
@@ -432,6 +541,19 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     const allHopsFlat = hopSets.flat();
     const uniqueNodes = new Set(allHopsFlat).size;
     const diversityIndex = allHopsFlat.length ? uniqueNodes / allHopsFlat.length : 0; // crude measure
+    // Compute entropy of individual node occurrences
+    const nodeCounts: Record<string, number> = {};
+    for (const n of allHopsFlat) nodeCounts[n] = (nodeCounts[n]||0)+1;
+    const totalNodes = allHopsFlat.length || 1;
+    let entropy = 0;
+    for (const k of Object.keys(nodeCounts)) {
+      const p = nodeCounts[k] / totalNodes;
+      entropy += -p * Math.log2(p);
+    }
+    // Path length stddev
+    const plMean = pathLengths.reduce((a,b)=>a+b,0) / (pathLengths.length || 1);
+    const plVar = pathLengths.reduce((a,b)=>a + Math.pow(b-plMean,2),0) / (pathLengths.length || 1);
+    const plStd = Math.sqrt(plVar);
     evidence.mix = {
       samples: hopSets.length,
       uniqueHopSets: uniqueSet.size,
@@ -442,8 +564,17 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       pathLengths,
       duplicateHopSets: duplicates,
       uniquenessRatio: hopSets.length ? uniqueSet.size / hopSets.length : 0,
-      diversityIndex
+      diversityIndex,
+      nodeEntropyBits: Number(entropy.toFixed(3)),
+      pathLengthStdDev: Number(plStd.toFixed(3))
     } as any;
+    // Mirror into consolidated statisticalVariance if present
+    (evidence as any).statisticalVariance = (evidence as any).statisticalVariance || {};
+  const mixRef: any = (evidence as any).mix;
+  (evidence as any).statisticalVariance.mixUniquenessRatio = mixRef?.uniquenessRatio;
+  (evidence as any).statisticalVariance.mixDiversityIndex = diversityIndex;
+  (evidence as any).statisticalVariance.mixNodeEntropyBits = Number(entropy.toFixed(3));
+  (evidence as any).statisticalVariance.mixPathLengthStdDev = Number(plStd.toFixed(3));
   }
   await fs.writeFile(outFile, JSON.stringify(evidence, null, 2));
   return outFile;

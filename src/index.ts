@@ -8,6 +8,7 @@ import { ALL_CHECKS, getChecksByIds } from './check-registry';
 import { SPEC_VERSION_SUPPORTED_BASE, SPEC_VERSION_PARTIAL, SPEC_11_PENDING_ISSUES, isVersionLE } from './constants';
 import { SBOMGenerator } from './sbom/sbom-generator';
 import { SEVERITY_EMOJI } from './constants';
+import * as crypto from 'crypto';
 
 export class BetanetComplianceChecker {
   private _analyzer: BinaryAnalyzer;
@@ -75,6 +76,7 @@ export class BetanetComplianceChecker {
               // Future: integrate cosign/DSSE key verification; here we mark presence only
               evidence.provenance = evidence.provenance || {};
               evidence.provenance.signatureVerified = false; // will remain false until real verification added
+              evidence.provenance.dsseSignerCount = parsed.signatures.length;
             }
           } catch {/* swallow decoding errors */}
         } else if (parsed.predicateType && parsed.predicate) {
@@ -106,13 +108,142 @@ export class BetanetComplianceChecker {
           Object.assign(evidence, parsed);
         }
         (this._analyzer as any).evidence = evidence; // attach for evaluators
+  // Phase 7: if signature & public key provided, verify detached signature over canonical JSON
+        if (options.evidenceSignatureFile && options.evidencePublicKeyFile && fs.existsSync(options.evidenceSignatureFile) && fs.existsSync(options.evidencePublicKeyFile)) {
+          try {
+            const sigB64 = fs.readFileSync(options.evidenceSignatureFile, 'utf8').trim();
+            const pubRaw = fs.readFileSync(options.evidencePublicKeyFile, 'utf8').trim();
+            const signature = Buffer.from(sigB64, 'base64');
+            // Support PEM public key or raw base64 32B
+            let pubKey: Buffer;
+            if (/BEGIN PUBLIC KEY/.test(pubRaw)) {
+              const body = pubRaw.replace(/-----BEGIN PUBLIC KEY-----/,'').replace(/-----END PUBLIC KEY-----/,'').replace(/\s+/g,'');
+              pubKey = Buffer.from(body, 'base64');
+            } else if (/^[A-Za-z0-9+/=]+$/.test(pubRaw)) {
+              pubKey = Buffer.from(pubRaw, 'base64');
+            } else {
+              throw new Error('Unsupported public key format');
+            }
+            // Canonical JSON: stable stringify (keys sorted)
+            const canonical = JSON.stringify(evidence, Object.keys(evidence).sort());
+            let valid = false;
+            try {
+              // Attempt ed25519 verification via Node 18+ crypto.sign (verify)
+              const verify = crypto.verify(null, Buffer.from(canonical), { key: pubKey, format: 'der', type: 'spki' }, signature);
+              valid = verify;
+            } catch {
+              // Fallback: try sodium-style 32B key (ed25519) via subtle if available
+            }
+            (this._analyzer as any).diagnostics = (this._analyzer as any).diagnostics || {};
+            (this._analyzer as any).diagnostics.evidenceSignatureValid = valid;
+            if (valid) {
+              evidence.provenance = evidence.provenance || {};
+              evidence.provenance.signatureVerified = true;
+            } else {
+              evidence.provenance = evidence.provenance || {};
+              evidence.provenance.signatureVerified = false;
+              evidence.provenance.signatureError = 'invalid-signature';
+            }
+          } catch (sigErr: any) {
+            (this._analyzer as any).diagnostics = (this._analyzer as any).diagnostics || {};
+            (this._analyzer as any).diagnostics.evidenceSignatureValid = false;
+            try { (this._analyzer as any).evidence.provenance = (this._analyzer as any).evidence.provenance || {}; (this._analyzer as any).evidence.provenance.signatureError = sigErr.message; } catch {/* ignore */}
+          }
+        }
         // Compute materials completeness metric
+        // Phase 7: DSSE envelope verification (single-envelope case already parsed above)
+        try {
+          if (options.dssePublicKeysFile && fs.existsSync(options.dssePublicKeysFile)) {
+            const keyMap = JSON.parse(fs.readFileSync(options.dssePublicKeysFile, 'utf8')) as Record<string,string>;
+            const evAny: any = (this._analyzer as any).evidence;
+            const raw = fs.readFileSync(options.evidenceFile!, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (parsed.payloadType && parsed.payload && Array.isArray(parsed.signatures)) {
+              const payloadBytes = Buffer.from(parsed.payload, 'base64');
+              let validCount = 0;
+              for (const sigObj of parsed.signatures) {
+                const keyId = sigObj.keyid || sigObj.keyId || sigObj.kid;
+                const sigB64 = sigObj.sig || sigObj.signature;
+                if (!keyId || !sigB64) continue;
+                const pk = keyMap[keyId];
+                if (!pk) continue;
+                try {
+                  const sig = Buffer.from(sigB64, 'base64');
+                  let pkBuf: Buffer;
+                  if (/BEGIN PUBLIC KEY/.test(pk)) {
+                    const body = pk.replace(/-----BEGIN PUBLIC KEY-----/,'').replace(/-----END PUBLIC KEY-----/,'').replace(/\s+/g,'');
+                    pkBuf = Buffer.from(body, 'base64');
+                  } else { pkBuf = Buffer.from(pk, 'base64'); }
+                  const ok = crypto.verify(null, payloadBytes, { key: pkBuf, format: 'der', type: 'spki' }, sig);
+                  if (ok) validCount++;
+                } catch {/* ignore per-sig errors */}
+              }
+              if (!evAny.provenance) evAny.provenance = {}; 
+              evAny.provenance.dsseSignerCount = parsed.signatures.length;
+              if (validCount > 0) {
+                evAny.provenance.dsseEnvelopeVerified = true;
+              }
+            }
+          }
+        } catch {/* ignore dsse errors */}
+
+        // Phase 7: multi-signer evidence bundle processing
+        try {
+          if (options.evidenceBundleFile && fs.existsSync(options.evidenceBundleFile)) {
+            const bundleRaw = JSON.parse(fs.readFileSync(options.evidenceBundleFile,'utf8'));
+            if (Array.isArray(bundleRaw)) {
+              const entries: any[] = [];
+              const concatHashes: string[] = [];
+              for (const entry of bundleRaw) {
+                try {
+                  const evPart = entry.evidence;
+                  const sigB64 = entry.signature;
+                  const pk = entry.publicKey;
+                  const signer = entry.signer || 'unknown';
+                  if (!evPart || !sigB64 || !pk) continue;
+                  const canonical = JSON.stringify(evPart, Object.keys(evPart).sort());
+                  const hash = crypto.createHash('sha256').update(canonical).digest('hex');
+                  let pkBuf: Buffer;
+                  if (/BEGIN PUBLIC KEY/.test(pk)) {
+                    const body = pk.replace(/-----BEGIN PUBLIC KEY-----/,'').replace(/-----END PUBLIC KEY-----/,'').replace(/\s+/g,'');
+                    pkBuf = Buffer.from(body, 'base64');
+                  } else { pkBuf = Buffer.from(pk, 'base64'); }
+                  let valid = false;
+                  try { valid = crypto.verify(null, Buffer.from(canonical), { key: pkBuf, format: 'der', type: 'spki' }, Buffer.from(sigB64,'base64')); } catch {/* ignore */}
+                  entries.push({ canonicalSha256: hash, signatureValid: valid, signer });
+                  concatHashes.push(hash);
+                } catch {/* per entry */}
+              }
+              const bundleSha256 = crypto.createHash('sha256').update(concatHashes.join('')).digest('hex');
+              const multiSignerThresholdMet = entries.filter(e => e.signatureValid).length >= 2;
+              (this._analyzer as any).evidence.signedEvidenceBundle = { entries, bundleSha256, multiSignerThresholdMet };
+            }
+          }
+        } catch {/* ignore bundle errors */}
         try {
           if (evidence.provenance?.materials) {
             const mats = evidence.provenance.materials;
             if (mats.length) {
               evidence.provenance.materialsComplete = mats.every(m => !!m.digest && m.digest.startsWith('sha256:'));
             }
+          }
+        } catch {/* ignore */}
+        // Phase 7: derive statistical variance aggregate if mix or fallbackTiming present
+        try {
+          const evAny: any = evidence as any;
+          if (evAny.mix || evAny.fallback || evAny.fallbackTiming || evAny.statisticalJitter) {
+            const variance: any = {};
+            if (evAny.statisticalJitter) {
+              variance.jitterStdDevMs = evAny.statisticalJitter.stdDevMs;
+              variance.jitterMeanMs = evAny.statisticalJitter.meanMs;
+              variance.sampleCount = evAny.statisticalJitter.samples;
+              variance.jitterWithinTarget = evAny.statisticalJitter.withinTarget === true;
+            }
+            if (evAny.mix) {
+              variance.mixUniquenessRatio = evAny.mix.uniquenessRatio;
+              variance.mixDiversityIndex = evAny.mix.diversityIndex;
+            }
+            if (Object.keys(variance).length) (evidence as any).statisticalVariance = variance;
           }
         } catch {/* ignore */}
       } catch (e: any) {

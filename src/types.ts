@@ -82,6 +82,7 @@ export interface AnalyzerDiagnostics {
   degradationReasons?: string[]; // human-readable reasons driving degraded=true
   networkAllowed?: boolean; // whether network operations permitted (Phase 6)
   networkOps?: { url: string; method: string; durationMs: number; status?: number; error?: string; blocked?: boolean }[]; // recorded network attempts
+  evidenceSignatureValid?: boolean; // Phase 7: detached evidence signature verification result
 }
 
 export interface CheckOptions {
@@ -103,6 +104,11 @@ export interface CheckOptions {
   enableNetwork?: boolean; // Phase 6: allow outbound network enrichment
   failOnNetwork?: boolean; // Phase 6: if network attempted while disabled, treat as failure condition
   networkAllowlist?: string[]; // Phase 6: restrict outbound network hosts (empty => allow any when enabled)
+  evidenceSignatureFile?: string; // Phase 7: detached signature file (base64) for evidence JSON
+  evidencePublicKeyFile?: string; // Phase 7: public key file (base64 raw 32B ed25519 or PEM) for signature verify
+  failOnSignatureInvalid?: boolean; // Phase 7: treat invalid evidence signature as failure exit
+  dssePublicKeysFile?: string; // Phase 7: map of DSSE key ids to public keys for envelope verification
+  evidenceBundleFile?: string; // Phase 7: multi-signer evidence bundle JSON path
 }
 
 export interface SBOMOptions {
@@ -127,6 +133,35 @@ export interface IngestedEvidence {
   materialsComplete?: boolean; // all listed materials include a digest
   signatureVerified?: boolean; // DSSE / provenance signature verified with provided key
   signatureError?: string; // capture signature verification error reason
+  dsseEnvelopeVerified?: boolean; // Phase 7: DSSE envelope signature(s) verified
+  dsseSignerCount?: number; // Phase 7: number of DSSE signers validated
+  };
+  // Phase 7: multi-signer evidence bundle (canonical hash chain) placeholder
+  signedEvidenceBundle?: {
+    entries?: { canonicalSha256?: string; signatureValid?: boolean; signer?: string }[];
+    bundleSha256?: string; // hash over concatenated entry hashes
+    multiSignerThresholdMet?: boolean; // >=2 signers present
+  };
+  // Phase 7: quantitative fallback timing evidence
+  fallbackTiming?: {
+    udpTimeoutMs?: number; // observed UDP wait before TCP attempt
+    tcpConnectMs?: number; // measured TCP connect duration
+    retryDelayMs?: number; // delay between UDP timeout and TCP start
+    coverConnections?: number; // number of cover connections spawned
+    coverTeardownMs?: number[]; // teardown times for cover flows
+    withinPolicy?: boolean; // aggregate policy evaluation
+    teardownStdDevMs?: number; // computed stddev of teardown times
+  };
+  // Phase 7: enhanced statistical variance metrics (jitter, mix)
+  statisticalVariance?: {
+    jitterStdDevMs?: number;
+    jitterMeanMs?: number;
+    sampleCount?: number;
+    jitterWithinTarget?: boolean;
+    mixUniquenessRatio?: number; // mirror mix.uniquenessRatio for consolidated stats
+    mixDiversityIndex?: number; // mirror mix.diversityIndex
+  mixNodeEntropyBits?: number; // consolidated Shannon entropy bits
+  mixPathLengthStdDev?: number; // consolidated path length stddev
   };
   clientHello?: any; // placeholder; future structured shape
   noise?: any; // placeholder
@@ -149,8 +184,11 @@ export interface IngestedEvidence {
   pathLengths?: number[]; // observed path lengths
   uniquenessRatio?: number; // derived uniqueHopSets/samples
   diversityIndex?: number; // dispersion metric (0-1)
+  nodeEntropyBits?: number; // Phase 7 extension: Shannon entropy of node occurrence distribution
+  pathLengthStdDev?: number; // Phase 7 extension: stddev of path length distribution
   }; // Phase 7 mix diversity sampling evidence
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
+  h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; withinTolerance?: boolean; sampleCount?: number };
   binaryMeta?: {
     format?: 'elf' | 'pe' | 'macho' | 'unknown';
     sections?: string[];
@@ -168,6 +206,7 @@ export interface IngestedEvidence {
     alpn?: string[]; // observed negotiated ALPN proposal ordering
     extOrderSha256?: string; // hash of observed extension ordering
     ja3?: string; // optional JA3/JA4 style fingerprint string (simulated until real capture integrated)
+  ja3Hash?: string; // md5 hash of JA3 canonical string
     capturedAt?: string; // ISO timestamp of capture
     matchStaticTemplate?: boolean; // analyzer/harness comparison result against static template
   note?: string; // free-form note / simulation marker

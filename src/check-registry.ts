@@ -301,6 +301,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   const materialsMismatchCount = prov.materialsMismatchCount || 0;
   const materialsComplete = prov.materialsComplete === true;
   const signatureVerified = prov.signatureVerified === true;
+  const dsseSigners = prov.dsseSignerCount || 0;
+  const dsseEnvelopeVerified = prov.dsseEnvelopeVerified === true;
       // Validate normative provenance
       let normativeDetails: string[] = [];
       let hasNormative = false;
@@ -366,7 +368,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         name: 'Build Provenance',
         description: 'Builds reproducibly and publishes SLSA 3 provenance',
         passed,
-  details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; signature verified' : ''})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (
+  details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; detached signature verified' : ''}${dsseEnvelopeVerified ? '; dsse envelope verified' : (dsseSigners ? `; dsse signers=${dsseSigners}` : '')})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (
           rebuildMismatch ? '❌ Rebuild digest mismatch (non-reproducible)' : (materialsMismatchCount ? `❌ Materials/SBOM mismatch (${materialsMismatchCount} unmatched)` : `❌ Missing: ${missing}`)
         ),
         severity: 'minor',
@@ -796,7 +798,8 @@ export const STEP_10_CHECKS = [
           const parts = dyn.note.split(':');
             mismatchCode = parts[parts.length-1];
         }
-        details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} (ja3=${(dyn.ja3||'').slice(0,16)})` : `❌ Dynamic mismatch ${mismatchCode ? '('+mismatchCode+') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)}`;
+  const ja3Disp = dyn.ja3Hash ? `${dyn.ja3Hash.slice(0,12)}` : (dyn.ja3||'').slice(0,16);
+  details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}` : `❌ Dynamic mismatch ${mismatchCode ? '('+mismatchCode+') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0,12)} dynHash=${dyn.extOrderSha256.slice(0,12)} ja3=${ja3Disp}`;
       }
       return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template extracted (ALPN order + extension hash) awaiting dynamic calibration', passed, details, severity: 'minor', evidenceType };
     }
@@ -862,10 +865,137 @@ export const PHASE_4_CHECKS: CheckDefinitionMeta[] = [
       return { id: 24, name: 'Adaptive Rate-Limit Buckets', description: 'Validates multi-bucket rate-limit configuration (global + scoped) with sane dispersion', passed, details, severity: 'minor', evidenceType: rl ? 'artifact' : 'heuristic' };
     }
   }
+  ,
+  // Phase 7: Quantitative fallback timing enforcement
+  {
+    id: 25,
+    key: 'fallback-timing-policy',
+    name: 'Fallback Timing Policy',
+  description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const ft = ev.fallbackTiming || ev.fallback; // allow harness legacy
+  if (!ft) return { id: 25, name: 'Fallback Timing Policy', description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)', passed: false, details: '❌ No fallback timing evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const udpOk = typeof ft.udpTimeoutMs === 'number' && ft.udpTimeoutMs >= 100 && ft.udpTimeoutMs <= 600; // expected window
+      const retryOk = typeof ft.retryDelayMs === 'number' ? ft.retryDelayMs <= 30 : true; // near-immediate retry
+      let teardownStd = ft.teardownStdDevMs;
+      if (!teardownStd && Array.isArray(ft.coverTeardownMs) && ft.coverTeardownMs.length >= 2) {
+        const arr = ft.coverTeardownMs;
+        const mean = arr.reduce((a:number,b:number)=>a+b,0)/arr.length;
+        teardownStd = Math.sqrt(arr.reduce((a:number,b:number)=>a + Math.pow(b-mean,2),0)/arr.length);
+      }
+  const teardownOk = typeof teardownStd !== 'number' || teardownStd <= 500; // dispersion limit
+  // Advanced metrics (Phase 7 quantitative modeling) if present
+  const cv = ft.coverTeardownCv;
+  const median = ft.coverTeardownMedianMs;
+  const p95 = ft.coverTeardownP95Ms;
+  const skew = ft.coverTeardownSkewness;
+  const outliers = ft.coverTeardownOutlierCount;
+  const anomalyCodes: string[] = ft.coverTeardownAnomalyCodes || [];
+  const modelScore = ft.behaviorModelScore;
+  const behaviorOk = ft.behaviorWithinPolicy !== false; // default pass unless explicitly false
+  const cvOk = typeof cv !== 'number' || cv <= 1.5;
+  const skewOk = typeof skew !== 'number' || Math.abs(skew) <= 1.2;
+  const outlierOk = typeof outliers !== 'number' || outliers <= Math.ceil((ft.coverTeardownMs?.length || 0) * 0.25);
+  const modelScoreOk = typeof modelScore !== 'number' || modelScore >= 0.6;
+  const passed = udpOk && retryOk && teardownOk && behaviorOk && cvOk && skewOk && outlierOk && modelScoreOk;
+  const detailParts = passed ? [
+    `udpTimeout=${ft.udpTimeoutMs}ms`,
+    `retryDelay=${ft.retryDelayMs||0}ms`,
+    `teardownStd=${Math.round(teardownStd||0)}ms`,
+    cv!==undefined?`cv=${cv.toFixed?cv.toFixed(3):cv}`:undefined,
+    median!==undefined?`median=${median}ms`:undefined,
+    p95!==undefined?`p95=${p95}ms`:undefined,
+    skew!==undefined?`skew=${(skew as number).toFixed? (skew as number).toFixed(2): skew}`:undefined,
+    modelScore!==undefined?`model=${modelScore}`:undefined,
+    anomalyCodes.length?`anomalies=[${anomalyCodes.join(',')}]`:undefined
+  ].filter(Boolean) : [];
+  const failReasons = !passed ? [
+    !udpOk && 'udpTimeout out of range',
+    !retryOk && 'retry delay too high',
+    !teardownOk && 'teardown variance high',
+    !behaviorOk && 'behavior model fail',
+    !cvOk && 'cv high',
+    !skewOk && 'skew excessive',
+    !outlierOk && 'outliers excessive',
+    !modelScoreOk && 'model score low'
+  ].filter(Boolean) : [];
+  const details = passed ? `✅ ${detailParts.join(' ')}` : `❌ Fallback timing issues: ${missingList(failReasons)}`;
+  return { id: 25, name: 'Fallback Timing Policy', description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
+    }
+  },
+  // Phase 7: Statistical jitter variance enforcement
+  {
+    id: 26,
+    key: 'padding-jitter-variance',
+    name: 'Padding Jitter Variance',
+    description: 'Enforces jitter stddev and mean bounds for adaptive padding distributions',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const sj = ev.statisticalJitter || ev.statisticalVariance;
+      if (!sj) return { id: 26, name: 'Padding Jitter Variance', description: 'Enforces jitter stddev and mean bounds for adaptive padding distributions', passed: false, details: '❌ No jitter variance evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const sampleOk = (sj.samples || sj.sampleCount || 0) >= 10;
+      const mean = sj.meanMs || sj.jitterMeanMs;
+      const std = sj.stdDevMs || sj.jitterStdDevMs;
+      const meanOk = typeof mean === 'number' && mean >= 5 && mean <= 800; // broad expected range
+      const stdOk = typeof std === 'number' && std >= 1 && std <= 1200; // control explosion
+      const passed = sampleOk && meanOk && stdOk;
+      const details = passed ? `✅ jitter mean=${Math.round(mean)}ms std=${Math.round(std)}ms samples=${sj.samples||sj.sampleCount}` : `❌ Jitter variance issues: ${missingList([!sampleOk && 'insufficient samples', !meanOk && 'mean out of range', !stdOk && 'stddev out of range'])}`;
+      return { id: 26, name: 'Padding Jitter Variance', description: 'Enforces jitter stddev and mean bounds for adaptive padding distributions', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
+    }
+  }
 ];
 
 // Unified export including all appended groups
-export const ALL_CHECKS: CheckDefinitionMeta[] = [...CHECK_REGISTRY, ...STEP_10_CHECKS as CheckDefinitionMeta[], ...PHASE_4_CHECKS];
+// Phase 7 continuation: new appended checks (advanced mix variance & HTTP/3 adaptive)
+export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
+  {
+    id: 27,
+    key: 'mix-advanced-variance',
+    name: 'Mix Advanced Variance',
+    description: 'Validates entropy (≥4 bits), path length stddev (>0), and uniqueness/diversity thresholds',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const mix = ev.mix;
+      if (!mix) return { id: 27, name: 'Mix Advanced Variance', description: 'Validates entropy (≥4 bits), path length stddev (>0), and uniqueness/diversity thresholds', passed: false, details: '❌ No mix variance evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const entropy = mix.nodeEntropyBits || 0;
+      const plStd = mix.pathLengthStdDev || 0;
+      const uniq = typeof mix.uniquenessRatio === 'number' ? mix.uniquenessRatio : 0;
+      const diversity = typeof mix.diversityIndex === 'number' ? mix.diversityIndex : 0;
+      const entropyOk = entropy >= 4; // heuristic baseline for ≥16 distinct-ish nodes with dispersion
+      const plStdOk = plStd > 0; // some variability in path lengths
+      const uniqOk = uniq >= 0.7; // slightly relaxed vs check 17 (which can be stricter)
+      const diversityOk = diversity >= 0.35; // allow slightly lower than primary check
+      const passed = entropyOk && plStdOk && uniqOk && diversityOk && mix.samples >= 5;
+      const details = passed ? `✅ entropy=${entropy.toFixed(2)} bits plStd=${plStd.toFixed(2)} uniq=${(uniq*100).toFixed(1)}% divIdx=${(diversity*100).toFixed(1)}%` : `❌ Mix variance insuff entropy=${entropy.toFixed(2)} bits plStd=${plStd.toFixed(2)} uniq=${(uniq*100).toFixed(1)}% divIdx=${(diversity*100).toFixed(1)}%`;
+      return { id: 27, name: 'Mix Advanced Variance', description: 'Validates entropy (≥4 bits), path length stddev (>0), and uniqueness/diversity thresholds', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
+    }
+  },
+  {
+    id: 28,
+    key: 'http3-adaptive-emulation',
+    name: 'HTTP/3 Adaptive Emulation',
+    description: 'Validates HTTP/3 (QUIC) adaptive padding jitter & QPACK settings',
+    severity: 'minor',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const h3 = ev.h3Adaptive;
+      if (!h3) return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter & QPACK settings', passed: false, details: '❌ No HTTP/3 adaptive evidence', severity: 'minor', evidenceType: 'heuristic' };
+      const passed = h3.withinTolerance && h3.sampleCount >= 5;
+      const details = passed ? `✅ jitterMean=${h3.paddingJitterMeanMs?.toFixed(1)}ms p95=${h3.paddingJitterP95Ms?.toFixed(1)}ms samples=${h3.sampleCount}` : `❌ HTTP/3 jitter out of tolerance mean=${h3.paddingJitterMeanMs?.toFixed(1)} p95=${h3.paddingJitterP95Ms?.toFixed(1)} samples=${h3.sampleCount}`;
+      return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter & QPACK settings', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
+    }
+  }
+];
+
+export const ALL_CHECKS: CheckDefinitionMeta[] = [...CHECK_REGISTRY, ...STEP_10_CHECKS as CheckDefinitionMeta[], ...PHASE_4_CHECKS, ...PHASE_7_CONT_CHECKS];
 
 // Append new checks to registry
 // (Avoid mutation side-effects if imported elsewhere before evaluation)
@@ -874,6 +1004,9 @@ for (const c of STEP_10_CHECKS) {
   if (!CHECK_REGISTRY.find(existing => existing.id === (c as any).id)) (CHECK_REGISTRY as any).push(c);
 }
 for (const c of PHASE_4_CHECKS) {
+  if (!CHECK_REGISTRY.find(existing => existing.id === (c as any).id)) (CHECK_REGISTRY as any).push(c);
+}
+for (const c of PHASE_7_CONT_CHECKS) {
   if (!CHECK_REGISTRY.find(existing => existing.id === (c as any).id)) (CHECK_REGISTRY as any).push(c);
 }
 

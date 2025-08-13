@@ -52,6 +52,11 @@ program
   .option('--enable-network', 'Allow network enrichment operations (default off)')
   .option('--fail-on-network', 'Fail if any network access attempted while disabled')
   .option('--network-allow <hosts>', 'Comma-separated host allowlist when network enabled')
+  .option('--evidence-signature <path>', 'Detached evidence JSON signature file (Phase 7)')
+  .option('--evidence-public-key <path>', 'Evidence signing public key file (ed25519)')
+  .option('--dsse-public-keys <path>', 'JSON map of keyid->public key (PEM or base64) for DSSE envelope verification')
+  .option('--evidence-bundle <path>', 'Multi-signer evidence bundle JSON (array of {evidence,signature,publicKey,signer})')
+  .option('--fail-on-sig-invalid', 'Exit non-zero if evidence signature invalid')
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -86,7 +91,12 @@ program
   , sbomFile: options.sbomFile, governanceFile: options.governanceFile,
   enableNetwork: options.enableNetwork,
   failOnNetwork: options.failOnNetwork,
-  networkAllowlist: options.networkAllow ? options.networkAllow.split(',').map(h=>h.trim()).filter(Boolean) : undefined
+  networkAllowlist: options.networkAllow ? options.networkAllow.split(',').map(h=>h.trim()).filter(Boolean) : undefined,
+  evidenceSignatureFile: options.evidenceSignature,
+  evidencePublicKeyFile: options.evidencePublicKey,
+  dssePublicKeysFile: options.dssePublicKeys,
+  evidenceBundleFile: options.evidenceBundle,
+  failOnSignatureInvalid: options.failOnSigInvalid
       });
       
       if (options.sbom) {
@@ -111,6 +121,9 @@ program
         process.exit(1);
       }
       // Exit with appropriate code
+      if (options.failOnSigInvalid && results?.diagnostics?.evidenceSignatureValid === false) {
+        process.exit(1);
+      }
       if (options.failOnDegraded && results.diagnostics?.degraded) {
         process.exit(1);
       }
