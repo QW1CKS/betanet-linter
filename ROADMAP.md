@@ -52,7 +52,7 @@ The following tasks constitute the definitive completion list. Implementing all 
    - Objective: Require optional signed evidence bundle (minisign/cosign) for artifact upgrades; reject if signature missing in strict-auth mode.
    - AC: strictAuth mode flag; evidenceSignatureValid=true required for artifact elevation; failure code EVIDENCE_UNSIGNED.
 
-[ ] 12. Adaptive PoW & Rate-Limit Statistical Validation
+[x] 12. Adaptive PoW & Rate-Limit Statistical Validation
    - Objective: Analyze powAdaptive.difficultySamples trend toward target acceptance percentile; rateLimit bucket dispersion statistical sanity beyond presence.
    - AC: Metrics: difficultyTrendStable=true, maxDrop<=configured, acceptancePercentile within tolerance; failure codes: POW_TREND_DIVERGENCE. Test with divergent synthetic series.
 
@@ -361,7 +361,7 @@ The following tasks constitute the definitive completion list. Implementing all 
   - Objective: Require optional signed evidence bundle (minisign/cosign) for artifact upgrades; reject if signature missing in strict-auth mode.
   - AC: strictAuth mode flag (CLI --strict-auth) triggers Check 35 requiring detached signature OR multi-signer bundle; failure code EVIDENCE_UNSIGNED.
 
-12. Adaptive PoW & Rate-Limit Statistical Validation
+[x] 12. Adaptive PoW & Rate-Limit Statistical Validation
    - Objective: Analyze powAdaptive.difficultySamples trend toward target acceptance percentile; rateLimit bucket dispersion statistical sanity beyond presence.
    - AC: Metrics: difficultyTrendStable=true, maxDrop<=configured, acceptancePercentile within tolerance; failure codes: POW_TREND_DIVERGENCE. Test with divergent synthetic series.
 

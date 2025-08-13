@@ -569,7 +569,31 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
   });
 
   // Task 12: Adaptive PoW & Rate-Limit Statistical Validation
-  test.todo('Task 12: Implement tests analyzing powAdaptive.difficultySamples trend (difficultyTrendStable, maxDrop) and acceptancePercentile; divergent synthetic series -> POW_TREND_DIVERGENCE.');
+  describe('Task 12: Adaptive PoW & Rate-Limit Statistical Validation (Check 36)', () => {
+    function analyzerForPow(pow: any, rl?: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: ['pow','adaptive'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true }),
+        getDiagnostics: () => ({}),
+        evidence: { powAdaptive: pow, rateLimit: rl }
+      } as any;
+    }
+    it('passes with stable trend, limited max drop, high acceptance percentile', async () => {
+      const pow = { difficultySamples: [22,22,21,22,22,23,22], targetBits: 22 };
+      const rl = { buckets: [{ name:'global', capacity:100 }, { name:'perIP', capacity:10 }] };
+      const result = await runWithAnalyzer(analyzerForPow(pow, rl));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.passed).toBe(true);
+      expect(check36.details).toMatch(/PoW trend stable/);
+    });
+    it('fails with divergent trend and high max drop producing POW_TREND_DIVERGENCE', async () => {
+      const pow = { difficultySamples: [22,18,15,12,10,8,5], targetBits: 22 }; // steep downward slope, large drops
+      const result = await runWithAnalyzer(analyzerForPow(pow));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.passed).toBe(false);
+      expect(check36.details).toMatch(/POW_TREND_DIVERGENCE/);
+    });
+  });
 
   // Task 13: Statistical Jitter Randomness Tests
   test.todo('Task 13: Implement tests performing chi-square / KS test mock with randomnessTest.pValue threshold; deterministic distribution => JITTER_RANDOMNESS_WEAK.');

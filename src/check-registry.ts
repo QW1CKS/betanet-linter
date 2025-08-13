@@ -584,6 +584,66 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     }
   }
   ,
+  // Task 12: Adaptive PoW & Rate-Limit Statistical Validation (Check 36)
+  {
+    id: 36,
+    key: 'adaptive-pow-rate-statistics',
+    name: 'Adaptive PoW & Rate-Limit Statistics',
+    description: 'Analyzes PoW difficulty trend stability, max drop, acceptance percentile & rate-limit bucket dispersion',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const pow = ev.powAdaptive;
+      const rl = ev.rateLimit;
+      if (!pow) {
+        return { id: 36, name: 'Adaptive PoW & Rate-Limit Statistics', description: 'Analyzes PoW difficulty trend stability, max drop, acceptance percentile & rate-limit bucket dispersion', passed: false, details: '❌ No powAdaptive evidence', severity: 'major', evidenceType: 'heuristic' };
+      }
+      const samples: number[] = Array.isArray(pow.difficultySamples) ? pow.difficultySamples.slice() : [];
+      const target = typeof pow.targetBits === 'number' ? pow.targetBits : (samples.length ? samples[0] : 0);
+      // Metrics
+      let maxDrop = 0;
+      for (let i=1;i<samples.length;i++) { const drop = samples[i-1] - samples[i]; if (drop>maxDrop) maxDrop = drop; }
+      // Linear regression slope (simple):
+      let slope = 0;
+      if (samples.length >= 3) {
+        const n = samples.length; const xs = samples.map((_,i)=>i); const meanX = (n-1)/2; const meanY = samples.reduce((a,b)=>a+b,0)/n;
+        let num=0, den=0; for (let i=0;i<n;i++){ num += (xs[i]-meanX)*(samples[i]-meanY); den += (xs[i]-meanX)**2; }
+        slope = den ? num/den : 0;
+      }
+      // Acceptance percentile: % of samples within ±2 of target
+      const withinTol = samples.filter(v => Math.abs(v - target) <= 2).length;
+      const acceptancePercentile = samples.length ? withinTol / samples.length : 0;
+      const difficultyTrendStable = Math.abs(slope) <= 0.2; // heuristic threshold
+      const maxDropOk = maxDrop <= 4; // reuse earlier PoW evolution tolerance
+      const acceptanceOk = acceptancePercentile >= 0.7; // require 70% within tolerance band
+      // Rate-limit dispersion sanity (if rl evidence present)
+      let rateLimitOk = true;
+      if (rl && Array.isArray(rl.buckets)) {
+        const caps = rl.buckets.map((b:any)=> b.capacity).filter((c:any)=> typeof c === 'number' && c>0);
+        if (caps.length >=2) {
+          const min = Math.min(...caps); const max = Math.max(...caps); const ratio = max/min;
+          // Flag as suspicious if dispersion extreme (>100x) unless explicitly justified
+          if (ratio > 100) rateLimitOk = false;
+        }
+      }
+      const passed = difficultyTrendStable && maxDropOk && acceptanceOk && rateLimitOk;
+      const evidenceType: 'heuristic' | 'artifact' = (pow && rl) ? 'artifact' : 'heuristic';
+      let details: string;
+      if (passed) {
+        details = `✅ PoW trend stable slope=${slope.toFixed(3)} maxDrop=${maxDrop} acceptPct=${(acceptancePercentile*100).toFixed(0)}%${!rateLimitOk?' rl-dispersion-anom':''}`;
+      } else {
+        const reasons = [] as string[];
+        if (!difficultyTrendStable) reasons.push('trend-unstable');
+        if (!maxDropOk) reasons.push('max-drop-exceeded');
+        if (!acceptanceOk) reasons.push('low-acceptance-percentile');
+        if (!rateLimitOk) reasons.push('rate-limit-dispersion');
+        details = `❌ POW_TREND_DIVERGENCE: ${reasons.join(',')}`;
+      }
+      return { id: 36, name: 'Adaptive PoW & Rate-Limit Statistics', description: 'Analyzes PoW difficulty trend stability, max drop, acceptance percentile & rate-limit bucket dispersion', passed, details, severity: 'major', evidenceType };
+    }
+  }
+  ,
   {
     id: 19,
     key: 'noise-rekey-policy',
