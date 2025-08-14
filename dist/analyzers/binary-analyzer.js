@@ -38,6 +38,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BinaryAnalyzer = void 0;
 const fs = __importStar(require("fs-extra"));
+// path import removed (unused)
 const execa_1 = __importDefault(require("execa"));
 class BinaryAnalyzer {
     async analyze(binaryPath) {

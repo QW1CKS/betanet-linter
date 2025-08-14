@@ -457,6 +457,7 @@ class BetanetComplianceChecker {
                 if (govObj.governanceHistoricalDiversity) {
                     analyzerAny.evidence.governanceHistoricalDiversity = govObj.governanceHistoricalDiversity;
                     try {
+                        // eslint-disable-next-line @typescript-eslint/no-var-requires -- dynamic import for optional governance parsing
                         const { evaluateHistoricalDiversity, evaluateHistoricalDiversityAdvanced } = require('./governance-parser');
                         const result = evaluateHistoricalDiversity(govObj.governanceHistoricalDiversity.series || []);
                         analyzerAny.evidence.governanceHistoricalDiversity.stable = result.stable;
@@ -493,8 +494,6 @@ class BetanetComplianceChecker {
         const timings = [];
         const maxParallel = options.maxParallel && options.maxParallel > 0 ? options.maxParallel : definitions.length;
         const timeoutMs = options.checkTimeoutMs && options.checkTimeoutMs > 0 ? options.checkTimeoutMs : undefined;
-        const queue = [...definitions];
-        const running = [];
         const startWall = performance.now();
         const attachHints = (result, defId) => {
             try {
@@ -505,7 +504,7 @@ class BetanetComplianceChecker {
                 const hints = [];
                 const stringReasons = reasons.filter(r => r.startsWith('strings-'));
                 const symbolReasons = reasons.filter(r => r.startsWith('symbols-'));
-                const depReasons = reasons.filter(r => r.startsWith('ldd'));
+                // Future: dependency resolution degradation hints (ldd parsing) can be surfaced here when implemented
                 const stringChecks = [1, 2, 4, 5, 6, 8, 10, 11];
                 const symbolChecks = [1, 3, 4, 10];
                 if (stringChecks.includes(defId) && stringReasons.length) {
@@ -520,8 +519,7 @@ class BetanetComplianceChecker {
                 }
                 if (symbolChecks.includes(defId) && symbolReasons.length)
                     hints.push('symbol extraction degraded');
-                if (depReasons.length && false)
-                    hints.push('dependency resolution degraded'); // placeholder
+                // Placeholder for future dependency resolution degradation hint (currently disabled)
                 if (!hints.length && diag.missingCoreTools?.length)
                     hints.push('core analysis tools missing');
                 if (hints.length)
@@ -555,16 +553,18 @@ class BetanetComplianceChecker {
                 checks.push({ id: def.id, name: def.name, description: def.description, passed: false, details: e && e.message === 'CHECK_TIMEOUT' ? '❌ Check timed out' : `❌ Check error: ${e?.message || e}`, severity: def.severity, durationMs: duration });
             }
         };
-        while (queue.length || running.length) {
-            while (queue.length && running.length < maxParallel) {
-                const def = queue.shift();
-                const p = runOne(def).finally(() => { const idx = running.indexOf(p); if (idx >= 0)
-                    running.splice(idx, 1); });
-                running.push(p);
-            }
-            if (running.length)
-                await Promise.race(running);
-        }
+        // Concurrency worker pool using recursive dispatcher (no constant-condition loops)
+        const total = definitions.length;
+        let currentIndex = 0;
+        const runNext = async () => {
+            if (currentIndex >= total)
+                return;
+            const def = definitions[currentIndex++];
+            await runOne(def);
+            return runNext();
+        };
+        const parallel = Math.min(maxParallel, total) || 1;
+        await Promise.all(Array.from({ length: parallel }, () => runNext()));
         const wallMs = performance.now() - startWall;
         checks.sort((a, b) => a.id - b.id);
         return { checks, timings, wallMs };

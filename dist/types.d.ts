@@ -1,4 +1,20 @@
 export interface Evidence {
+    echVerification?: {
+        outerSni?: string;
+        innerSni?: string;
+        outerCertHash?: string;
+        innerCertHash?: string;
+        certHashesDiffer?: boolean;
+        extensionPresent?: boolean;
+        greasePresent?: boolean;
+        greaseAbsenceObserved?: boolean;
+        outerAlpn?: string[];
+        innerAlpn?: string[];
+        alpnConsistent?: boolean;
+        diffIndicators?: string[];
+        verified?: boolean;
+        failureCodes?: string[];
+    };
     h2AdaptiveDynamic?: {
         settings?: Record<string, number>;
         paddingJitterMeanMs?: number;
@@ -31,11 +47,38 @@ export interface Evidence {
         pqDateOk?: boolean;
         withinPolicy?: boolean;
     };
+    noiseTranscript?: {
+        messages?: {
+            type: string;
+            nonce?: number;
+            direction?: '->' | '<-';
+            bytes?: number;
+            ts?: number;
+            keyEpoch?: number;
+        }[];
+        rekeysObserved?: number;
+        rekeyTriggers?: {
+            bytes?: number;
+            timeMinSec?: number;
+            frames?: number;
+        };
+        rekeyEvents?: {
+            atMessage?: number;
+            trigger?: 'bytes' | 'time' | 'frames';
+            bytes?: number;
+            frames?: number;
+            timeMinSec?: number;
+        }[];
+        transcriptHash?: string;
+        pqDateOk?: boolean;
+    };
     scionControl?: {
         offers?: {
             path: string;
             latencyMs?: number;
             expiresAt?: string;
+            ts?: number;
+            flowId?: string;
         }[];
         rawCborB64?: string;
         uniquePaths?: number;
@@ -43,6 +86,14 @@ export interface Evidence {
         duplicateOfferDetected?: boolean;
         duplicateWindowSec?: number;
         parseError?: string;
+        schemaValid?: boolean;
+        pathSwitchLatenciesMs?: number[];
+        maxPathSwitchLatencyMs?: number;
+        probeIntervalsMs?: number[];
+        avgProbeIntervalMs?: number;
+        rateBackoffOk?: boolean;
+        signatureValid?: boolean;
+        timestampSkewOk?: boolean;
     };
 }
 export interface ComplianceCheck {
@@ -293,7 +344,28 @@ export interface IngestedEvidence {
             used?: boolean;
             justified?: boolean;
             livenessDays?: number;
+            chain?: string;
         };
+        chains?: {
+            name: string;
+            finalityDepth?: number;
+            weightSum?: number;
+            epoch?: number;
+            signatures?: {
+                signer: string;
+                weight?: number;
+                valid?: boolean;
+            }[];
+        }[];
+        requiredFinalityDepth?: number;
+        weightThresholdPct?: number;
+        uniqueSignerCount?: number;
+        duplicateSignerDetected?: boolean;
+        epochMonotonic?: boolean;
+        emergencyAdvanceActiveChains?: string[];
+        signatureValidationMode?: 'placeholder' | 'ed25519';
+        signatureSampleVerifiedPct?: number;
+        weightCapExceeded?: boolean;
     };
     governanceHistoricalDiversity?: {
         series?: {
@@ -321,6 +393,32 @@ export interface IngestedEvidence {
         diversityIndex?: number;
         nodeEntropyBits?: number;
         pathLengthStdDev?: number;
+        beaconSources?: {
+            drand?: {
+                round?: number;
+                randomness?: string;
+            };
+            nist?: {
+                entropyHex?: string;
+            };
+            eth?: {
+                blockNumber?: number;
+                blockHash?: string;
+            };
+        };
+        aggregatedBeaconEntropyBits?: number;
+        vrfProofs?: {
+            hopSetIndex: number;
+            proof?: string;
+            valid?: boolean;
+        }[];
+        nodeASNs?: Record<string, string>;
+        nodeOrgs?: Record<string, string>;
+        asDiversityIndex?: number;
+        orgDiversityIndex?: number;
+        firstReuseIndex?: number;
+        requiredUniqueBeforeReuse?: number;
+        vrfSelectionSimulated?: boolean;
     };
     h2Adaptive?: {
         settings?: Record<string, number>;
@@ -351,6 +449,8 @@ export interface IngestedEvidence {
         alpn?: string[];
         extensions?: number[];
         extOrderSha256?: string;
+        extensionCount?: number;
+        popId?: string;
     };
     dynamicClientHelloCapture?: {
         alpn?: string[];
@@ -358,6 +458,7 @@ export interface IngestedEvidence {
         ja3?: string;
         ja3Hash?: string;
         ja3Canonical?: string;
+        ja4?: string;
         capturedAt?: string;
         matchStaticTemplate?: boolean;
         note?: string;
@@ -369,6 +470,8 @@ export interface IngestedEvidence {
         rawClientHelloB64?: string;
         rawClientHelloCanonicalB64?: string;
         rawClientHelloCanonicalHash?: string;
+        extensionCount?: number;
+        popId?: string;
     };
     accessTicket?: {
         detected: boolean;
@@ -404,6 +507,11 @@ export interface IngestedEvidence {
             n?: number;
             t?: number;
         };
+        publicKeysB64?: string[];
+        aggregatedPublicKeyB64?: string;
+        sigAlgorithm?: string;
+        verificationMode?: 'synthetic' | 'aggregated-ed25519';
+        signatureComputedValid?: boolean;
     };
     calibrationBaseline?: {
         alpn?: string[];
@@ -434,6 +542,12 @@ export interface IngestedEvidence {
         targetBits?: number;
         monotonicTrend?: boolean;
         anomalies?: string[];
+        acceptancePercentile?: number;
+        regressionSlope?: number;
+        windowSize?: number;
+        windowMaxDrop?: number;
+        rollingAcceptance?: number[];
+        recentMeanBits?: number;
     };
     rateLimit?: {
         buckets?: {
@@ -444,12 +558,45 @@ export interface IngestedEvidence {
         bucketCount?: number;
         distinctScopes?: number;
         scopeRefillVariancePct?: number;
+        bucketSaturationPct?: number[];
+        dispersionRatio?: number;
+        capacityP95?: number;
+        capacityStdDev?: number;
+        refillVarianceTrend?: number;
     };
     algorithmAgility?: {
         registryDigest?: string;
         allowedSets?: string[];
         usedSets?: string[];
         unregisteredUsed?: string[];
+    };
+    scionControl?: {
+        offers?: {
+            path?: string;
+            latencyMs?: number;
+            ts?: number;
+            flowId?: string;
+        }[];
+        uniquePaths?: number;
+        noLegacyHeader?: boolean;
+        duplicateOfferDetected?: boolean;
+        parseError?: string;
+        schemaValid?: boolean;
+        pathSwitchLatenciesMs?: number[];
+        maxPathSwitchLatencyMs?: number;
+        probeIntervalsMs?: number[];
+        avgProbeIntervalMs?: number;
+        rateBackoffOk?: boolean;
+        signatureValid?: boolean;
+        timestampSkewOk?: boolean;
+        rawCborB64?: string;
+        signatureB64?: string;
+        publicKeyB64?: string;
+        signatureAlgorithm?: string;
+        controlStreamHash?: string;
+        duplicateWindowSec?: number;
+        tokenBucketLevels?: number[];
+        expectedBucketCapacity?: number;
     };
     negative?: {
         forbiddenPresent?: string[];

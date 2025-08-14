@@ -78,11 +78,12 @@ function sanitizeName(name) {
     }
     catch { /* ignore */ }
     // Replace disallowed chars
-    let cleaned = name.replace(/[^A-Za-z0-9._-]+/g, '-');
+    // Hyphen placed at end of class, so no need to escape; remove superfluous escapes triggering lint
+    let cleaned = name.replace(/[^A-Za-z0-9._.-]+/g, '-');
     // Collapse dashes
     cleaned = cleaned.replace(/-+/g, '-');
     // Trim leading/trailing dashes/periods (avoid hidden or awkward names)
-    cleaned = cleaned.replace(/^[\-.]+/, '').replace(/[\-.]+$/, '');
+    cleaned = cleaned.replace(/^[.-]+/, '').replace(/[.-]+$/, '');
     if (!cleaned.length)
         cleaned = 'component';
     if (cleaned.length > exports.COMPONENT_NAME_MAX_LENGTH) {

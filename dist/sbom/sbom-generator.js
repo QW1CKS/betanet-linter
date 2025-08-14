@@ -222,6 +222,7 @@ class SBOMGenerator {
         catch (error) {
             try {
                 // Fallback to Node.js crypto
+                // eslint-disable-next-line @typescript-eslint/no-var-requires -- conditional runtime require for portability
                 const crypto = require('crypto');
                 const hash = crypto.createHash('sha256');
                 const data = await fs.readFile(binaryPath);
@@ -240,7 +241,7 @@ class SBOMGenerator {
         // ISSUE-021: Improved version inference with context & scoring
         // Scoring tiers: semver (3), semver+pre (3), date-like (2), sha/hash near keyword (1)
         const versionRegexes = [
-            { re: /\b[vV]?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z\.-]+)?)\b/g, score: 3, normalize: m => m[1] }, // semver & prerelease
+            { re: /\b[vV]?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\b/g, score: 3, normalize: m => m[1] }, // semver & prerelease
             { re: /\b(\d{4}\.\d{1,2}\.\d{1,2})\b/g, score: 2, normalize: m => m[1] }, // date style
             { re: /\b([0-9a-f]{7,12})\b/g, score: 1, normalize: m => m[1] } // short git hash
         ];
@@ -456,7 +457,7 @@ class SBOMGenerator {
             ];
             const found = [];
             // Capture composite expressions like "Apache-2.0 OR MIT" or "Apache-2.0 AND MIT"
-            const compositeMatch = text.match(/((?:[A-Za-z0-9\.-]+\s+(?:OR|AND)\s+)+[A-Za-z0-9\.-]+)/);
+            const compositeMatch = text.match(/((?:[A-Za-z0-9.-]+\s+(?:OR|AND)\s+)+[A-Za-z0-9.-]+)/); // remove unnecessary escapes
             if (compositeMatch) {
                 const expr = compositeMatch[1];
                 expr.split(/\s+(?:OR|AND)\s+/).forEach(token => {
@@ -483,72 +484,80 @@ class SBOMGenerator {
         try {
             switch (ext) {
                 case '.json':
-                    const pkgJson = await fs.readJSON(packagePath);
-                    if (pkgJson.dependencies) {
-                        Object.entries(pkgJson.dependencies).forEach(([name, version]) => {
-                            const safe = (0, constants_1.sanitizeName)(name);
-                            dependencies.push({
-                                ref: safe,
-                                version: version,
-                                type: 'npm',
-                                purl: `pkg:npm/${safe}@${version}`
-                            });
-                        });
-                    }
-                    break;
-                case '.txt':
-                    const content = await fs.readFile(packagePath, 'utf8');
-                    const lines = content.split('\n');
-                    lines.forEach(line => {
-                        const match = line.match(/^([a-zA-Z0-9\-_]+)==(.+)$/);
-                        if (match) {
-                            const safe = (0, constants_1.sanitizeName)(match[1]);
-                            dependencies.push({
-                                ref: safe,
-                                version: match[2],
-                                type: 'pip',
-                                purl: `pkg:pypi/${safe}@${match[2]}`
-                            });
-                        }
-                    });
-                    break;
-                case '.toml':
-                    const tomlContent = await fs.readFile(packagePath, 'utf8');
-                    // Simple TOML parsing (for basic dependencies)
-                    const depMatches = tomlContent.match(/dependencies\s*=\s*\{([^}]+)\}/);
-                    if (depMatches) {
-                        const depsStr = depMatches[1];
-                        const depPairs = depsStr.split(',');
-                        depPairs.forEach(pair => {
-                            const [name, version] = pair.split('=').map(s => s.trim().replace(/"/g, ''));
-                            if (name && version) {
+                    {
+                        const pkgJson = await fs.readJSON(packagePath);
+                        if (pkgJson.dependencies) {
+                            Object.entries(pkgJson.dependencies).forEach(([name, version]) => {
                                 const safe = (0, constants_1.sanitizeName)(name);
                                 dependencies.push({
                                     ref: safe,
                                     version: version,
-                                    type: 'cargo',
-                                    purl: `pkg:cargo/${safe}@${version}`
+                                    type: 'npm',
+                                    purl: `pkg:npm/${safe}@${version}`
+                                });
+                            });
+                        }
+                    }
+                    break;
+                case '.txt':
+                    {
+                        const content = await fs.readFile(packagePath, 'utf8');
+                        const lines = content.split('\n');
+                        lines.forEach(line => {
+                            const match = line.match(/^([a-zA-Z0-9-_]+)==(.+)$/); // removed unnecessary escape before -
+                            if (match) {
+                                const safe = (0, constants_1.sanitizeName)(match[1]);
+                                dependencies.push({
+                                    ref: safe,
+                                    version: match[2],
+                                    type: 'pip',
+                                    purl: `pkg:pypi/${safe}@${match[2]}`
                                 });
                             }
                         });
                     }
                     break;
+                case '.toml':
+                    {
+                        const tomlContent = await fs.readFile(packagePath, 'utf8');
+                        // Simple TOML parsing (for basic dependencies)
+                        const depMatches = tomlContent.match(/dependencies\s*=\s*\{([^}]+)\}/);
+                        if (depMatches) {
+                            const depsStr = depMatches[1];
+                            const depPairs = depsStr.split(',');
+                            depPairs.forEach(pair => {
+                                const [name, version] = pair.split('=').map(s => s.trim().replace(/"/g, ''));
+                                if (name && version) {
+                                    const safe = (0, constants_1.sanitizeName)(name);
+                                    dependencies.push({
+                                        ref: safe,
+                                        version: version,
+                                        type: 'cargo',
+                                        purl: `pkg:cargo/${safe}@${version}`
+                                    });
+                                }
+                            });
+                        }
+                    }
+                    break;
                 case '.mod':
-                    const modContent = await fs.readFile(packagePath, 'utf8');
-                    const requireMatches = modContent.match(/require\s+([^\s]+)\s+(.+)/g);
-                    if (requireMatches) {
-                        requireMatches.forEach(match => {
-                            const parts = match.split(/\s+/);
-                            if (parts.length >= 3) {
-                                const safe = (0, constants_1.sanitizeName)(parts[1]);
-                                dependencies.push({
-                                    ref: safe,
-                                    version: parts[2],
-                                    type: 'go',
-                                    purl: `pkg:golang/${safe}@${parts[2]}`
-                                });
-                            }
-                        });
+                    {
+                        const modContent = await fs.readFile(packagePath, 'utf8');
+                        const requireMatches = modContent.match(/require\s+([^\s]+)\s+(.+)/g);
+                        if (requireMatches) {
+                            requireMatches.forEach(match => {
+                                const parts = match.split(/\s+/);
+                                if (parts.length >= 3) {
+                                    const safe = (0, constants_1.sanitizeName)(parts[1]);
+                                    dependencies.push({
+                                        ref: safe,
+                                        version: parts[2],
+                                        type: 'go',
+                                        purl: `pkg:golang/${safe}@${parts[2]}`
+                                    });
+                                }
+                            });
+                        }
                     }
                     break;
             }

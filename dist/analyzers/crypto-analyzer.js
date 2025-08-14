@@ -4,6 +4,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CryptoAnalyzer = void 0;
+// Removed unused fs import (lint cleanup)
 const execa_1 = __importDefault(require("execa"));
 class CryptoAnalyzer {
     async analyze(binaryPath) {

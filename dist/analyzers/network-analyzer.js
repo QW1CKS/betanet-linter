@@ -32,13 +32,10 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NetworkAnalyzer = void 0;
 const fs = __importStar(require("fs-extra"));
-const execa_1 = __importDefault(require("execa"));
+const safe_exec_1 = require("../safe-exec");
 class NetworkAnalyzer {
     async analyze(binaryPath) {
         const [protocols, ports, endpoints, certificates, tlsConfig] = await Promise.all([
@@ -112,8 +109,9 @@ class NetworkAnalyzer {
             const content = buffer.toString('latin1');
             const endpoints = [];
             // Look for URL patterns and endpoints
-            const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
-            const endpointRegex = /\/[a-zA-Z0-9\-_\/]+/g;
+            // eslint-disable-next-line no-useless-escape -- backslash before / is required to represent literal slash at start
+            const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`[\]]+/g; // Removed unnecessary escape for '['; keep escaped ] & \
+            const endpointRegex = /\/[\w/-]+/g; // Removed unnecessary escape for '/' inside character class
             const urlMatches = content.match(urlRegex);
             const endpointMatches = content.match(endpointRegex);
             if (urlMatches) {
@@ -134,7 +132,8 @@ class NetworkAnalyzer {
     }
     async detectCertificates(binaryPath) {
         try {
-            const { stdout } = await (0, execa_1.default)('strings', [binaryPath]);
+            const res = await (0, safe_exec_1.safeExec)('strings', [binaryPath], 4000);
+            const stdout = res.failed ? '' : res.stdout;
             const certificates = [];
             // Look for certificate-related strings
             const certPatterns = [
@@ -185,7 +184,8 @@ class NetworkAnalyzer {
     }
     async analyzeTLSConfig(binaryPath) {
         try {
-            const { stdout } = await (0, execa_1.default)('strings', [binaryPath]);
+            const res = await (0, safe_exec_1.safeExec)('strings', [binaryPath], 4000);
+            const stdout = res.failed ? '' : res.stdout;
             const tlsConfig = {
                 versions: [],
                 ciphers: [],

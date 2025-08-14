@@ -33,6 +33,7 @@ export interface HarnessOptions {
         innerHost?: string;
         simulateCertDiff?: boolean;
         greaseAnomaly?: boolean;
+        innerAddsPrivateAlpn?: boolean;
     };
 }
 export interface HarnessEvidence {

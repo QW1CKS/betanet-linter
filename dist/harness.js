@@ -106,7 +106,6 @@ async function performTlsProbe(host, port = 443, offeredAlpn = ['h2', 'http/1.1'
 async function simulateFallback(host, udpPort, tcpPort, udpTimeoutMs, coverConnections = 0) {
     const start = Date.now();
     const udpSocket = dgram.createSocket('udp4');
-    let udpDone = false;
     // Send a single empty datagram (most likely no listener -> silent drop)
     try {
         udpSocket.send(Buffer.from('ping'), udpPort, host, () => { });
@@ -114,17 +113,14 @@ async function simulateFallback(host, udpPort, tcpPort, udpTimeoutMs, coverConne
     catch { /* ignore */ }
     const fallback = { udpAttempted: true, udpTimeoutMs, tcpConnected: false };
     await new Promise(r => setTimeout(r, udpTimeoutMs));
-    udpDone = true;
     try {
         udpSocket.close();
     }
     catch { /* ignore */ }
     const tcpStart = Date.now();
-    let tcpConnected = false;
     await new Promise(resolve => {
         try {
             const sock = net.createConnection({ host, port: tcpPort, timeout: 4000 }, () => {
-                tcpConnected = true;
                 fallback.tcpConnected = true;
                 fallback.tcpConnectMs = Date.now() - tcpStart;
                 fallback.tcpRetryDelayMs = tcpStart - (start + udpTimeoutMs); // delay after UDP wait until TCP attempt (should be ~0)
@@ -254,11 +250,20 @@ async function runHarness(binaryPath, outFile, opts = {}) {
         const outerCertHash = crypto.createHash('sha256').update('cert:' + outerHost).digest('hex').slice(0, 12);
         const innerCertHash = opts.echSimulate.simulateCertDiff ? crypto.createHash('sha256').update('cert:' + innerHost + ':inner').digest('hex').slice(0, 12) : outerCertHash;
         const certHashesDiffer = outerCertHash !== innerCertHash;
+        // Simulated ALPN offerings (outer always offers h2,http/1.1; inner may add private alpn)
+        const outerAlpn = ['h2', 'http/1.1'];
+        const innerAlpn = opts.echSimulate.innerAddsPrivateAlpn ? ['h2', 'http/1.1', 'priv-alpn'] : ['h2', 'http/1.1'];
+        const alpnConsistent = outerAlpn.every((a, i) => innerAlpn[i] === a); // strict prefix order consistent
+        const greasePresent = !opts.echSimulate.greaseAnomaly; // anomaly => missing GREASE rotation
         const diffIndicators = [];
         if (certHashesDiffer)
             diffIndicators.push('cert-hash-diff');
-        if (!opts.echSimulate.greaseAnomaly)
-            diffIndicators.push('grease-absent');
+        if (alpnConsistent)
+            diffIndicators.push('alpn-ok');
+        if (greasePresent)
+            diffIndicators.push('grease-present');
+        else
+            diffIndicators.push('grease-missing');
         evidence;
         evidence.echVerification = {
             outerSni: outerHost,
@@ -267,7 +272,11 @@ async function runHarness(binaryPath, outFile, opts = {}) {
             innerCertHash,
             certHashesDiffer,
             extensionPresent: true,
-            greaseAbsenceObserved: !opts.echSimulate.greaseAnomaly,
+            greasePresent,
+            greaseAbsenceObserved: greasePresent, // backward compatibility
+            outerAlpn,
+            innerAlpn,
+            alpnConsistent,
             diffIndicators
         };
     }
@@ -308,19 +317,58 @@ async function runHarness(binaryPath, outFile, opts = {}) {
             evidence.fallback.policy = { retryDelayMsOk: retryDelayOk, coverConnectionsOk: coverOk, teardownSpreadOk: spreadOk, overall: retryDelayOk && coverOk && spreadOk };
         }
     }
-    // Simulate a Noise rekey observation (Step 9 placeholder)
+    // Simulate a full Noise transcript with rekey events (Task 3)
     if (opts.rekeySimulate) {
-        const rekeysObserved = 1; // single rekey event
-        evidence.noiseTranscriptDynamic = {
-            messagesObserved: ['e', 'ee', 's', 'es', 'rekey'],
-            expectedSequenceOk: true,
-            rekeysObserved,
-            rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024, timeMinSec: 3600, frames: 65536 },
-            nonceReuseDetected: false,
-            patternVerified: true,
-            pqDateOk: true,
-            withinPolicy: true
-        };
+        // Allow caller to choose trigger type; default bytes
+        const rekeyOpts = typeof opts.rekeySimulate === 'object' ? opts.rekeySimulate : {};
+        const triggerType = rekeyOpts.trigger || 'bytes';
+        // Build initial XK handshake messages
+        const messages = [
+            { type: 'e', nonce: 0, keyEpoch: 0, ts: 0 },
+            { type: 'ee', nonce: 1, keyEpoch: 0, ts: 5 },
+            { type: 's', nonce: 2, keyEpoch: 0, ts: 10 },
+            { type: 'es', nonce: 3, keyEpoch: 0, ts: 15 }
+        ];
+        // Simulated traffic frames until trigger threshold reached
+        let totalBytes = 0;
+        let frames = 0;
+        const start = Date.now();
+        while (true) {
+            const size = 1024 * 64; // 64KB per frame (simulation)
+            totalBytes += size;
+            frames++;
+            const elapsedSec = (Date.now() - start) / 1000;
+            messages.push({ type: 'data', nonce: 4 + frames, keyEpoch: 0, bytes: size, ts: Math.floor(elapsedSec * 1000) });
+            const bytesReached = totalBytes >= (8 * 1024 * 1024 * 1024);
+            const framesReached = frames >= 65536;
+            const timeReached = elapsedSec >= 3600;
+            if ((triggerType === 'bytes' && bytesReached) || (triggerType === 'frames' && framesReached) || (triggerType === 'time' && timeReached))
+                break;
+            if (frames > 10 && triggerType === 'bytes')
+                break; // cap loop in simulation for brevity when not really accumulating 8GiB
+            if (frames > 10 && triggerType === 'frames')
+                break; // same cap
+            if (frames > 10 && triggerType === 'time')
+                break; // same cap
+        }
+        // Insert rekey event
+        messages.push({ type: 'rekey', nonce: 999999, keyEpoch: 0, ts: messages[messages.length - 1].ts + 5 });
+        // Continue a couple of post-rekey data messages with epoch increment & nonce reset
+        messages.push({ type: 'data', nonce: 0, keyEpoch: 1, bytes: 2048, ts: messages[messages.length - 1].ts + 10 });
+        messages.push({ type: 'data', nonce: 1, keyEpoch: 1, bytes: 4096, ts: messages[messages.length - 1].ts + 15 });
+        const rekeysObserved = 1;
+        const rekeyEvents = [{ atMessage: messages.findIndex(m => m.type === 'rekey'), trigger: triggerType }];
+        const rekeyTriggers = {};
+        if (triggerType === 'bytes')
+            rekeyTriggers.bytes = 8 * 1024 * 1024 * 1024;
+        if (triggerType === 'frames')
+            rekeyTriggers.frames = 65536;
+        if (triggerType === 'time')
+            rekeyTriggers.timeMinSec = 3600;
+        // Compute a simple transcript hash (sha256 over type+nonce+epoch sequence)
+        const hashInput = messages.map(m => `${m.type}:${m.nonce ?? ''}:${m.keyEpoch}`).join('|');
+        const transcriptHash = crypto.createHash('sha256').update(hashInput).digest('hex');
+        evidence.noiseTranscript = { messages, rekeysObserved, rekeyEvents, rekeyTriggers, transcriptHash, pqDateOk: true };
     }
     // Simulate HTTP/2 adaptive emulation jitter metrics (Step 9 placeholder)
     if (opts.h2AdaptiveSimulate) {
@@ -392,6 +440,8 @@ async function runHarness(binaryPath, outFile, opts = {}) {
         const host = opts.clientHelloCapture.host;
         const port = opts.clientHelloCapture.port || 443;
         const openssl = opts.clientHelloCapture.opensslPath || 'openssl';
+        // Record pre-flight baseline timestamp for calibration pairing
+        const preflightAt = new Date().toISOString();
         try {
             const output = await new Promise((resolve) => {
                 // Use -msg for richer handshake dump when available; fall back to -tlsextdebug only
@@ -453,6 +503,7 @@ async function runHarness(binaryPath, outFile, opts = {}) {
             // Build canonical textual representation (future: real packet capture to replace extIds/ciphers ordering)
             const canonical = (0, tls_capture_1.buildCanonicalClientHello)({ extensions: extIds, ciphers, curves, alpn, host });
             const matchStatic = !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256);
+            const extensionCount = extIds.length;
             let mismatchReason;
             if (!matchStatic && evidence.clientHello) {
                 if (alpn && evidence.clientHello.alpn) {
@@ -597,6 +648,19 @@ async function runHarness(binaryPath, outFile, opts = {}) {
                 rawClientHelloCanonicalB64: canonicalRaw ? canonicalRaw.toString('base64') : undefined,
                 rawClientHelloCanonicalHash: canonicalRaw ? crypto.createHash('sha256').update(canonicalRaw).digest('hex') : undefined
             };
+            evidence.dynamicClientHelloCapture.extensionCount = extensionCount;
+            evidence.dynamicClientHelloCapture.popId = process.env.BETANET_POP_ID || undefined;
+            // Pair calibration baseline with dynamic capture if absent
+            if (!evidence.calibrationPreflightPair && evidence.clientHello) {
+                evidence.calibrationPreflightPair = {
+                    baselineCapturedAt: preflightAt,
+                    dynamicCapturedAt: evidence.dynamicClientHelloCapture.capturedAt,
+                    baselineAlpn: evidence.clientHello.alpn,
+                    dynamicAlpn: evidence.dynamicClientHelloCapture.alpn,
+                    baselineExtHash: evidence.clientHello.extOrderSha256,
+                    dynamicExtHash: evidence.dynamicClientHelloCapture.extOrderSha256
+                };
+            }
             if (!evidence.calibrationBaseline && evidence.clientHello) {
                 evidence.calibrationBaseline = { alpn: evidence.clientHello.alpn, extOrderSha256: evidence.clientHello.extOrderSha256, source: 'static-template', capturedAt: new Date().toISOString() };
             }
@@ -679,21 +743,19 @@ async function runHarness(binaryPath, outFile, opts = {}) {
             }
         });
         // Basic parse (sent packet + potential response classification)
-        function decodeVarInt(buf, offset) {
+        const decodeVarInt = (buf, offset) => {
             if (offset >= buf.length)
                 return null;
             const first = buf[offset];
             const prefix = first >> 6; // 2 bits
-            let length = 1 << prefix; // 1,2,4,8
+            const length = 1 << prefix; // 1,2,4,8
             if (offset + length > buf.length)
                 return null;
-            let value = first & (prefix === 0 ? 0x3f : prefix === 1 ? 0x3f : prefix === 2 ? 0x3f : 0x3f);
-            // Simplified: for >1 byte lengths, accumulate remaining bytes
-            for (let i = 1; i < length; i++) {
+            let value = first & 0x3f; // simplified mask
+            for (let i = 1; i < length; i++)
                 value = (value << 8) | buf[offset + i];
-            }
             return { value, bytes: length };
-        }
+        };
         if (!initial.error && initial.udpSent) {
             try {
                 const raw = quicProbe; // what we sent
@@ -703,9 +765,9 @@ async function runHarness(binaryPath, outFile, opts = {}) {
                     const scilIndex = 6 + dcil; // after DCID len + DCID
                     const scil = raw[scilIndex];
                     const tokenLenIndex = scilIndex + 1 + scil; // after SCID len + SCID
-                    let tokenLength = raw[tokenLenIndex];
+                    const tokenLength = raw[tokenLenIndex];
                     let cursor = tokenLenIndex + 1;
-                    let lengthField;
+                    let lengthField; // stays let: assigned conditionally
                     const lenDecoded = decodeVarInt(raw, cursor);
                     if (lenDecoded) {
                         lengthField = lenDecoded.value;

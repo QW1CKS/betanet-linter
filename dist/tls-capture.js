@@ -39,7 +39,7 @@ const crypto = __importStar(require("crypto"));
 // It organizes provided structural elements into a more faithful TLS ClientHello
 // layout so later real packet capture can swap in without changing callers.
 function buildCanonicalClientHello(struct) {
-    const { extensions, ciphers, curves = [], alpn = [], host = 'example.org', seedHash } = struct;
+    const { extensions, ciphers, curves = [] } = struct; // drop unused destructured vars
     const version = 771; // TLS1.2 in JA3 format
     const ecPointFormats = []; // not parsed yet
     // JA3 canonical per spec: SSLVersion,CipherSuites,Extensions,EllipticCurves,EllipticCurvePointFormats
@@ -53,6 +53,11 @@ function buildCanonicalClientHello(struct) {
     const ja3Hash = crypto.createHash('md5').update(ja3).digest('hex');
     // Provide ja3Canonical separate to allow future divergence once real capture differs
     const ja3Canonical = ja3;
+    // Derive extension count and a coarse JA4-style placeholder hash for forward compatibility
+    // extensionCount & ALPN set hash reserved for future enhanced JA4 style classification (omitted to avoid unused var lint)
+    // JA4 simplified: version|cipherCount|extCount|alpnSetHash
+    // JA4 placeholder kept for potential future return (not yet wired through types to avoid unused var warnings)
+    // const ja4 = `${version}|${ciphers.length}|${extensionCount}|${alpnSetHash}`;
     // Synthetic raw canonical already produced in harness; we only compute textual here.
     return { ja3, ja3Hash, ja3Canonical, rawSynthetic: undefined, rawCanonical: undefined, extensions, ciphers, curves, ecPointFormats };
 }
