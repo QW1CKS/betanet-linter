@@ -67,6 +67,15 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 - Added tests covering pass, calibration mismatch, and missing evidence scenarios.
 - Roadmap Task 18 marked complete; Task 24 will later expand to full transport parameter parsing & additional mismatch codes.
 
+### Task 20: Mix Diversity Variance & Entropy Metrics
+- Extended mix evidence schema with variance & confidence fields: pathLengthMean, pathLengthStdErr, pathLengthCI95Width, varianceMetricsComputed, entropyConfidence.
+- Harness now computes mean, stddev, stdErr, 95% CI width and a heuristic entropyConfidence based on sample size.
+- Check 17 upgraded to enforce variance sanity (non-zero/non-excessive stddev, reasonable CI width) and entropy confidence (≥0.5 when provided) alongside existing uniqueness, entropy, diversity, reuse, AS/Org, VRF & beacon thresholds.
+- Failure diagnostics extended: adds reasons 'path length variance abnormal' and 'entropy confidence low'.
+- Updated details output to surface plStd, ci95W and entConf metrics for auditing.
+- Tests to be added in subsequent commit expanding negative scenarios (variance anomaly, low entropy confidence) – placeholder if not yet present.
+- Caveats: thresholds heuristic (stddev ≤ 1.5*mean, CI width ≤ max(2, 1.2*mean)); future work may introduce statistical hypothesis tests & bootstrap CI for entropy; variance anomaly reasons not yet codified as distinct failure codes (string reasons only) to preserve backward compatibility.
+
 ### Task 11 Completion: Provenance & Evidence Authenticity Hardening
 ### Task 12 Completion: Algorithm Agility Registry Enforcement
 ### Task 13 Completion: Statistical Jitter Randomness Multi-Metric Enforcement

@@ -917,7 +917,12 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       uniquenessRatio: hopSets.length ? uniqueSet.size / hopSets.length : 0,
       diversityIndex,
       nodeEntropyBits: Number(entropy.toFixed(3)),
-      pathLengthStdDev: Number(plStd.toFixed(3))
+  pathLengthStdDev: Number(plStd.toFixed(3)),
+  pathLengthMean: Number(plMean.toFixed(3)),
+  pathLengthStdErr: Number((plStd / Math.sqrt(pathLengths.length || 1)).toFixed(4)),
+  pathLengthCI95Width: Number((2 * 1.96 * (plStd / Math.sqrt(pathLengths.length || 1))).toFixed(4)),
+  varianceMetricsComputed: true,
+  entropyConfidence: Number((Math.min(1, Math.max(0, 1 - (1/(1+pathLengths.length)) ))).toFixed(3))
     } as any;
     // Mirror into consolidated statisticalVariance if present
     (evidence as any).statisticalVariance = (evidence as any).statisticalVariance || {};

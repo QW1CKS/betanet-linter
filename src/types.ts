@@ -366,6 +366,12 @@ export interface IngestedEvidence {
   diversityIndex?: number; // dispersion metric (0-1)
   nodeEntropyBits?: number; // Phase 7 extension: Shannon entropy of node occurrence distribution
   pathLengthStdDev?: number; // Phase 7 extension: stddev of path length distribution
+  // Task 20 variance & entropy metric extensions
+  pathLengthMean?: number; // arithmetic mean of path lengths
+  pathLengthStdErr?: number; // standard error of path length mean (stddev / sqrt(n))
+  pathLengthCI95Width?: number; // 95% confidence interval total width (2 * 1.96 * stdErr)
+  varianceMetricsComputed?: boolean; // flag indicating Task 20 variance metrics added
+  entropyConfidence?: number; // optional bootstrap/approximate confidence (0..1)
   // Task 6 (Mixnode Selection Entropy & Diversity Enforcement) extended fields
   beaconSources?: {
     drand?: { round?: number; randomness?: string };
