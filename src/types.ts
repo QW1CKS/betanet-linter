@@ -426,12 +426,25 @@ export interface IngestedEvidence {
     targetBits?: number; // expected steady-state target (e.g., 22)
     monotonicTrend?: boolean; // optional precomputed trend flag (ingester may supply)
     anomalies?: string[]; // anomaly codes from ingestion (e.g., 'large-drop','oscillation')
+  // Advanced metrics (Spec Gap Task 5 – Bootstrap PoW & Multi-Bucket Rate-Limit Statistics)
+  acceptancePercentile?: number; // precomputed acceptance percentile (within tolerance band of target)
+  regressionSlope?: number; // optional precomputed linear regression slope over full series
+  windowSize?: number; // rolling window size used for window* metrics
+  windowMaxDrop?: number; // maximum drop observed inside any rolling window (bits)
+  rollingAcceptance?: number[]; // rolling window acceptance percentiles (0..1)
+  recentMeanBits?: number; // mean of most recent window (stability aid)
   };
   rateLimit?: {
     buckets?: { name?: string; capacity?: number; refillPerSec?: number }[]; // parsed bucket definitions
     bucketCount?: number; // convenience (can be derived from buckets length)
     distinctScopes?: number; // number of distinct scope types (ip,user,global,...)
     scopeRefillVariancePct?: number; // variance across scope refill rates (sanity check of multi-bucket logic)
+  // Advanced metrics (Spec Gap Task 5)
+  bucketSaturationPct?: number[]; // observed saturation percentages per bucket during sampling (0..100)
+  dispersionRatio?: number; // max/min capacity ratio (precomputed if provided)
+  capacityP95?: number; // 95th percentile capacity across buckets
+  capacityStdDev?: number; // standard deviation of capacities
+  refillVarianceTrend?: number; // optional trend metric over observed refills
   };
   // Task 9: Algorithm agility registry validation
   algorithmAgility?: {

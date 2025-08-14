@@ -643,20 +643,58 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
         evidence: { powAdaptive: pow, rateLimit: rl }
       } as any;
     }
-    it('passes with stable trend, limited max drop, high acceptance percentile', async () => {
-      const pow = { difficultySamples: [22,22,21,22,22,23,22], targetBits: 22 };
-      const rl = { buckets: [{ name:'global', capacity:100 }, { name:'perIP', capacity:10 }] };
+    it('passes with stable trend, rolling stability and acceptable bucket dispersion', async () => {
+      const pow = { difficultySamples: [22,22,21,22,22,23,22,22,21], targetBits: 22 };
+      const rl = { buckets: [{ name:'global', capacity:100 }, { name:'perIP', capacity:10 }], bucketSaturationPct: [40,55] };
       const result = await runWithAnalyzer(analyzerForPow(pow, rl));
       const check36 = result.checks.find(c => c.id === 36)!;
       expect(check36.passed).toBe(true);
-      expect(check36.details).toMatch(/PoW trend stable/);
+      expect(check36.details).toMatch(/PoW stable/);
     });
-    it('fails with divergent trend and high max drop producing POW_TREND_DIVERGENCE', async () => {
-      const pow = { difficultySamples: [22,18,15,12,10,8,5], targetBits: 22 }; // steep downward slope, large drops
+    it('fails with slope instability', async () => {
+      const pow = { difficultySamples: [10,12,14,16,18,20,22], targetBits: 22 }; // upward slope
       const result = await runWithAnalyzer(analyzerForPow(pow));
       const check36 = result.checks.find(c => c.id === 36)!;
       expect(check36.passed).toBe(false);
-      expect(check36.details).toMatch(/POW_TREND_DIVERGENCE/);
+      expect(check36.details).toMatch(/POW_SLOPE_INSTABILITY/);
+    });
+    it('fails with max drop exceeded', async () => {
+      const pow = { difficultySamples: [25,19,25,19,25,19], targetBits: 22 }; // large oscillations causing max drop >4
+      const result = await runWithAnalyzer(analyzerForPow(pow));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.details).toMatch(/POW_MAX_DROP_EXCEEDED/);
+    });
+    it('fails with acceptance divergence', async () => {
+      const pow = { difficultySamples: [30,30,30,30,30,30,30], targetBits: 22 };
+      const result = await runWithAnalyzer(analyzerForPow(pow));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.details).toMatch(/POW_ACCEPTANCE_DIVERGENCE/);
+    });
+    it('fails with rolling window instability', async () => {
+      const pow = { difficultySamples: [22,30,22,30,22,30,22,30,22], targetBits: 22 };
+      const result = await runWithAnalyzer(analyzerForPow(pow));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.details).toMatch(/POW_ROLLING_WINDOW_UNSTABLE/);
+    });
+    it('fails with recent window low acceptance', async () => {
+      const pow = { difficultySamples: [22,22,22,22,30,30,30,30,30], targetBits: 22 };
+      const result = await runWithAnalyzer(analyzerForPow(pow));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.details).toMatch(/POW_RECENT_WINDOW_LOW/);
+    });
+    it('fails with bucket dispersion high', async () => {
+      const pow = { difficultySamples: [22,22,21,21,22,22,21], targetBits: 22 };
+      const rl = { buckets: [{ name:'global', capacity:1000 }, { name:'perIP', capacity:5 }, { name:'perUser', capacity:3 }], bucketSaturationPct: [40,60,55] };
+      const result = await runWithAnalyzer(analyzerForPow(pow, rl));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.details).toMatch(/BUCKET_DISPERSION_HIGH/);
+    });
+    it('fails with bucket saturation excess', async () => {
+      const pow = { difficultySamples: [22,22,22,22,22,22], targetBits: 22 };
+      const rl = { buckets: [{ name:'global', capacity:100 }, { name:'perIP', capacity:10 }], bucketSaturationPct: [50, 99] };
+      const result = await runWithAnalyzer(analyzerForPow(pow, rl));
+      const check36 = result.checks.find(c => c.id === 36)!;
+      expect(check36.details).toMatch(/BUCKET_SATURATION_EXCESS/);
     });
   });
 
