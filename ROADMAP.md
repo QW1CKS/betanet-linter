@@ -416,9 +416,13 @@ These are required to transition from “spec gap tasks complete” to a bounty�
   - Tests: new `security-sandbox-hardening.test.ts` covers happy path + CPU budget (0ms), memory budget (best-effort), fs write deny (blocked write), and network deny with attempted capability check. Failure codes added to failure-codes coverage test to preserve quality gates.
   - Deferred (non-blocking): granular per-operation CPU sampling, syscall interception, rate-limit / transparency log spec, key rotation policy doc, dynamic harness resource pressure simulation.
 
-30. [ ] Documentation & Spec Mapping Automation
-  - Auto-generate spec clause → check ID mapping from `betanet1.1.md` with coverage status (PASS/FAIL/CAVEAT) into README & a JSON artifact. Add script to refresh on release.
-  - Provide operator guide with evidence field glossary & troubleshooting matrix.
+30. [x] Documentation & Spec Mapping Automation
+  - Implemented `scripts/generate-spec-mapping.js` which parses `betanet1.1.md` for normative clauses (MUST/MUST NOT/SHALL/PROHIBITED) and heuristically associates them with check IDs (keyword map) producing:
+    * `dist/spec-mapping.json` (machine-readable: rows, coverage %, mapped/unmapped counts)
+    * `dist/spec-mapping.md` (top 50 clauses table)
+  - Added npm script: `npm run spec:mapping` (writes JSON + markdown, prints snippet to stdout). README gains new "Automated Spec Mapping" section describing artifacts, usage, interpretation, and planned extensions.
+  - Initial heuristic mapping intentionally excludes low-level constant lines (wire numeric values) unless captured by existing checks; unmapped lines now visible for future check expansion or explicit out-of-scope classification.
+  - Deferred enhancements: explicit override YAML (manual associations & caveats), PASS/FAIL/CAVEAT synthesis using actual test outcomes, CI gate on coveragePct, auto-regeneration of Compliance Matrix, operator troubleshooting matrix & evidence glossary (to be added in docs/evidence-schema.md follow-up).
 
 31. [ ] Performance & Scalability Benchmarking
   - Add micro + end-to-end benchmarks (large evidence, high-mix samples) with target runtime budget (< X sec baseline). Optimize hotspots (algorithm agility diff, JSON canonicalization, signature verification). Track performance regressions in CI with threshold deltas.

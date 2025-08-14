@@ -9,16 +9,11 @@ describe('safeExec utility', () => {
   });
 
   it('executes a simple command', async () => {
-    process.env.BETANET_SKIP_TOOLS = '';
-    const cmd = process.platform === 'win32' ? 'cmd' : 'echo';
-    const args = process.platform === 'win32' ? ['/c','echo','hello'] : ['hello'];
-    const res = await safeExec(cmd, args);
-    if (res.failed) {
-      // On minimal CI images, echo via shell builtin may not surface same; treat as soft skip
-      console.warn('simple command execution failed, skipping assertion:', res.errorMessage);
-      return;
-    }
-    expect(res.stdout.toLowerCase()).toContain('hello');
+  process.env.BETANET_SKIP_TOOLS = '';
+  // Use node itself for a cross-platform reliable command to eliminate console.warn noise on platforms
+  const res = await safeExec(process.execPath, ['-e', 'console.log("hello")']);
+  expect(res.failed).toBe(false);
+  expect(res.stdout.toLowerCase()).toContain('hello');
   });
 
   it('handles timeout', async () => {

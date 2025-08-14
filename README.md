@@ -101,6 +101,39 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 
 Legend: All items have ≥1 non‑heuristic evidence path; historical simulated scaffolds remain only where sufficient for normative acceptance.
 
+### Automated Spec Mapping (Task 30)
+The `spec:mapping` script parses `betanet1.1.md` for normative clauses (MUST / MUST NOT / SHALL / PROHIBITED) and heuristically associates them with check IDs via keyword matching.
+
+Artifacts produced:
+- `dist/spec-mapping.json` – machine-readable rows with line number, clause text, associated check IDs, and coverage status.
+- `dist/spec-mapping.md` – top 50 normative clauses table (for quick review / PR diffs).
+
+Refresh after spec or check updates:
+```
+npm run spec:mapping
+```
+
+Interpreting results:
+- Mapped: at least one check currently enforces or partially covers the clause.
+- Unmapped: candidate for (a) new check / evidence extraction, (b) deliberate exclusion (wire constant, non-runtime), or (c) refinement of keyword heuristics.
+- Coverage percentage (in JSON) lets CI or release workflows assert a non-regressing mapping baseline.
+
+Planned extensions (future): override YAML for explicit mappings & caveats, PASS/FAIL synthesis using real test outcomes, automated regeneration of this Compliance Matrix section, and classification of unmapped clauses as "Out-of-Scope" vs "Pending".
+
+JSON schema excerpt:
+```json
+{
+  "generated": "<iso8601>",
+  "specFile": "betanet1.1.md",
+  "totalNormativeClauses": <n>,
+  "mappedClauses": <n>,
+  "coveragePct": <number>,
+  "rows": [ { "line": <int>, "text": "...", "checks": [<ids>], "coverage": "Mapped|Unmapped" } ]
+}
+```
+
+Snapshot table (see `dist/spec-mapping.md` for current content) is not embedded to avoid churn in the README diff noise.
+
 ### Provenance, Reproducible Build & Sandbox Hardening
 An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 1. Deterministic build with fixed `SOURCE_DATE_EPOCH`.

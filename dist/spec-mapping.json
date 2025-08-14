@@ -1,0 +1,384 @@
+{
+  "generated": "2025-08-14T22:53:59.424Z",
+  "specFile": "betanet1.1.md",
+  "totalNormativeClauses": 41,
+  "mappedClauses": 25,
+  "unmappedClauses": 16,
+  "coveragePct": 60.98,
+  "rows": [
+    {
+      "line": 3,
+      "text": "> **Normative document.** All requirements marked **MUST**, **MUST NOT**, or **SHALL** are mandatory for compliance.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 34,
+      "text": "**PQ requirement.** From *2027-01-01*, the **inner** key agreement (L2 §5.3) **MUST** be hybrid X25519-Kyber768. The **outer** TLS handshake (L2 §5.1) **MUST** mirror the front origin and **MUST NOT** advertise PQ that diverges from the origin’s canonical fingerprint.",
+      "checks": [
+        1,
+        12,
+        22,
+        32,
+        13,
+        19,
+        10,
+        38
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 36,
+      "text": "**Algorithm agility.** Implementations **MUST** expose a registry of cryptographic parameters keyed by OIDs; future substitutions **MUST** be negotiated via governance (L7) without changing wire formats where lengths permit.",
+      "checks": [
+        15,
+        16,
+        34
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 72,
+      "text": "* **Ver** MUST be `0x02`.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 73,
+      "text": "* **Type** MUST be `0x01` (single path) or `0x03` (path list).",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 74,
+      "text": "* Each AS-hop signature in every segment **MUST** verify before forwarding; otherwise drop.",
+      "checks": [
+        9,
+        35
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 78,
+      "text": "Gateways bridging non-SCION segments **MUST** encapsulate SCION packets inside an **HTX control session** (L2) between gateways:",
+      "checks": [
+        4,
+        33,
+        23
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 90,
+      "text": "* Gateways **MUST** verify `TS` within **±300 s**, reject duplicate `(FLOW,TS)` for **2 h**, and apply per-peer token buckets.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 92,
+      "text": "* Gateways **MUST** close and re-establish the control stream on rekey (§5.3). Out-of-date control streams are invalid.",
+      "checks": [
+        13,
+        19,
+        10,
+        38,
+        4,
+        33,
+        23
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 94,
+      "text": "**Public-Internet requirement.** The legacy on-wire transition header is **PROHIBITED** on public networks. It **MAY** be used only on private, administratively controlled links (§11).",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 100,
+      "text": "* Probe with exponential back-off (min 1 s, max 60 s); **MUST NOT** exceed 1 probe per destination per **10 s** under persistent loss.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 108,
+      "text": "* Clients **MUST** mirror the front origin’s fingerprint class (JA3/JA4 family, ALPN set, extension order, GREASE, H2 SETTINGS, H3 availability).",
+      "checks": [
+        1,
+        12,
+        22,
+        32
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 109,
+      "text": "* A **per-connection calibration pre-flight** to the same origin (or same CDN POP if indicated) **MUST** be performed before inner handshake; any deviation **MUST** fail closed.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 110,
+      "text": "* **Tolerances:** ALPN **set and order MUST match exactly**. Extension order **MUST match exactly**. H2 SETTINGS values **MUST** be within **±15 %** of calibrated origin values where the origin publishes variable ranges; otherwise **MUST** match exactly.",
+      "checks": [
+        1,
+        12,
+        22,
+        32
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 111,
+      "text": "* **POP selection:** If the origin presents geo/POP variance, clients **MUST** calibrate against the same POP as the target connection as indicated by authoritative DNS co-location or CDN route headers; otherwise calibration **MUST** be repeated until equality is achieved.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 112,
+      "text": "* ALPN selection **MUST** match the origin; fixed global distributions are **PROHIBITED**.",
+      "checks": [
+        1,
+        12,
+        22,
+        32
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 113,
+      "text": "* Session resumption **MUST** follow origin policy; **0-RTT MUST NOT** be used for HTX initiation.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 139,
+      "text": "9. Servers **MUST** parse fields in order (`version, cliPub32, ticketKeyID8, nonce32, accessTicket32`) and **MUST ignore trailing bytes** (padding). Accepted padding range is **24..64 bytes**.",
+      "checks": [
+        2,
+        30,
+        20,
+        28,
+        26,
+        37
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 145,
+      "text": "* Inner handshake **MUST** be Noise *XK* over the outer TLS tunnel.",
+      "checks": [
+        1,
+        12,
+        22,
+        32,
+        13,
+        19,
+        10,
+        38
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 146,
+      "text": "* From *2027-01-01*, initiators **MUST** use hybrid (X25519-Kyber768); prior to that, X25519 is RECOMMENDED.",
+      "checks": [
+        13,
+        19,
+        10,
+        38
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 152,
+      "text": "* Rekeying (**MUST** meet all):",
+      "checks": [
+        13,
+        19,
+        10,
+        38
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 156,
+      "text": "* Ordering: Receivers **MUST** accept `KEY_UPDATE` out-of-order relative to data frames and **MUST** discard frames that verify only under the previous key after receiving and acknowledging `KEY_UPDATE`. Senders **MUST** cease using the old key immediately after transmitting `KEY_UPDATE`.",
+      "checks": [
+        13,
+        19,
+        10,
+        38
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 174,
+      "text": "* H2 SETTINGS **MUST** mirror origin within tolerances learned during pre-flight (§5.1).",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 175,
+      "text": "* PING cadence **MUST** be random in **\\[10 s, 60 s]** with ±10 % jitter; periodicity is **PROHIBITED**.",
+      "checks": [
+        20,
+        28,
+        26,
+        37
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 183,
+      "text": "* To defeat induced linkability, clients **MUST** launch **cover connections** to **≥ 2** unrelated origins (non-HTX) within **\\[0, 1 000 ms]** of the retry; HTX start **MUST** be delayed by an additional **\\[100, 700 ms]** chosen independently.",
+      "checks": [
+        25,
+        18
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 184,
+      "text": "* Cover connections **MUST NOT** exceed **2** retries per minute and **MUST** be torn down within **\\[3, 15] s** unless they carry user traffic.",
+      "checks": [
+        25,
+        18
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 204,
+      "text": "Clients **MUST** iterate methods **a → e** until **≥ 5** peers respond:",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 215,
+      "text": "* Responders **MUST** require proof-of-work (initial **≥ 22 bits**, adaptive per §6.5) and rate-limit per source prefix; verification **MUST** be constant-time.",
+      "checks": [
+        6,
+        36,
+        24
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 226,
+      "text": "* Each bootstrap responder **MUST** maintain sliding-window metrics and adjust PoW difficulty to keep accept rate at the 95th percentile of capacity.",
+      "checks": [
+        6,
+        36,
+        24
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 227,
+      "text": "* Rate-limits **MUST** apply per `/24` IPv4, `/56` IPv6, and per-AS aggregates; any bucket **MUST NOT** exceed **5 %** of responder capacity.",
+      "checks": [
+        6,
+        36,
+        24
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 246,
+      "text": "`BeaconSet(epoch) = SHA256(\"bn-fallback\" ‖ K0c ‖ uint64_be(epoch))` and **MUST** log the condition.",
+      "checks": [
+        11,
+        17,
+        27,
+        25,
+        18
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 288,
+      "text": "* `seq` **MUST** increase monotonically per `pk`.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 303,
+      "text": "Each `sig` is Ed25519 over `(\"bn-aa1\" ‖ payloadHash ‖ epoch)`. Verifiers **MUST** validate weights per §10.2–§10.3 and reject duplicates or lower-epoch certificates.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 322,
+      "text": "* Relays **MUST** accept vouchers only for known keysets; unknown keysets **MAY** be cached pending validation.",
+      "checks": [
+        8,
+        14,
+        29,
+        31,
+        36
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 323,
+      "text": "* Per-keyset and per-peer rate-limits **MUST** apply.",
+      "checks": [
+        6,
+        36,
+        24
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 328,
+      "text": "Vouchers **MUST NOT** leave encrypted streams.",
+      "checks": [
+        8,
+        14,
+        29,
+        31,
+        36
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 346,
+      "text": "* **Per-AS cap:** the **sum** of `vote_weight_raw` across all nodes within the same L1 AS **MUST** be capped to **20 %** of the global total.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 347,
+      "text": "* **Per-Org cap:** nodes mapped to the same RPKI organisation (or equivalent attestation) **MUST** be capped to **25 %** combined.",
+      "checks": [
+        9,
+        35
+      ],
+      "coverage": "Mapped"
+    },
+    {
+      "line": 361,
+      "text": "After threshold, activation waits **≥ 30 days**. If §10.3 fails at any time ≥ 7 days before activation, activation **MUST** be deferred until criteria are met for **7** consecutive days.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 389,
+      "text": "* Legacy on-wire transition headers **MUST NOT** be used on public networks; bridge via HTX tunnels.",
+      "checks": [],
+      "coverage": "Unmapped"
+    },
+    {
+      "line": 390,
+      "text": "* 64-B vouchers **MAY** be issued only to legacy peers; 1.1 receivers **MUST** accept both for the operator-defined deprecation window.",
+      "checks": [
+        8,
+        14,
+        29,
+        31,
+        36
+      ],
+      "coverage": "Mapped"
+    }
+  ]
+}
