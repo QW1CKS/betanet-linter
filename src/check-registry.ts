@@ -99,11 +99,33 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       // Basic stddev sanity (avoid degenerate distributions)
       if (jm.stdDevPing !== undefined && jm.stdDevPing < 0.1) failureCodes.push('PING_STDDEV_LOW');
       if (jm.stdDevPadding !== undefined && jm.stdDevPadding < 0.1) failureCodes.push('PADDING_STDDEV_LOW');
+      // Task 25: additional anomaly detection using distribution shape when collected
+      if (jm.sourceType === 'collected') {
+        // Padding anomaly: excessive repetition (low entropy but many samples) OR stddev extremely high (bursting)
+        if (jm.paddingSizes && jm.paddingSizes.length >= 10) {
+          const uniquePad = new Set(jm.paddingSizes).size;
+            if (uniquePad <= Math.max(3, Math.floor(jm.paddingSizes.length * 0.15)) && (jm.entropyBitsPerSample||0) < 0.30) {
+              failureCodes.push('PADDING_DISTRIBUTION_ANOMALY');
+            }
+        }
+        // Priority rate anomaly: if average gap > 5x median ping interval or extremely low variance (suggest scripted)
+        if (jm.priorityFrameGaps && jm.priorityFrameGaps.length >= 5 && jm.pingIntervalsMs && jm.pingIntervalsMs.length >= 5) {
+          const avgPri = jm.priorityFrameGaps.reduce((a:number,b:number)=>a+b,0)/jm.priorityFrameGaps.length;
+          const avgPing = jm.pingIntervalsMs.reduce((a:number,b:number)=>a+b,0)/jm.pingIntervalsMs.length;
+          if (avgPing > 0 && (avgPri/avgPing > 5 || avgPri/avgPing < 0.1)) failureCodes.push('PRIORITY_RATE_ANOMALY');
+        }
+        // HTTP/3 jitter randomness weak umbrella when any primary randomness code present & collected
+        if (failureCodes.some(c=>['CHI_SQUARE_P_LOW','RUNS_TEST_P_LOW','KS_P_LOW','ENTROPY_LOW'].includes(c))) {
+          failureCodes.push('H3_JITTER_RANDOMNESS_WEAK');
+        }
+      }
       const passed = failureCodes.length === 0;
-      const evidenceType: 'heuristic' | 'artifact' = passed ? 'artifact' : 'heuristic';
+      const evidenceType: 'heuristic' | 'dynamic-protocol' | 'artifact' = passed
+        ? (jm.sourceType === 'collected' ? 'dynamic-protocol' : 'artifact')
+        : 'heuristic';
       const details = passed
-        ? `✅ jitter stats ok pingN=${jm.pingIntervalsMs?.length||0} padN=${jm.paddingSizes?.length||0} priN=${jm.priorityFrameGaps?.length||0} chiP=${jm.chiSquareP?.toExponential(2)} runsP=${jm.runsP?.toExponential(2)} ksP=${jm.ksP?.toExponential(2)} entropy=${jm.entropyBitsPerSample?.toFixed(3)}`
-        : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] chiP=${jm.chiSquareP} runsP=${jm.runsP} ksP=${jm.ksP} entropy=${jm.entropyBitsPerSample} n=${totalSamples}`;
+        ? `✅ jitter stats (${jm.sourceType||'unknown'}) ok pingN=${jm.pingIntervalsMs?.length||0} padN=${jm.paddingSizes?.length||0} priN=${jm.priorityFrameGaps?.length||0} chiP=${jm.chiSquareP?.toExponential(2)} runsP=${jm.runsP?.toExponential(2)} ksP=${jm.ksP?.toExponential(2)} entropy=${jm.entropyBitsPerSample?.toFixed(3)}`
+        : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] src=${jm.sourceType} chiP=${jm.chiSquareP} runsP=${jm.runsP} ksP=${jm.ksP} entropy=${jm.entropyBitsPerSample} n=${totalSamples}`;
       return { id: 41, name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests', description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy', passed, details, severity: 'major', evidenceType };
     }
   },

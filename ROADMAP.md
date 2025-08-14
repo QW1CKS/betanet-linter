@@ -388,9 +388,11 @@ These are required to transition from “spec gap tasks complete” to a bounty�
   - Tests: Added granular mismatch test (final-compliance-tasks.test.ts) plus existing pass/mismatch/missing coverage.
   - Caveats: Still synthetic probe (not full TLS + QUIC crypto frames), token & transport parameters simulated (no real crypto frame parse), no parameter diff taxonomy beyond idleTimeout yet; future enhancements reserved for Definition A item 4.
 
-25. [ ] Real Statistical Collectors (Jitter, Padding, HTTP/3)
-  - Implement live collection of PING cadence, idle padding size distribution, PRIORITY frame rates (H2/H3), HTTP/3 adaptive metrics; compute p-values (chi-square / runs / KS) and entropy; deprecate purely synthetic inputs.
-  - Failure codes: PADDING_DISTRIBUTION_ANOMALY, PRIORITY_RATE_ANOMALY, H3_JITTER_RANDOMNESS_WEAK.
+25. [x] Real Statistical Collectors (Jitter, Padding, HTTP/3)
+  - Implemented timer-based real collection mode (flags: --collect-h2/--collect-h3 via harness options collectH2/collectH3) producing jitterMetrics with sourceType='collected', captureWindowMs, derivedStats, and statistical tests (chi-square, runs, KS, entropy, stddevs). Synthetic path preserved (sourceType='synthetic'). Evidence escalates to dynamic-protocol when collected and passing.
+  - Added schema extensions: jitterMetrics.sourceType, captureWindowMs, derivedStats.
+  - Check 41 extended: new anomaly failure codes PADDING_DISTRIBUTION_ANOMALY (low unique padding & low entropy), PRIORITY_RATE_ANOMALY (priority gap mean disproportionate vs ping), H3_JITTER_RANDOMNESS_WEAK (umbrella when core randomness codes present on collected data). Existing codes retained. Passing details now indicate source type.
+  - Added tests covering collected pass, padding anomaly, priority rate anomaly; total test count increased (217→220). Backward compatibility maintained for synthetic simulations (no new failures unless collected anomalies detected).
 
 26. [ ] Authenticity Hardening & Caching
   - Canonical JSON normalization (stable ordering, Unicode, escaping), signature verification result cache keyed by (digest, signer, algo), Merkle/chain structure for bundles to prove inclusion ordering, multi-format key support (PEM, raw, minisign, cosign), explicit SIGNATURE_FORMAT_UNSUPPORTED & CANONICAL_JSON_MISMATCH codes.

@@ -651,6 +651,28 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       expect(check41.passed).toBe(false);
       expect(check41.details).toMatch(/JITTER_EVIDENCE_MISSING/);
     });
+    // Task 25 collected metrics path
+    it('passes with collected sourceType and acceptable distributions', async () => {
+      const jm = { sourceType: 'collected', pingIntervalsMs: [45,50,55,60,52,58,49,53,57,61], paddingSizes: [500,620,710,640,690,560,580,600,650,630], priorityFrameGaps: [25,30,28,33,27,32,29], chiSquareP: 0.3, runsP: 0.4, ksP: 0.35, entropyBitsPerSample: 0.45, sampleCount: 30, stdDevPing: 5, stdDevPadding: 60 };
+      const result = await runWithAnalyzer(analyzerForJitter(jm));
+      const check41 = result.checks.find(c=>c.id===41)!;
+      expect(check41.passed).toBe(true);
+      expect(check41.details).toMatch(/collected/);
+    });
+    it('fails with padding distribution anomaly when low unique & low entropy', async () => {
+      const jm = { sourceType: 'collected', pingIntervalsMs: Array(20).fill(50).map((v,i)=>50 + (i%3)), paddingSizes: Array(30).fill(600), priorityFrameGaps: [25,25,25,25,25,25,25], chiSquareP: 0.2, runsP: 0.2, ksP: 0.2, entropyBitsPerSample: 0.05, sampleCount: 60, stdDevPing: 1, stdDevPadding: 0 };
+      const result = await runWithAnalyzer(analyzerForJitter(jm));
+      const check41 = result.checks.find(c=>c.id===41)!;
+      expect(check41.passed).toBe(false);
+      expect(check41.details).toMatch(/PADDING_DISTRIBUTION_ANOMALY/);
+    });
+    it('fails with priority rate anomaly when avg gap disproportional', async () => {
+      const jm = { sourceType: 'collected', pingIntervalsMs: [40,41,42,43,44,45,46,47,48,49], paddingSizes: [500,520,540,560,580,600,620,640,660,680], priorityFrameGaps: [400,420,410,430,415], chiSquareP: 0.2, runsP: 0.2, ksP: 0.2, entropyBitsPerSample: 0.5, sampleCount: 30, stdDevPing: 3, stdDevPadding: 50 };
+      const result = await runWithAnalyzer(analyzerForJitter(jm));
+      const check41 = result.checks.find(c=>c.id===41)!;
+      expect(check41.passed).toBe(false);
+      expect(check41.details).toMatch(/PRIORITY_RATE_ANOMALY/);
+    });
   });
 
   describe('Task 20: Mix Diversity Variance & Entropy Metrics (Check 17 extension)', () => {

@@ -585,6 +585,9 @@ export interface IngestedEvidence {
     stdDevPing?: number; // derived stddev for ping intervals
     stdDevPadding?: number; // derived stddev for padding sizes
     stdDevPriorityGap?: number; // derived stddev for priority frame gaps
+  sourceType?: 'synthetic' | 'collected'; // Task 25: indicates whether metrics are real collected vs synthetic simulation
+  captureWindowMs?: number; // Task 25: elapsed wall-clock capture window for collected metrics
+  derivedStats?: { buckets?: number; entropyMax?: number }; // Task 25: helper derivations for checks
   };
   // Task 23: Cross-cut runtime calibration & behavioral instrumentation aggregation
   runtimeCalibration?: {
