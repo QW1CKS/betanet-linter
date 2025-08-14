@@ -600,6 +600,15 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       expect(check40.passed).toBe(false);
       expect(check40.details).toMatch(/QUIC_EVIDENCE_MISSING/);
     });
+    it('captures granular mismatch codes (Task 24)', async () => {
+      const parsed = { version: '0x00000001', dcil: 8, scil: 4, dcidHex: '01020304', scidHex: 'aabbccdd', tokenLength: 0, lengthField: 0, mismatchCodes: ['QUIC_DCIL_DIFF','QUIC_IDLE_TIMEOUT_DIFF'], transportParams: { idleTimeout: 45 } };
+      const qi = { parsed, calibrationHash: 'newhash', calibrationMismatch: true };
+      const baseline = { calibrationHash: 'oldhash', dcil: 4, scil: 4, tokenLength: 0, idleTimeout: 30 };
+      const result = await runWithAnalyzer(analyzerWithQuic(qi, baseline));
+      const check40 = result.checks.find(c => c.id === 40)!;
+      expect(check40.passed).toBe(false);
+      expect(check40.details).toMatch(/QUIC_DCIL_DIFF/);
+    });
   });
 
   describe('Task 19: HTTP/2 & HTTP/3 Jitter Statistical Tests (Check 41)', () => {

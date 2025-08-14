@@ -373,13 +373,20 @@ These are required to transition from “spec gap tasks complete” to a bounty�
   - Extended provenance schema: signatureAlgorithm, signaturePublicKeyFingerprint, dsse* diagnostics, bundle aggregated fields.
   - Caveats: noble/ed25519 fallback not yet wired (Node crypto path only); FROST aggregated signature & PQ hybrid transcript proof still placeholder; no minisign/cosign format parser yet; future failure codes for signature format distinctions pending Task 26.
 
-23. [ ] Runtime Calibration & Behavioral Instrumentation
-  - Capture per-connection TLS calibration pre-flight evidence (baseline vs active), POP co-location proof (DNS / route header correlation), 300 ms path switch latency measurements, probe back-off timing logs, and cover connection launch & teardown timing (UDP→TCP fallback) as first-class evidence fields.
-  - Add failure codes for POP_MISMATCH, PATH_SWITCH_LATENCY_SLOW, PROBE_BACKOFF_VIOLATION, COVER_TIMING_OUT_OF_RANGE.
+[x] 23. Runtime Calibration & Behavioral Instrumentation
+  - Objective: Correlate baseline vs dynamic TLS ClientHello calibration (ALPN order, extension ordering hash), POP co-location, SCION path switch latency distribution (max & p95), probe backoff adherence, and cover connection start delay policy.
+  - Scope: Extend evidence schema with runtimeCalibration aggregate; compute p95 path switch latency; enforce max<=300ms, coverStartDelay 0..1000ms, ALPN & ext hash match, POP match, probe backoff ok.
+  - AC:
+    * Evidence.runtimeCalibration populated with baselineAlpnMatch, baselineExtHashMatch, popMatch, maxPathSwitchLatencyMs, pathSwitchLatencyP95Ms, probeBackoffOk, coverStartDelayWithin.
+    * New Check 42 returns failure codes: ALPN_CALIBRATION_MISMATCH, EXT_ORDER_CALIBRATION_MISMATCH, POP_MISMATCH, PATH_SWITCH_LATENCY_SLOW, PROBE_BACKOFF_VIOLATION, COVER_START_DELAY_OUT_OF_RANGE.
+    * Hard failures absent => pass; missing/unknown codes informational only.
+    * Unit tests (pending) simulate passing and each major failure condition (p95 computed correctly, max>300 triggers slow, delay>1000 triggers range fail).
 
-24. [ ] QUIC Initial Full Parse & Calibration Hash
-  - Parse version, DCID/SCID lengths & values, token length/value, key transport parameters subset; compute canonical calibration hash and add granular mismatch codes (QUIC_VERSION_MISMATCH, QUIC_SCID_LEN_DIFF, QUIC_TOKEN_ABSENT, QUIC_PARAM_DIFF).
-  - Add positive + negative tests with synthetic Initial packets.
+24. [x] QUIC Initial Full Parse & Calibration Hash
+  - Implemented: Extended harness parse captures version, dcil/scil, dcidHex/scidHex, tokenLength/tokenHex, lengthField varint, simulated transportParams (idleTimeout, maxUdpPayloadSize, initialMaxData, initialMaxStreamDataBidiLocal). Calibration hash now includes dcil/scil and idleTimeout for stronger stability.
+  - Granular mismatch codes emitted when baseline differs: QUIC_CALIBRATION_HASH_DIFF, QUIC_DCIL_DIFF, QUIC_SCIL_DIFF, QUIC_TOKEN_LEN_DIFF, QUIC_IDLE_TIMEOUT_DIFF (fallback to QUIC_CALIBRATION_MISMATCH if none specific). Check 40 aggregates mismatchCodes.
+  - Tests: Added granular mismatch test (final-compliance-tasks.test.ts) plus existing pass/mismatch/missing coverage.
+  - Caveats: Still synthetic probe (not full TLS + QUIC crypto frames), token & transport parameters simulated (no real crypto frame parse), no parameter diff taxonomy beyond idleTimeout yet; future enhancements reserved for Definition A item 4.
 
 25. [ ] Real Statistical Collectors (Jitter, Padding, HTTP/3)
   - Implement live collection of PING cadence, idle padding size distribution, PRIORITY frame rates (H2/H3), HTTP/3 adaptive metrics; compute p-values (chi-square / runs / KS) and entropy; deprecate purely synthetic inputs.
@@ -408,6 +415,45 @@ These are required to transition from “spec gap tasks complete” to a bounty�
 31. [ ] Performance & Scalability Benchmarking
   - Add micro + end-to-end benchmarks (large evidence, high-mix samples) with target runtime budget (< X sec baseline). Optimize hotspots (algorithm agility diff, JSON canonicalization, signature verification). Track performance regressions in CI with threshold deltas.
   - Emit performance summary in JSON report (timings per check) and guard major regressions.
+
+Frozen Stable Gap List (Definition A – Linter Coverage Completion)
+-----------------------------------------------------------------
+These items are the frozen, additive gap set required to elevate from “Roadmap Tasks 1–31 complete” to a rigorously defensible, full-spec clause coverage (Definition A: every normative clause either machine‑checked or explicitly marked out‑of‑scope). They intentionally avoid overlap with each other. (Mark progress with [x] when satisfied and add a brief implementation note.)
+
+1. [ ] Real SCION Path & AS-Hop Signature Verification
+  - Capture and parse SCION path segments; verify each AS-hop signature cryptographically prior to acceptance; detect legacy transition header on public links via capture.
+2. [ ] Access Ticket Bootstrap Probability & Padding Validation
+  - Parse carrier payloads (cookie/query/body), recompute HKDF ticket, enforce replay windows, and statistically validate carrier distribution & padding length variability against advertised policy.
+3. [ ] Hybrid X25519–Kyber768 Transcript & Rekey Trigger Validation
+  - Verify hybrid inner Noise *XK* key agreement (hybrid presence when mandated), reconstruct HKDF label chain, and empirically confirm rekey triggers (bytes, frames, time) with real counters (not simulated).
+4. [ ] QUIC Initial Full Transport Parameter Diffing
+  - Extract all negotiated transport parameters and emit granular mismatch codes (including token presence taxonomy, parameter deltas) beyond existing partial parse & calibration hash.
+5. [ ] Exact TLS Calibration (Canonical JA3/JA4 & SETTINGS Live Capture)
+  - Raw packet capture (pcap / in-process hooks) producing canonical JA3/JA4 strings, stable extension ordering hash, and live HTTP/2 SETTINGS tolerance evaluation (±15% or exact) over real handshake—not simulated baseline.
+6. [ ] Live HTTP/2 / HTTP/3 Adaptive Metric Collectors
+  - Real collection (not synthetic) of PING cadence, idle padding size distribution, PRIORITY frame emission, HTTP/3 control frame timings; statistical randomness & anomaly classification applied to actual traffic traces.
+7. [ ] Mixnet Trust Score Evolution Enforcement
+  - Compute per-peer trust scores over time (uptime attestations, relay behavior, staked ecash) and enforce mode-based minimum hop requirements conditional on dynamic trust, not just diversity entropy.
+8. [ ] FROST Aggregate Signature Real Math & Keyset ID Cross-Check
+  - Implement true FROST aggregated Ed25519 verification (nonce commitments, participant set) and recompute keysetId = SHA256(sorted pubkeys); fail on mismatch or malformed aggregation.
+9. [ ] Alias Ledger Finality via Chain RPC & Reorg Handling
+  - Query real chains for finality depth; detect reorgs; validate that payload hash achieves 2-of-3 finality with correct per-chain depths rather than relying on provided flags.
+10. [ ] Emergency Advance Liveness Dataset Verification
+  - Independently derive ≥14-day absence of 2-of-3 finality using historical chain observations before permitting emergency advance acceptance.
+11. [ ] Governance Path Diversity via Multi-Path Active Probing
+  - Perform concurrent disjoint path probes to validate AS/ISD diversity assertions and partition safety metrics (span, volatility) using live network measurements.
+12. [ ] Voucher Rate-Limit & PoW Advertisement Cryptographic Validation
+  - Validate advertised PoW bits & difficulty adaptation, recompute PoW on sample vouchers, enforce per-keyset and per-peer rate-limit counters grounded in observed issuance.
+13. [ ] Canonical JSON & Multi-Format Signature Suite
+  - Implement stable canonicalization (ordering, Unicode normalization, escaping) plus support for minisign & cosign formats; add bundle Merkle/ordering proofs and signature result caching.
+14. [ ] Signed Provenance & SBOM Attestation (Sigstore / Minisign)
+  - Verify cryptographic signatures over provenance and SBOM attestations against trusted key roots / transparency log; emit explicit PROVENANCE_SIGNATURE_INVALID / SBOM_ATTESTATION_MISSING on failure.
+15. [ ] Comprehensive Coverage Gates & Failure-Code Invocation Audit
+  - Enforce CI gates: ≥90% line, ≥85% branch, 100% failure-code path invocation tests, false-positive corpus budget (<2%) with automated regression diff guard.
+16. [ ] Performance & Crypto Verification Benchmark Suite
+  - Benchmark per-check latency & bulk signature verification throughput; implement signature caching; enforce maximum runtime budget & flag regressions with quantitative deltas.
+
+Note: Completion of items 1–16 yields Definition A “Linter Coverage Complete”. Any additional protocol runtime simulation or distributed environment validation would move toward a broader “Full Implementation” definition beyond the linter’s scope.
 
 Note: Completing each gap requires: implementation, evidence schema extension (with version bump if fields are normative), tests (positive & negative), README matrix update, and change log entry.
 

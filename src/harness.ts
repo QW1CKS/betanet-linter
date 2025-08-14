@@ -784,7 +784,9 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
             lengthField = lenDecoded.value;
             cursor += lenDecoded.bytes;
           }
-          initial.parsed = { version, dcil, scil, dcidHex: dcid.toString('hex'), scidHex: scid.toString('hex'), tokenLength, tokenHex, lengthField, odcil: dcil };
+          // Simulated minimal transport parameters (placeholder until real parsing of crypto frame)
+          const transportParams = { idleTimeout: 30, maxUdpPayloadSize: 1350, initialMaxData: 100000, initialMaxStreamDataBidiLocal: 50000 };
+          initial.parsed = { version, dcil, scil, dcidHex: dcid.toString('hex'), scidHex: scid.toString('hex'), tokenLength, tokenHex, lengthField, odcil: dcil, transportParams };
         } else {
           initial.parsed = { version: '0x00000001' };
         }
@@ -827,12 +829,23 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     // Compute calibration hash over stable parsed subset
     if (initial.parsed) {
       try {
-        const stable = { version: initial.parsed.version, dcid: initial.parsed.dcidHex, scid: initial.parsed.scidHex, tokenLength: initial.parsed.tokenLength, lengthField: initial.parsed.lengthField };
+        const stable = { version: initial.parsed.version, dcil: initial.parsed.dcil, scil: initial.parsed.scil, dcid: initial.parsed.dcidHex, scid: initial.parsed.scidHex, tokenLength: initial.parsed.tokenLength, lengthField: initial.parsed.lengthField, idleTimeout: initial.parsed.transportParams?.idleTimeout };
         initial.calibrationHash = crypto.createHash('sha256').update(JSON.stringify(stable)).digest('hex');
-        if (!(evidence as any).quicInitialBaseline) {
-          (evidence as any).quicInitialBaseline = { calibrationHash: initial.calibrationHash, capturedAt: new Date().toISOString() };
-        } else if ((evidence as any).quicInitialBaseline?.calibrationHash && (evidence as any).quicInitialBaseline.calibrationHash !== initial.calibrationHash) {
-          initial.calibrationMismatch = true;
+        const baseline = (evidence as any).quicInitialBaseline;
+        if (!baseline) {
+          (evidence as any).quicInitialBaseline = { calibrationHash: initial.calibrationHash, capturedAt: new Date().toISOString(), dcil: initial.parsed.dcil, scil: initial.parsed.scil, tokenLength: initial.parsed.tokenLength, idleTimeout: initial.parsed.transportParams?.idleTimeout };
+        } else {
+          // Granular mismatch codes (Task 24)
+          const mismatch: string[] = [];
+          if (baseline.calibrationHash && baseline.calibrationHash !== initial.calibrationHash) mismatch.push('QUIC_CALIBRATION_HASH_DIFF');
+            if (baseline.dcil !== undefined && baseline.dcil !== initial.parsed.dcil) mismatch.push('QUIC_DCIL_DIFF');
+            if (baseline.scil !== undefined && baseline.scil !== initial.parsed.scil) mismatch.push('QUIC_SCIL_DIFF');
+            if (baseline.tokenLength !== undefined && baseline.tokenLength !== initial.parsed.tokenLength) mismatch.push('QUIC_TOKEN_LEN_DIFF');
+            if (baseline.idleTimeout !== undefined && baseline.idleTimeout !== initial.parsed.transportParams?.idleTimeout) mismatch.push('QUIC_IDLE_TIMEOUT_DIFF');
+          if (mismatch.length) {
+            initial.calibrationMismatch = true;
+            initial.parsed.mismatchCodes = mismatch;
+          }
         }
       } catch { /* ignore */ }
     }

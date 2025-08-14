@@ -565,6 +565,8 @@ export interface IngestedEvidence {
       retry?: boolean;
       versionsOffered?: string[];
       odcil?: number; // original DCID len (mirror)
+  transportParams?: { idleTimeout?: number; maxUdpPayloadSize?: number; initialMaxData?: number; initialMaxStreamDataBidiLocal?: number };
+  mismatchCodes?: string[]; // Task 24 granular mismatch codes
     };
     calibrationHash?: string; // sha256 over stable subset of parsed fields
     calibrationMismatch?: boolean; // set when differs from baseline
@@ -583,6 +585,20 @@ export interface IngestedEvidence {
     stdDevPing?: number; // derived stddev for ping intervals
     stdDevPadding?: number; // derived stddev for padding sizes
     stdDevPriorityGap?: number; // derived stddev for priority frame gaps
+  };
+  // Task 23: Cross-cut runtime calibration & behavioral instrumentation aggregation
+  runtimeCalibration?: {
+    baselineAlpnMatch?: boolean; // calibrationBaseline.alpn vs dynamicClientHelloCapture.alpn sequence equality
+    baselineExtHashMatch?: boolean; // calibrationBaseline.extOrderSha256 vs dynamicClientHelloCapture.extOrderSha256
+    popIdBaseline?: string;
+    popIdDynamic?: string;
+    popMatch?: boolean; // popIdBaseline === popIdDynamic (when both present)
+    maxPathSwitchLatencyMs?: number; // copied from scionControl.maxPathSwitchLatencyMs
+    pathSwitchLatencyP95Ms?: number; // computed P95 of scionControl.pathSwitchLatenciesMs
+    probeBackoffOk?: boolean; // mirrors scionControl.rateBackoffOk
+    coverStartDelayMs?: number; // fallbackTiming.coverStartDelayMs
+    coverStartDelayWithin?: boolean; // within policy window (<=1000ms for now)
+    failureCodes?: string[]; // populated by runtime calibration check 42
   };
   [k: string]: any; // allow forward-compatible keys
 }

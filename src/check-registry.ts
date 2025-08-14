@@ -51,7 +51,12 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         failureCodes.push('QUIC_VERSION_UNEXPECTED');
       }
       if (qi.calibrationMismatch) {
-        failureCodes.push('QUIC_CALIBRATION_MISMATCH');
+        // Add granular mismatch codes if present
+        if (qi.parsed?.mismatchCodes && qi.parsed.mismatchCodes.length) {
+          for (const mc of qi.parsed.mismatchCodes) failureCodes.push(mc);
+        } else {
+          failureCodes.push('QUIC_CALIBRATION_MISMATCH');
+        }
       }
       if (p.versionNegotiation) failureCodes.push('QUIC_VERSION_NEGOTIATION');
       if (p.retry) failureCodes.push('QUIC_RETRY');
@@ -662,6 +667,78 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     }
   }
   ,
+  {
+    id: 42,
+    key: 'runtime-calibration-behavior',
+    name: 'Runtime Calibration & Behavioral Instrumentation',
+    description: 'Correlates baseline vs dynamic TLS calibration, POP co-location, SCION path switch latency distribution, probe backoff, and cover connection start timing',
+    severity: 'major',
+    introducedIn: '1.1',
+    mandatoryIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence || {};
+      const rc = ev.runtimeCalibration || (ev.runtimeCalibration = {});
+      const baseline = ev.calibrationBaseline;
+      const dyn = ev.dynamicClientHelloCapture;
+      const sc = ev.scionControl;
+      const ft = ev.fallbackTiming;
+      const failureCodes: string[] = [];
+      // Baseline ALPN & extension ordering correlation
+      if (baseline && dyn) {
+        if (Array.isArray(baseline.alpn) && Array.isArray(dyn.alpn)) {
+          rc.baselineAlpnMatch = baseline.alpn.join(',') === dyn.alpn.join(',');
+          if (!rc.baselineAlpnMatch) failureCodes.push('ALPN_CALIBRATION_MISMATCH');
+        } else {
+          failureCodes.push('ALPN_BASELINE_MISSING');
+        }
+        if (baseline.extOrderSha256 && dyn.extOrderSha256) {
+          rc.baselineExtHashMatch = baseline.extOrderSha256 === dyn.extOrderSha256;
+          if (!rc.baselineExtHashMatch) failureCodes.push('EXT_ORDER_CALIBRATION_MISMATCH');
+        } else {
+          failureCodes.push('EXT_HASH_BASELINE_MISSING');
+        }
+        rc.popIdBaseline = baseline.popIdBaseline || baseline.popId; // support future rename
+        rc.popIdDynamic = dyn.popId;
+        if (rc.popIdBaseline && rc.popIdDynamic) {
+          rc.popMatch = rc.popIdBaseline === rc.popIdDynamic;
+          if (!rc.popMatch) failureCodes.push('POP_MISMATCH');
+        }
+      } else {
+        failureCodes.push('CALIBRATION_BASELINE_OR_DYNAMIC_MISSING');
+      }
+      // SCION path switch latency distribution
+      if (sc && Array.isArray(sc.pathSwitchLatenciesMs) && sc.pathSwitchLatenciesMs.length) {
+        const sorted = sc.pathSwitchLatenciesMs.slice().sort((a:number,b:number)=>a-b);
+        const p95Index = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+        const p95 = sorted[p95Index];
+        const max = Math.max(...sorted);
+        rc.maxPathSwitchLatencyMs = max;
+        rc.pathSwitchLatencyP95Ms = p95;
+        if (max > 300) failureCodes.push('PATH_SWITCH_LATENCY_SLOW');
+      } else {
+        failureCodes.push('PATH_SWITCH_LATENCY_MISSING');
+      }
+      if (sc) {
+        rc.probeBackoffOk = sc.rateBackoffOk;
+        if (sc.rateBackoffOk === false) failureCodes.push('PROBE_BACKOFF_VIOLATION');
+        if (sc.rateBackoffOk == null) failureCodes.push('PROBE_BACKOFF_UNKNOWN');
+      }
+      // Cover connection start delay
+      if (ft && typeof ft.coverStartDelayMs === 'number') {
+        rc.coverStartDelayMs = ft.coverStartDelayMs;
+        rc.coverStartDelayWithin = ft.coverStartDelayMs >= 0 && ft.coverStartDelayMs <= 1000; // policy window 0..1000ms
+        if (!rc.coverStartDelayWithin) failureCodes.push('COVER_START_DELAY_OUT_OF_RANGE');
+      } else {
+        failureCodes.push('COVER_START_DELAY_MISSING');
+      }
+      rc.failureCodes = failureCodes;
+      const hard = failureCodes.filter(c => !c.endsWith('_MISSING') && !c.endsWith('_UNKNOWN'));
+      const passed = hard.length === 0;
+      const details = passed ? `✅ runtime calibration ok p95Latency=${rc.pathSwitchLatencyP95Ms}ms maxLatency=${rc.maxPathSwitchLatencyMs}ms` : `❌ runtime calibration issues: ${failureCodes.join(',')}`;
+      const evidenceType: 'heuristic' | 'dynamic-protocol' | 'artifact' = passed ? 'dynamic-protocol' : 'heuristic';
+      return { id: 42, name: 'Runtime Calibration & Behavioral Instrumentation', description: 'Correlates baseline vs dynamic TLS calibration, POP co-location, SCION path switch latency distribution, probe backoff, and cover connection start timing', passed, details, severity: 'major', evidenceType };
+    }
+  },
   // Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes (Check 39)
   {
     id: 39,
