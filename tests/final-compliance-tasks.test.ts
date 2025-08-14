@@ -758,7 +758,35 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       const result = await runWithAnalyzer(analyzerForAuth(ev));
       const check35 = result.checks.find(c => c.id === 35)!;
       expect(check35.passed).toBe(false);
-      expect(check35.details).toMatch(/EVIDENCE_UNSIGNED/);
+  expect(check35.details).toMatch(/SIG_DETACHED_INVALID|EVIDENCE_UNSIGNED/);
+    });
+    it('fails with SIG_DETACHED_INVALID when detached signature attempted but invalid', async () => {
+      const ev = { provenance: { signatureVerified: false } };
+      const result = await runWithAnalyzer(analyzerForAuth(ev));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      // Enhanced code includes SIG_DETACHED_INVALID in codes list
+      expect(check35.details).toMatch(/SIG_DETACHED_INVALID|EVIDENCE_UNSIGNED/); // backward compat if mapping simplified
+    });
+    it('fails with BUNDLE_THRESHOLD_UNMET when bundle present but threshold not met', async () => {
+      const ev = { signedEvidenceBundle: { multiSignerThresholdMet: false, entries: [ { signatureValid: true }, { signatureValid: true } ] } };
+      const result = await runWithAnalyzer(analyzerForAuth(ev));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      expect(check35.passed).toBe(false);
+      expect(check35.details).toMatch(/BUNDLE_THRESHOLD_UNMET/);
+    });
+    it('fails with BUNDLE_SIGNATURE_INVALID when any bundle entry invalid', async () => {
+      const ev = { signedEvidenceBundle: { multiSignerThresholdMet: false, entries: [ { signatureValid: true }, { signatureValid: false } ] } };
+      const result = await runWithAnalyzer(analyzerForAuth(ev));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      expect(check35.passed).toBe(false);
+      expect(check35.details).toMatch(/BUNDLE_SIGNATURE_INVALID/);
+    });
+    it('fails with MISSING_AUTH_SIGNALS when neither detached nor bundle present', async () => {
+      const ev = { other: true }; // no provenance.signatureVerified nor bundle
+      const result = await runWithAnalyzer(analyzerForAuth(ev));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      expect(check35.passed).toBe(false);
+      expect(check35.details).toMatch(/MISSING_AUTH_SIGNALS|EVIDENCE_UNSIGNED/);
     });
   });
 

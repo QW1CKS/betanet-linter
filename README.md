@@ -110,6 +110,15 @@ An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 
 Implementation: detached signature verification, optional DSSE envelope verification, signer threshold & required key policy, materials completeness & mismatch detection, reproducible rebuild digest comparison, toolchain diff gating, authenticity gate (Check 35) in strict auth mode.
 
+Authenticity (Check 35) granular failure codes:
+- SIG_DETACHED_INVALID – detached signature path attempted but cryptographic verification failed.
+- BUNDLE_THRESHOLD_UNMET – multi-signer bundle present but required threshold not satisfied.
+- BUNDLE_SIGNATURE_INVALID – one or more bundle entry signatures structurally/cryptographically invalid.
+- MISSING_AUTH_SIGNALS – neither detached signature nor bundle evidence provided under strict auth.
+- EVIDENCE_UNSIGNED – (non-strict mode) authenticity not enforced but surfaced for visibility.
+
+Pass conditions: either a verified detached signature OR a bundle with `multiSignerThresholdMet=true`. Evidence type is elevated to `artifact` only when authenticity satisfied; otherwise remains heuristic in reports. Future enhancements (non-blocking) include canonical JSON normalization before hash/sign, real public key allow/deny lists, and hash-chain validation for bundle entries.
+
 ### Multi-Signal Scoring & Anti-Evasion
 JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Keyword stuffing detection flags excessive spec-token density with insufficient category diversity and can fail the multi-signal anti‑evasion check (ID 18).
 

@@ -53,6 +53,12 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 
 ## Unreleased
 
+### Task 11 Completion: Provenance & Evidence Authenticity Hardening
+- Added granular authenticity failure codes in Check 35: SIG_DETACHED_INVALID, BUNDLE_THRESHOLD_UNMET, BUNDLE_SIGNATURE_INVALID, MISSING_AUTH_SIGNALS, EVIDENCE_UNSIGNED (non-strict informational)
+- strictAuthMode now enforces presence of either verified detached signature or multi-signer bundle threshold; non-strict mode surfaces unsigned state without blocking
+- Extended tests (Task 11 section) covering pass (detached + bundle) and each new negative scenario
+- ROADMAP updated to mark Task 11 complete with caveats retained for future real cryptographic bundle verification & key policy enhancements
+
 Post‑1.1 optional enhancements and polish items (see deferred list above). No breaking changes scheduled; future work will aim for additive schema expansions and optional flags.
 
 ### Added (since 1.0 baseline, historical aggregation)

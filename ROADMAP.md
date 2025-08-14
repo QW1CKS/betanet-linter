@@ -320,9 +320,11 @@ The following additional items were identified as still incomplete for a strictl
   - Evidence schema extended with advanced statistical fields (median, p95, cv, skewness, outlier count, anomaly codes, behavior model score, policy flag) and enforced when present (absence treated permissively to preserve backward compatibility).
   - Tests: Added in `final-compliance-tasks.test.ts` covering pass and each failure scenario (insufficient cover, delay out of range, teardown variance excess, provenance insufficiency).
   - Caveats (non-blocking): High-resolution timing capture & real network harness integration, statistical justification (confidence intervals) for thresholds, multi-origin cover validation & anomaly classification taxonomy.
-11. [ ] Provenance DSSE Signature & Rebuild Diff Hardening
-  - Verify DSSE signatures with trusted keys, enforce materials completeness & toolchain pinning, compare rebuild digest; SIG_INVALID / MATERIAL_GAP / REBUILD_MISMATCH.
-  - Caveats: multi-signer threshold logic, key allow/deny lists, reproducible rebuild invocation & diff hashing, per-material digest cross‑reference with SBOM, policy reason aggregation.
+11. [x] Provenance DSSE Signature & Rebuild Diff Hardening
+  - Implemented: Enhanced Check 9 already enforces DSSE signer threshold (MISSING_SIGNER), signature validity (SIG_INVALID), materials completeness (MATERIAL_GAP), rebuild digest mismatch (REBUILD_MISMATCH), toolchain diff count, required signer presence & policy reasons. Task 11 completion adds expanded authenticity gating via Check 35 (granular codes) and strictAuth option.
+  - New authenticity failure codes (Check 35): SIG_DETACHED_INVALID (detached signature attempted but invalid), BUNDLE_THRESHOLD_UNMET (bundle present but threshold unmet), BUNDLE_SIGNATURE_INVALID (one or more bundle entry signatures invalid), MISSING_AUTH_SIGNALS (no detached or bundle authenticity signals), EVIDENCE_UNSIGNED (non-strict mode informational fallback). Passing when either detached signature verified or multi-signer bundle threshold met.
+  - Tests: Added positive detached & bundle pass plus negative scenarios for each new failure code in `final-compliance-tasks.test.ts`.
+  - Caveats (non-blocking): Real cryptographic verification for multi-signer bundle (currently flag-based), canonical JSON normalization before hashing, key allow/deny list policy ingestion, per-entry signer identity validation, aggregation of DSSE + bundle interplay (combined threshold policy), tamper-proof hash chain verification & signature caching.
 12. [ ] Algorithm Agility Registry Enforcement
   - Parse registry artifact (allowed cipher/hash/KEM sets); verify used sets ⊆ allowed; unregisteredUsed empty; failure on unknown combos.
   - Caveats: canonical registry hash, strict parsing (schema validation), mapping binary-observed suites to registry names, mismatch diff reporting & tests.

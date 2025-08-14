@@ -1720,16 +1720,42 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const diag = (analyzer.getDiagnostics && analyzer.getDiagnostics()) || {};
       const provenance = ev.provenance || {};
       const bundle = ev.signedEvidenceBundle;
-  const strictAuth = (analyzer as any).options?.strictAuthMode === true; // options attached in ensureAnalyzer
-      // Determine authenticity signals
-  const detachedValid = provenance.signatureVerified === true || diag.evidenceSignatureValid === true;
-  const bundleValid = bundle?.multiSignerThresholdMet === true;
-  const anyAuth = (detachedValid === true) || (bundleValid === true);
-      // Pass policy: if strictAuth mode enabled, require anyAuth true. If not strict, informational pass if authenticity present.
-  const passed = anyAuth; // bool
-  const evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
-  const details = anyAuth ? `✅ authenticity ${detachedValid ? 'detached-signature' : 'bundle'} verified` : (strictAuth ? '❌ EVIDENCE_UNSIGNED' : '❌ EVIDENCE_UNSIGNED (not enforced)');
-  return { id: 35, name: 'Evidence Authenticity', description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode', passed, details, severity: 'major', evidenceType };
+      const strictAuth = (analyzer as any).options?.strictAuthMode === true;
+      const detachedAttempted = provenance.signatureVerified === true || provenance.signatureVerified === false || diag.evidenceSignatureValid !== undefined;
+      const detachedValid = provenance.signatureVerified === true || diag.evidenceSignatureValid === true;
+      const bundlePresent = !!bundle;
+      const bundleThresholdMet = bundle?.multiSignerThresholdMet === true;
+      const anyAuth = detachedValid || bundleThresholdMet;
+      const failureCodes: string[] = [];
+      if (!anyAuth) {
+        if (strictAuth) {
+          if (bundlePresent) {
+            if (!bundleThresholdMet) failureCodes.push('BUNDLE_THRESHOLD_UNMET');
+            const invalidEntries = (bundle.entries||[]).filter((e:any)=>e && e.signatureValid === false).length;
+            if (invalidEntries > 0) failureCodes.push('BUNDLE_SIGNATURE_INVALID');
+          } else if (detachedAttempted) {
+            if (!detachedValid) failureCodes.push('SIG_DETACHED_INVALID');
+          } else {
+            failureCodes.push('MISSING_AUTH_SIGNALS');
+          }
+        } else {
+          failureCodes.push('EVIDENCE_UNSIGNED');
+        }
+      }
+      const evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
+      let details: string;
+      if (anyAuth) {
+        details = `✅ authenticity ${(detachedValid ? 'detached-signature' : 'bundle')} verified`;
+      } else {
+        const codeStr = failureCodes.length ? ` codes=[${failureCodes.join(',')}]` : '';
+        if (strictAuth) {
+          details = `❌ ${codeStr || 'EVIDENCE_UNSIGNED'}`;
+        } else {
+          details = `❌ EVIDENCE_UNSIGNED (not enforced)${codeStr}`;
+        }
+      }
+      const passed = anyAuth;
+      return { id: 35, name: 'Evidence Authenticity', description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode', passed, details, severity: 'major', evidenceType };
     }
   }
   ,
