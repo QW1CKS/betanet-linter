@@ -1278,6 +1278,56 @@ exports.CHECK_REGISTRY = [
                             ledger.quorumCertificateInvalidReasons = validation.reasons;
                         }
                         ledger.finalitySets = ledger.finalitySets || qcs.map((q) => `epoch-${q.epoch}`);
+                        // Task 17: perform deeper cryptographic verification when validatorKeys supplied
+                        if (validatorKeys) {
+                            const crypto = require('crypto');
+                            let totalSigs = 0;
+                            let validSigs = 0;
+                            let invalidSigs = 0;
+                            const weightAgg = {};
+                            let anyInvalid = false;
+                            for (const qc of qcs) {
+                                for (const s of qc.signatures) {
+                                    totalSigs++;
+                                    const pkPem = validatorKeys[s.validator];
+                                    if (!pkPem || !s.sig) {
+                                        invalidSigs++;
+                                        anyInvalid = true;
+                                        continue;
+                                    }
+                                    const message = Buffer.from(`epoch:${qc.epoch}|root:${qc.rootHash || 'none'}`);
+                                    let ok = false;
+                                    try {
+                                        ok = crypto.verify(null, message, pkPem, Buffer.from(s.sig, 'base64'));
+                                    }
+                                    catch { /* ed25519 verify attempt */ }
+                                    if (!ok) {
+                                        try {
+                                            const verifier = crypto.createVerify('SHA256');
+                                            verifier.update(message);
+                                            verifier.end();
+                                            ok = verifier.verify(pkPem, Buffer.from(s.sig, 'base64'));
+                                        }
+                                        catch { /* ignore */ }
+                                    }
+                                    if (ok) {
+                                        validSigs++;
+                                    }
+                                    else {
+                                        invalidSigs++;
+                                        anyInvalid = true;
+                                    }
+                                    weightAgg[s.validator] = (weightAgg[s.validator] || 0) + (s.weight || 0);
+                                }
+                            }
+                            ledger.quorumSignatureStats = { total: totalSigs, valid: validSigs, invalid: invalidSigs, mode: 'ed25519' };
+                            ledger.chainsSignatureVerified = totalSigs > 0 && invalidSigs === 0;
+                            ledger.signerAggregatedWeights = weightAgg;
+                            ledger.signatureValidationMode = 'ed25519';
+                            if (anyInvalid) {
+                                ledger.quorumCertificatesValid = false; // force invalid
+                            }
+                        }
                     }
                     catch { /* ignore */ }
                 }
@@ -1372,6 +1422,31 @@ exports.CHECK_REGISTRY = [
                 // Weight cap
                 if (ledger.weightCapExceeded)
                     failureCodes.push('WEIGHT_CAP_EXCEEDED');
+                // Task 17 additional failure codes based on new cryptographic validation
+                if (ledger.chainsSignatureVerified === false)
+                    failureCodes.push('QUORUM_SIG_INVALID');
+                if (ledger.quorumSignatureStats && ledger.quorumSignatureStats.total > 0) {
+                    const pct = (ledger.quorumSignatureStats.valid / ledger.quorumSignatureStats.total) * 100;
+                    if (pct < 80)
+                        failureCodes.push('QUORUM_SIG_COVERAGE_LOW');
+                }
+                // Weight aggregation consistency: compare per-chain declared weightSum vs aggregated signer weights when available
+                if (Array.isArray(ledger.chains) && ledger.signerAggregatedWeights) {
+                    let mismatch = false;
+                    for (const ch of ledger.chains) {
+                        if (Array.isArray(ch.signatures) && typeof ch.weightSum === 'number') {
+                            const agg = ch.signatures.reduce((a, s) => a + (s.weight || 0), 0);
+                            if (Math.abs(agg - ch.weightSum) > 1e-6) {
+                                mismatch = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (mismatch) {
+                        ledger.weightAggregationMismatch = true;
+                        failureCodes.push('WEIGHT_AGG_MISMATCH');
+                    }
+                }
                 passed = failureCodes.length === 0;
                 details = passed
                     ? `✅ Finality sets=${(finalitySets || []).length} depth=${finalityDepth ?? 'n/a'} chains=${chains.length} quorumCertsOk weights=${quorumWeights ? quorumWeights.length : (chains.length || 0)}${emergencyAdvanceUsed ? ' emergencyAdvanceOk' : ''}`
@@ -1514,13 +1589,35 @@ exports.CHECK_REGISTRY = [
             const analysis = await analyzer.analyze();
             const strings = analysis.strings || [];
             const SPEC_KEYWORDS = ['betanet', 'htx', 'quic', 'ech', 'ticket', 'rotation', 'scion', 'chacha20', 'poly1305', 'cashu', 'lightning', 'federation', 'slsa', 'reproducible', 'provenance', 'kyber', 'kyber768', 'x25519', 'beacon', 'diversity', 'voucher', 'frost', 'pow', 'governance', 'ledger', 'quorum', 'finality', 'mix', 'hop'];
+            // Normalize strings (filter out very short tokens)
+            const filtered = strings.filter(s => s && s.length >= 4).slice(0, 2000); // cap to avoid skew & performance
             let keywordHits = 0;
-            for (const s of strings) {
+            const keywordFreq = {};
+            for (const s of filtered) {
                 const lower = s.toLowerCase();
-                if (SPEC_KEYWORDS.some(k => lower.includes(k)))
-                    keywordHits++;
+                for (const k of SPEC_KEYWORDS) {
+                    if (lower.includes(k)) {
+                        keywordHits++;
+                        keywordFreq[k] = (keywordFreq[k] || 0) + 1;
+                    }
+                }
             }
-            const stuffingRatio = strings.length ? keywordHits / strings.length : 0;
+            const stuffingRatio = filtered.length ? keywordHits / filtered.length : 0;
+            // Compute keyword distribution entropy (Shannon) to detect repeated padding of a narrow subset
+            const totalKw = Object.values(keywordFreq).reduce((a, b) => a + b, 0);
+            let kwEntropy = 0;
+            if (totalKw > 0) {
+                for (const c of Object.values(keywordFreq)) {
+                    const p = c / totalKw;
+                    kwEntropy += -p * Math.log2(p);
+                }
+            }
+            const maxEntropy = totalKw > 0 ? Math.log2(Object.keys(keywordFreq).length || 1) : 0;
+            const entropyRatio = maxEntropy > 0 ? kwEntropy / maxEntropy : 1; // 1 = diverse, 0 = single keyword repeated
+            // Text diversity proxy: unique non-keyword tokens ratio
+            const nonKwTokens = filtered.filter(s => !SPEC_KEYWORDS.some(k => s.toLowerCase().includes(k)));
+            const uniqueNonKw = new Set(nonKwTokens.map(s => s.toLowerCase())).size;
+            const nonKwDiversity = filtered.length ? uniqueNonKw / filtered.length : 0;
             // Category presence (artifact/dynamic/static) derived from existing evidence objects
             const categories = [
                 { name: 'provenance', present: !!ev.provenance },
@@ -1533,21 +1630,44 @@ exports.CHECK_REGISTRY = [
             const presentCount = categories.filter(c => c.present).length;
             // Baseline pass threshold
             let passed = presentCount >= 2;
-            // Evasion rule: extremely high keyword stuffing with only minimal category corroboration
-            const severeStuffing = stuffingRatio > 0.6 && presentCount < 3; // two categories but heavy stuffing => suspect
+            const failureCodes = [];
+            // Advanced heuristics thresholds
+            const HIGH_STUFF_RATIO = 0.60; // tighten slightly to reduce FPs
+            const EXTREME_STUFF_RATIO = 0.80; // extreme threshold higher to preserve legacy ok cases
+            const LOW_ENTROPY_RATIO = 0.45; // keyword distribution concentrated (<45% of possible entropy)
+            const LOW_NONKW_DIVERSITY = 0.20; // <20% unique non-keyword tokens
+            const lowSignal = presentCount < 3; // insufficient corroborating categories
+            const extremeStuffing = stuffingRatio >= EXTREME_STUFF_RATIO && lowSignal;
+            const highStuffing = stuffingRatio >= HIGH_STUFF_RATIO && lowSignal;
+            const concentrated = entropyRatio < LOW_ENTROPY_RATIO && keywordHits > 12; // at least some volume
+            const lowNonKw = nonKwDiversity < LOW_NONKW_DIVERSITY && keywordHits > 8;
             let evasionFlag = false;
-            if (severeStuffing) {
+            if (extremeStuffing || (highStuffing && (concentrated || lowNonKw))) {
                 passed = false;
                 evasionFlag = true;
+                if (extremeStuffing)
+                    failureCodes.push('KEYWORD_STUFFING_EXTREME');
+                else
+                    failureCodes.push('KEYWORD_STUFFING_HIGH');
+                if (concentrated)
+                    failureCodes.push('KEYWORD_DISTRIBUTION_LOW_ENTROPY');
+                if (lowNonKw)
+                    failureCodes.push('LOW_NON_KEYWORD_DIVERSITY');
+                if (presentCount < 2)
+                    failureCodes.push('INSUFFICIENT_CATEGORIES');
+            }
+            else if (!passed) {
+                failureCodes.push('INSUFFICIENT_CATEGORIES');
             }
             return {
                 id: 18,
                 name: 'Multi-Signal Anti-Evasion',
                 description: 'Requires ≥2 non-heuristic evidence categories for critical spec areas (transport, privacy, provenance, governance)',
                 passed,
-                details: passed ? `✅ Multi-signal categories=${presentCount} (${categories.filter(c => c.present).map(c => c.name).join(', ')}) keywordDensity=${(stuffingRatio * 100).toFixed(1)}%` : (evasionFlag ? `❌ Suspected keyword stuffing (density ${(stuffingRatio * 100).toFixed(1)}% with only ${presentCount} category evidences)` : `❌ Insufficient multi-signal evidence (${presentCount}/2) keywordDensity=${(stuffingRatio * 100).toFixed(1)}%`),
+                details: passed ? `✅ Multi-signal categories=${presentCount} (${categories.filter(c => c.present).map(c => c.name).join(', ')}) kwDensity=${(stuffingRatio * 100).toFixed(1)}% kwEntropyRatio=${entropyRatio.toFixed(2)} nonKwDiv=${nonKwDiversity.toFixed(2)}` : (evasionFlag ? `❌ Suspected keyword stuffing codes=[${failureCodes.join(',')}] kwDensity=${(stuffingRatio * 100).toFixed(1)}% kwEntropyRatio=${entropyRatio.toFixed(2)} nonKwDiv=${nonKwDiversity.toFixed(2)} cats=${presentCount}` : `❌ Insufficient multi-signal evidence (${presentCount}/2) kwDensity=${(stuffingRatio * 100).toFixed(1)}%`),
                 severity: 'major',
-                evidenceType: presentCount ? 'artifact' : 'heuristic'
+                evidenceType: presentCount ? 'artifact' : 'heuristic',
+                failureCodes: passed ? [] : failureCodes
             };
         }
     }
@@ -1979,6 +2099,27 @@ exports.PHASE_7_CONT_CHECKS = [
             const detachedAttempted = provenance.signatureVerified === true || provenance.signatureVerified === false || diag.evidenceSignatureValid !== undefined;
             const detachedValid = provenance.signatureVerified === true || diag.evidenceSignatureValid === true;
             const bundlePresent = !!bundle;
+            // Recompute bundle hash chain if present (concatenate canonicalSha256 values and hash)
+            if (bundlePresent && Array.isArray(bundle.entries)) {
+                try {
+                    const crypto = require('crypto');
+                    const concat = bundle.entries.map((e) => e?.canonicalSha256 || '').join('');
+                    const recomputed = crypto.createHash('sha256').update(concat).digest('hex');
+                    bundle.computedBundleSha256 = recomputed;
+                    if (bundle.bundleSha256) {
+                        bundle.hashChainValid = recomputed === bundle.bundleSha256;
+                    }
+                }
+                catch (e) {
+                    bundle.hashChainValid = false;
+                    bundle.hashChainError = String(e);
+                }
+                // Derive threshold if missing
+                if (bundle.thresholdRequired == null)
+                    bundle.thresholdRequired = 2;
+                const uniqueSigners = new Set((bundle.entries || []).filter((e) => e && e.signatureValid).map((e) => e.signer).filter((s) => s));
+                bundle.multiSignerThresholdMet = uniqueSigners.size >= (bundle.thresholdRequired || 2);
+            }
             const bundleThresholdMet = bundle?.multiSignerThresholdMet === true;
             const anyAuth = detachedValid || bundleThresholdMet;
             const failureCodes = [];
@@ -1990,6 +2131,8 @@ exports.PHASE_7_CONT_CHECKS = [
                         const invalidEntries = (bundle.entries || []).filter((e) => e && e.signatureValid === false).length;
                         if (invalidEntries > 0)
                             failureCodes.push('BUNDLE_SIGNATURE_INVALID');
+                        if (bundle.hashChainValid === false)
+                            failureCodes.push('BUNDLE_HASH_CHAIN_INVALID');
                     }
                     else if (detachedAttempted) {
                         if (!detachedValid)
@@ -2006,7 +2149,9 @@ exports.PHASE_7_CONT_CHECKS = [
             const evidenceType = anyAuth ? 'artifact' : 'heuristic';
             let details;
             if (anyAuth) {
-                details = `✅ authenticity ${(detachedValid ? 'detached-signature' : 'bundle')} verified`;
+                const mode = detachedValid ? 'detached-signature' : 'bundle';
+                const chainInfo = bundlePresent ? ` hashChain=${bundle?.hashChainValid === false ? 'invalid' : 'ok'}` : '';
+                details = `✅ authenticity ${mode} verified${chainInfo}`;
             }
             else {
                 const codeStr = failureCodes.length ? ` codes=[${failureCodes.join(',')}]` : '';

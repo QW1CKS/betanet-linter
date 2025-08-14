@@ -334,6 +334,11 @@ export interface IngestedEvidence {
   signatureValidationMode?: 'placeholder' | 'ed25519'; // cryptographic mode
   signatureSampleVerifiedPct?: number; // percent of sampled signatures verified
   weightCapExceeded?: boolean; // if any signer weight beyond cap
+  // Task 17 cryptographic quorum signature validation extensions
+  chainsSignatureVerified?: boolean; // overall cryptographic verification success across chains
+  quorumSignatureStats?: { total: number; valid: number; invalid: number; mode: string };
+  signerAggregatedWeights?: Record<string, number>; // aggregated weight across chains
+  weightAggregationMismatch?: boolean; // flag when declared weightSum differs from aggregated signer weights
   };
   governanceHistoricalDiversity?: {
     // Time-series of AS share distributions: array of { timestamp, asShares: { [as: string]: number } }

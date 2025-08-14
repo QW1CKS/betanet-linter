@@ -481,6 +481,93 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
+  describe('Task 17: Governance & Ledger Cryptographic Quorum Signature Validation', () => {
+    function analyzerWithLedger(ledger: any, governance?: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        evidence: { ledger, governance }
+      } as any;
+    }
+    it('passes when all signatures are valid (ed25519)', async () => {
+      const crypto = require('crypto');
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+      const pkPem = publicKey.export({ type: 'spki', format: 'pem' }).toString();
+      function makeQC(epoch: number, root: string) {
+        const message = Buffer.from(`epoch:${epoch}|root:${root}`);
+        const sig = crypto.sign(null, message, privateKey).toString('base64');
+        return { epoch, signatures: [{ validator: 'v1', weight: 10, sig }], rootHash: root };
+      }
+      const qc1 = makeQC(1,'r1');
+      const qc2 = makeQC(2,'r2');
+      const cbor = require('cbor');
+      const b64s = [qc1,qc2].map(q=> cbor.encode(q).toString('base64'));
+  const ledgerInput = { quorumCertificatesCbor: b64s, finalityDepth: 2, chains: [{ name:'c1', finalityDepth:2, weightSum:10, epoch:1, signatures:[{ signer:'v1', weight:10, valid:true }] }, { name:'c2', finalityDepth:2, weightSum:10, epoch:2, signatures:[{ signer:'v1', weight:10, valid:true }] }] };
+  const governance = { validatorKeys: { v1: pkPem } };
+  const analyzerInst: any = analyzerWithLedger(ledgerInput, governance);
+  const result = await runWithAnalyzer(analyzerInst);
+      const check = result.checks.find(c=>c.id===16);
+      expect(check?.passed).toBe(true);
+  const mutatedLedger: any = analyzerInst.evidence.ledger;
+  expect(mutatedLedger.chainsSignatureVerified).toBe(true);
+  expect(mutatedLedger.quorumSignatureStats.valid).toBe(2);
+    });
+    it('fails when a signature is invalid', async () => {
+      const crypto = require('crypto');
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+      const { publicKey: publicKey2, privateKey: privateKey2 } = crypto.generateKeyPairSync('ed25519');
+      const pkPem = publicKey.export({ type:'spki', format:'pem' }).toString();
+      function good(epoch: number, root: string) {
+        const message = Buffer.from(`epoch:${epoch}|root:${root}`);
+        const sig = crypto.sign(null, message, privateKey).toString('base64');
+        return { epoch, signatures: [{ validator:'v1', weight:10, sig }], rootHash: root };
+      }
+      function bad(epoch: number, root: string) {
+        const message = Buffer.from(`epoch:${epoch}|root:${root}`);
+        const sig = crypto.sign(null, message, privateKey2).toString('base64'); // signed by different key
+        return { epoch, signatures: [{ validator:'v1', weight:10, sig }], rootHash: root };
+      }
+      const qc1 = good(1,'r1');
+      const qc2 = bad(2,'r2');
+      const cbor = require('cbor');
+      const b64s = [qc1,qc2].map(q=> cbor.encode(q).toString('base64'));
+  const ledgerInput = { quorumCertificatesCbor: b64s, finalityDepth: 2, chains:[{ name:'c1', finalityDepth:2, weightSum:10, epoch:1, signatures:[{ signer:'v1', weight:10, valid:true }] }, { name:'c2', finalityDepth:2, weightSum:10, epoch:2, signatures:[{ signer:'v1', weight:10, valid:true }] }] };
+  const governance = { validatorKeys: { v1: pkPem } };
+  const analyzerInst: any = analyzerWithLedger(ledgerInput, governance);
+  const result = await runWithAnalyzer(analyzerInst);
+      const check = result.checks.find(c=>c.id===16);
+      expect(check?.passed).toBe(false);
+      expect(check?.details).toMatch(/QUORUM_SIG_INVALID|QUORUM_CERTS_INVALID/);
+    });
+    it('fails on low signature coverage (<80%)', async () => {
+      const crypto = require('crypto');
+      const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+      const pkPem = publicKey.export({ type:'spki', format:'pem' }).toString();
+      function makeQC(epoch: number, root: string, withSig: boolean) {
+        let signatures: any[] = [];
+        if (withSig) {
+          const message = Buffer.from(`epoch:${epoch}|root:${root}`);
+          const sig = crypto.sign(null, message, privateKey).toString('base64');
+          signatures.push({ validator:'v1', weight:10, sig });
+        } else {
+          signatures.push({ validator:'v1', weight:10 }); // missing signature
+        }
+        return { epoch, signatures, rootHash: root };
+      }
+      const qc1 = makeQC(1,'r1', true);
+      const qc2 = makeQC(2,'r2', false); // missing signature -> invalid
+      const cbor = require('cbor');
+      const b64s = [qc1,qc2].map(q=> cbor.encode(q).toString('base64'));
+  const ledgerInput = { quorumCertificatesCbor: b64s, finalityDepth:2, chains:[{ name:'c1', finalityDepth:2, weightSum:10, epoch:1, signatures:[{ signer:'v1', weight:10, valid:true }] }, { name:'c2', finalityDepth:2, weightSum:10, epoch:2, signatures:[{ signer:'v1', weight:10, valid:true }] }] };
+  const governance = { validatorKeys: { v1: pkPem } };
+  const analyzerInst: any = analyzerWithLedger(ledgerInput, governance);
+  const result = await runWithAnalyzer(analyzerInst);
+      const check = result.checks.find(c=>c.id===16);
+      expect(check?.passed).toBe(false);
+      expect(check?.details).toMatch(/QUORUM_SIG_COVERAGE_LOW|QUORUM_SIG_INVALID|QUORUM_CERTS_INVALID/);
+    });
+  });
+
   // Task 7: Governance ACK Span & Partition Safety Dataset
   describe('Task 7: Governance Historical Diversity & Partition Safety (Check 15 extension)', () => {
     function analyzerForGov(hist: any, gov: any = {}) {

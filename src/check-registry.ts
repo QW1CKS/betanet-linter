@@ -1141,6 +1141,34 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
               ledger.quorumCertificateInvalidReasons = validation.reasons;
             }
             ledger.finalitySets = ledger.finalitySets || qcs.map((q: any) => `epoch-${q.epoch}`);
+            // Task 17: perform deeper cryptographic verification when validatorKeys supplied
+            if (validatorKeys) {
+              const crypto = require('crypto');
+              let totalSigs = 0; let validSigs = 0; let invalidSigs = 0; const weightAgg: Record<string, number> = {};
+              let anyInvalid = false;
+              for (const qc of qcs) {
+                for (const s of qc.signatures) {
+                  totalSigs++;
+                  const pkPem = validatorKeys[s.validator];
+                  if (!pkPem || !s.sig) { invalidSigs++; anyInvalid = true; continue; }
+                  const message = Buffer.from(`epoch:${qc.epoch}|root:${qc.rootHash||'none'}`);
+                  let ok = false;
+                  try { ok = crypto.verify(null, message, pkPem, Buffer.from(s.sig, 'base64')); } catch {/* ed25519 verify attempt */}
+                  if (!ok) {
+                    try { const verifier = crypto.createVerify('SHA256'); verifier.update(message); verifier.end(); ok = verifier.verify(pkPem, Buffer.from(s.sig,'base64')); } catch {/* ignore */}
+                  }
+                  if (ok) { validSigs++; } else { invalidSigs++; anyInvalid = true; }
+                  weightAgg[s.validator] = (weightAgg[s.validator]||0) + (s.weight||0);
+                }
+              }
+              ledger.quorumSignatureStats = { total: totalSigs, valid: validSigs, invalid: invalidSigs, mode: 'ed25519' };
+              ledger.chainsSignatureVerified = totalSigs > 0 && invalidSigs === 0;
+              ledger.signerAggregatedWeights = weightAgg;
+              ledger.signatureValidationMode = 'ed25519';
+              if (anyInvalid) {
+                ledger.quorumCertificatesValid = false; // force invalid
+              }
+            }
           } catch {/* ignore */}
         }
         const { finalitySets, quorumCertificatesValid } = ledger;
@@ -1209,6 +1237,23 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         }
         // Weight cap
         if (ledger.weightCapExceeded) failureCodes.push('WEIGHT_CAP_EXCEEDED');
+        // Task 17 additional failure codes based on new cryptographic validation
+        if (ledger.chainsSignatureVerified === false) failureCodes.push('QUORUM_SIG_INVALID');
+        if (ledger.quorumSignatureStats && ledger.quorumSignatureStats.total > 0) {
+          const pct = (ledger.quorumSignatureStats.valid / ledger.quorumSignatureStats.total) * 100;
+          if (pct < 80) failureCodes.push('QUORUM_SIG_COVERAGE_LOW');
+        }
+        // Weight aggregation consistency: compare per-chain declared weightSum vs aggregated signer weights when available
+        if (Array.isArray(ledger.chains) && ledger.signerAggregatedWeights) {
+          let mismatch = false;
+          for (const ch of ledger.chains) {
+            if (Array.isArray(ch.signatures) && typeof ch.weightSum === 'number') {
+              const agg = ch.signatures.reduce((a: number,s: any)=> a + (s.weight||0),0);
+              if (Math.abs(agg - ch.weightSum) > 1e-6) { mismatch = true; break; }
+            }
+          }
+          if (mismatch) { ledger.weightAggregationMismatch = true; failureCodes.push('WEIGHT_AGG_MISMATCH'); }
+        }
         passed = failureCodes.length === 0;
         details = passed
           ? `✅ Finality sets=${(finalitySets||[]).length} depth=${finalityDepth ?? 'n/a'} chains=${chains.length} quorumCertsOk weights=${quorumWeights ? quorumWeights.length : (chains.length||0)}${emergencyAdvanceUsed ? ' emergencyAdvanceOk' : ''}`

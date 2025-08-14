@@ -277,9 +277,13 @@ export interface IngestedEvidence {
             canonicalSha256?: string;
             signatureValid?: boolean;
             signer?: string;
+            signatureError?: string;
         }[];
         bundleSha256?: string;
+        computedBundleSha256?: string;
         multiSignerThresholdMet?: boolean;
+        hashChainValid?: boolean;
+        thresholdRequired?: number;
     };
     algorithmAgility?: {
         allowedSets?: string[];
@@ -393,6 +397,15 @@ export interface IngestedEvidence {
         signatureValidationMode?: 'placeholder' | 'ed25519';
         signatureSampleVerifiedPct?: number;
         weightCapExceeded?: boolean;
+        chainsSignatureVerified?: boolean;
+        quorumSignatureStats?: {
+            total: number;
+            valid: number;
+            invalid: number;
+            mode: string;
+        };
+        signerAggregatedWeights?: Record<string, number>;
+        weightAggregationMismatch?: boolean;
     };
     governanceHistoricalDiversity?: {
         series?: {

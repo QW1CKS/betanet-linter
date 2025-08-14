@@ -89,6 +89,14 @@ Post‑1.1 optional enhancements and polish items (see deferred list above). No 
 - New failure codes: KEYWORD_STUFFING_HIGH, KEYWORD_STUFFING_EXTREME, KEYWORD_DISTRIBUTION_LOW_ENTROPY, LOW_NON_KEYWORD_DIVERSITY, INSUFFICIENT_CATEGORIES.
 - README & ROADMAP updated; tests added covering pass, high stuffing, extreme stuffing scenarios.
 
+### Task 17 Completion: Governance & Ledger Cryptographic Quorum Signature Validation
+- Check 16 upgraded with real Ed25519 quorum certificate signature verification when validator public keys supplied (governance.validatorKeys). For each certificate constructs canonical message `epoch:NUM|root:HASH` and attempts Ed25519 verify (null algorithm) with SHA256-RSA fallback.
+- Added metadata: chainsSignatureVerified boolean, quorumSignatureStats { total, valid, invalid, mode }, signerAggregatedWeights map, weightAggregationMismatch flag, signatureValidationMode='ed25519'.
+- New failure codes: QUORUM_SIG_INVALID (any invalid signature), QUORUM_SIG_COVERAGE_LOW (<80% valid of total), WEIGHT_AGG_MISMATCH (declared chain weightSum differs from aggregated signer weights).
+- Passing now requires all previous conditions plus chainsSignatureVerified (when keys provided) and coverage ≥80%. Existing QUORUM_CERTS_INVALID remains surfaced if parser-level validation fails.
+- Tests added (final-compliance-tasks) for: all valid signatures pass, invalid signature fails, low coverage (missing signature) triggers QUORUM_SIG_COVERAGE_LOW.
+- ROADMAP & types updated to mark Task 17 complete and document caveats (batch verification optimization, duplicate org correlation, multi-algorithm extensibility, Merkle root consistency future work).
+
 ### Added (since 1.0 baseline, historical aggregation)
 - Evidence schema v2+ (binaryMeta, clientHelloTemplate hash, noisePatternDetail, negative assertions) and later authenticity / adaptive PoW / jitter evidence fields.
 - Multi-signal scoring (artifact=3, dynamic=2, static=1) + anti-evasion keyword stuffing (Check 18) -> expanded to full authenticity & corroboration policies.

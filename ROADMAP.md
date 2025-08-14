@@ -343,9 +343,9 @@ The following additional items were identified as still incomplete for a strictl
   - Implemented: Enhanced Check 18 now computes keyword density over filtered tokens (length≥4, capped 2000), per-keyword frequency, Shannon entropy & entropy ratio, non-keyword diversity ratio. New failure codes: KEYWORD_STUFFING_HIGH, KEYWORD_STUFFING_EXTREME, KEYWORD_DISTRIBUTION_LOW_ENTROPY, LOW_NON_KEYWORD_DIVERSITY, INSUFFICIENT_CATEGORIES. Detection triggers when high/ extreme density co-occurs with low category corroboration and low entropy / low non-keyword diversity. Details emit kwDensity, kwEntropyRatio, nonKwDiv, categories present, failure codes.
   - Tests: Added positive moderate density + diversity case and negative cases for high & extreme stuffing scenarios.
   - Caveats (non-blocking): curated benign corpus for FP calibration, adaptive dynamic thresholds based on corpus statistics, semantic embedding similarity outlier detection, random insertion pattern classifier, regression suite for false-positive tracking.
-17. [ ] Governance & Ledger Cryptographic Quorum Signature Validation
-  - Perform real Ed25519 signature checks for quorum certificates & maintain weight duplicates detection.
-  - Caveats: per-signer weight aggregation, duplicate signer / org detection, weight cap enforcement, signature batch verification optimization, invalid reason codes.
+17. [x] Governance & Ledger Cryptographic Quorum Signature Validation
+  - Implemented: Real Ed25519 verification of quorum certificate signatures when validatorKeys supplied (Check 16 upgrade). Added per-certificate message canonical form `epoch:X|root:HASH`, attempted Ed25519 verify then SHA256-RSA fallback for compatibility; aggregates total/valid/invalid counts (quorumSignatureStats), sets chainsSignatureVerified, enforces ≥80% valid coverage (QUORUM_SIG_COVERAGE_LOW) and invalid signature failure (QUORUM_SIG_INVALID). Aggregates signer weights (signerAggregatedWeights) and detects declared per-chain weightSum mismatch (WEIGHT_AGG_MISMATCH). Added failure codes: QUORUM_SIG_INVALID, QUORUM_SIG_COVERAGE_LOW, WEIGHT_AGG_MISMATCH. Metadata: signatureValidationMode='ed25519'.
+  - Caveats (non-blocking): batch verification optimization, org-level duplicate signer correlation, multi-algorithm key negotiation, threshold multi-signer aggregation proofs, root hash Merkle consistency validation.
 18. [ ] Extended QUIC Initial Parsing & Calibration Hash
   - Extract version, DCID/SCID, token length/value, transport params subset; generate calibration hash & mismatch diagnostics.
   - Caveats: real QUIC Initial packet capture, varint parsing correctness tests, transport parameter extraction, hash stability spec, mismatch code taxonomy.
@@ -358,6 +358,50 @@ The following additional items were identified as still incomplete for a strictl
 21. [ ] Lint & Type Hygiene Hardening
   - Eliminate remaining ESLint error(s) & systematically reduce any/no-non-null & no-explicit-any warnings for core modules or justify via documented exclusions.
   - Caveats: introduce strict TypeScript config (noImplicitAny, strictNullChecks) compliance, documented whitelist for unavoidable anys, CI gate enforcing 0 errors, target warning budget.
+
+Essential Final Polish (Post 21 Gap Tasks)
+------------------------------------------
+These are required to transition from “spec gap tasks complete” to a bounty‑ready, production‑quality normative release. They are intentionally separated so they can be tackled immediately after the 21 gap tasks finish.
+
+22. [ ] Real Cryptographic Verification Completion
+  - Implement actual Ed25519 multi-signer bundle verification (aggregate or per-entry), minisign & cosign signature parsing, DSSE envelope cryptographic checks (beyond flag placeholders), FROST aggregated signature verification, governance quorum certificate Ed25519 batch verification, and PQ hybrid (X25519-Kyber768) handshake transcript proof.
+  - Deliverables: crypto libs (or minimal implementations), deterministic test vectors, failure codes for signature format/verification errors, updated authenticity policy docs.
+
+23. [ ] Runtime Calibration & Behavioral Instrumentation
+  - Capture per-connection TLS calibration pre-flight evidence (baseline vs active), POP co-location proof (DNS / route header correlation), 300 ms path switch latency measurements, probe back-off timing logs, and cover connection launch & teardown timing (UDP→TCP fallback) as first-class evidence fields.
+  - Add failure codes for POP_MISMATCH, PATH_SWITCH_LATENCY_SLOW, PROBE_BACKOFF_VIOLATION, COVER_TIMING_OUT_OF_RANGE.
+
+24. [ ] QUIC Initial Full Parse & Calibration Hash
+  - Parse version, DCID/SCID lengths & values, token length/value, key transport parameters subset; compute canonical calibration hash and add granular mismatch codes (QUIC_VERSION_MISMATCH, QUIC_SCID_LEN_DIFF, QUIC_TOKEN_ABSENT, QUIC_PARAM_DIFF).
+  - Add positive + negative tests with synthetic Initial packets.
+
+25. [ ] Real Statistical Collectors (Jitter, Padding, HTTP/3)
+  - Implement live collection of PING cadence, idle padding size distribution, PRIORITY frame rates (H2/H3), HTTP/3 adaptive metrics; compute p-values (chi-square / runs / KS) and entropy; deprecate purely synthetic inputs.
+  - Failure codes: PADDING_DISTRIBUTION_ANOMALY, PRIORITY_RATE_ANOMALY, H3_JITTER_RANDOMNESS_WEAK.
+
+26. [ ] Authenticity Hardening & Caching
+  - Canonical JSON normalization (stable ordering, Unicode, escaping), signature verification result cache keyed by (digest, signer, algo), Merkle/chain structure for bundles to prove inclusion ordering, multi-format key support (PEM, raw, minisign, cosign), explicit SIGNATURE_FORMAT_UNSUPPORTED & CANONICAL_JSON_MISMATCH codes.
+  - Benchmarks for verification speed; negative tamper tests (altered entry hash, ordering change).
+
+27. [ ] Coverage & Regression Quality Gates
+  - Enforce 100% failure-code invocation coverage, overall line/branch coverage thresholds (e.g. 90%/85%), keyword stuffing FP corpus (<2% false positives), golden evidence fixture diff guard, mutation test smoke (optional).
+  - CI stage gating merge on coverage + FP budget.
+
+28. [ ] Reproducibility & Supply Chain Provenance Hardening
+  - Add signed provenance attestation (Sigstore or minisign), SBOM attestation signatures, checksum manifest (sha256sum.txt) with detached signature, periodic action pin re-audit script, build environment lock file (toolchain versions) diff enforcement.
+  - Failure codes: PROVENANCE_SIGNATURE_INVALID, SBOM_ATTESTATION_MISSING.
+
+29. [ ] Security & Sandbox Hardening
+  - Sandbox dynamic harness (resource limits: CPU time, memory, network domain allowlist), implement enforced network allowlist tests, rate-limit external calls, key rotation policy & transparency log design doc.
+  - Add RISK_* diagnostic warnings for sandbox escapes or policy bypass attempts.
+
+30. [ ] Documentation & Spec Mapping Automation
+  - Auto-generate spec clause → check ID mapping from `betanet1.1.md` with coverage status (PASS/FAIL/CAVEAT) into README & a JSON artifact. Add script to refresh on release.
+  - Provide operator guide with evidence field glossary & troubleshooting matrix.
+
+31. [ ] Performance & Scalability Benchmarking
+  - Add micro + end-to-end benchmarks (large evidence, high-mix samples) with target runtime budget (< X sec baseline). Optimize hotspots (algorithm agility diff, JSON canonicalization, signature verification). Track performance regressions in CI with threshold deltas.
+  - Emit performance summary in JSON report (timings per check) and guard major regressions.
 
 Note: Completing each gap requires: implementation, evidence schema extension (with version bump if fields are normative), tests (positive & negative), README matrix update, and change log entry.
 
