@@ -90,9 +90,10 @@ export class NetworkAnalyzer {
       const content = buffer.toString('latin1');
       const endpoints: string[] = [];
 
-      // Look for URL patterns and endpoints
-      const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
-  const endpointRegex = /\/[a-zA-Z0-9-_\/]+/g;
+  // Look for URL patterns and endpoints
+  // eslint-disable-next-line no-useless-escape -- backslash before / is required to represent literal slash at start
+  const urlRegex = /https?:\/\/[^\s<>"'{}|\\^`[\]]+/g; // Removed unnecessary escape for '['; keep escaped ] & \
+  const endpointRegex = /\/[\w/-]+/g; // Removed unnecessary escape for '/' inside character class
 
       const urlMatches = content.match(urlRegex);
       const endpointMatches = content.match(endpointRegex);

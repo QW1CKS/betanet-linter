@@ -69,11 +69,12 @@ export function sanitizeName(name: string): string {
   // Normalize to NFC to reduce multi-codepoint equivalence issues, ignore errors silently
   try { name = name.normalize('NFC'); } catch { /* ignore */ }
   // Replace disallowed chars
+  // Hyphen placed at end of class, so no need to escape; remove superfluous escapes triggering lint
   let cleaned = name.replace(/[^A-Za-z0-9._.-]+/g, '-');
   // Collapse dashes
   cleaned = cleaned.replace(/-+/g, '-');
   // Trim leading/trailing dashes/periods (avoid hidden or awkward names)
-  cleaned = cleaned.replace(/^[\-.]+/, '').replace(/[\-.]+$/, '');
+  cleaned = cleaned.replace(/^[.-]+/, '').replace(/[.-]+$/, '');
   if (!cleaned.length) cleaned = 'component';
   if (cleaned.length > COMPONENT_NAME_MAX_LENGTH) {
     cleaned = cleaned.slice(0, COMPONENT_NAME_MAX_LENGTH);

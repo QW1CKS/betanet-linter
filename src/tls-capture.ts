@@ -20,10 +20,10 @@ export function buildCanonicalClientHello(struct: {
   ciphers: number[];
   curves?: number[];
   alpn?: string[];
-  host?: string;
-  seedHash?: string;
+  host?: string; // host unused intentionally (future SNI embed)
+  seedHash?: string; // seedHash reserved for deterministic ordering tests
 }): CanonicalClientHello {
-  const { extensions, ciphers, curves = [], alpn = [], host = 'example.org', seedHash } = struct;
+  const { extensions, ciphers, curves = [] } = struct; // drop unused destructured vars
   const version = 771; // TLS1.2 in JA3 format
   const ecPointFormats: number[] = []; // not parsed yet
   // JA3 canonical per spec: SSLVersion,CipherSuites,Extensions,EllipticCurves,EllipticCurvePointFormats

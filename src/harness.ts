@@ -128,19 +128,15 @@ export interface HarnessEvidence {
 async function simulateFallback(host: string, udpPort: number, tcpPort: number, udpTimeoutMs: number, coverConnections: number = 0): Promise<HarnessEvidence['fallback']> {
   const start = Date.now();
   const udpSocket = dgram.createSocket('udp4');
-  let udpDone = false;
   // Send a single empty datagram (most likely no listener -> silent drop)
   try { udpSocket.send(Buffer.from('ping'), udpPort, host, () => { /* noop */ }); } catch { /* ignore */ }
   const fallback: HarnessEvidence['fallback'] = { udpAttempted: true, udpTimeoutMs, tcpConnected: false };
   await new Promise(r => setTimeout(r, udpTimeoutMs));
-  udpDone = true;
   try { udpSocket.close(); } catch { /* ignore */ }
   const tcpStart = Date.now();
-  let tcpConnected = false;
   await new Promise<void>(resolve => {
     try {
       const sock = net.createConnection({ host, port: tcpPort, timeout: 4000 }, () => {
-        tcpConnected = true;
         fallback.tcpConnected = true;
         fallback.tcpConnectMs = Date.now() - tcpStart;
         fallback.tcpRetryDelayMs = tcpStart - (start + udpTimeoutMs); // delay after UDP wait until TCP attempt (should be ~0)
@@ -660,19 +656,16 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       }
     });
     // Basic parse (sent packet + potential response classification)
-    function decodeVarInt(buf: Buffer, offset: number): { value: number; bytes: number } | null {
+    const decodeVarInt = (buf: Buffer, offset: number): { value: number; bytes: number } | null => {
       if (offset >= buf.length) return null;
       const first = buf[offset];
       const prefix = first >> 6; // 2 bits
-      let length = 1 << prefix; // 1,2,4,8
+      const length = 1 << prefix; // 1,2,4,8
       if (offset + length > buf.length) return null;
-      let value = first & (prefix === 0 ? 0x3f : prefix === 1 ? 0x3f : prefix === 2 ? 0x3f : 0x3f);
-      // Simplified: for >1 byte lengths, accumulate remaining bytes
-      for (let i = 1; i < length; i++) {
-        value = (value << 8) | buf[offset + i];
-      }
+      let value = first & 0x3f; // simplified mask
+      for (let i = 1; i < length; i++) value = (value << 8) | buf[offset + i];
       return { value, bytes: length };
-    }
+    };
     if (!initial.error && initial.udpSent) {
       try {
         const raw = quicProbe; // what we sent
@@ -682,9 +675,9 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
           const scilIndex = 6 + dcil; // after DCID len + DCID
           const scil = raw[scilIndex];
           const tokenLenIndex = scilIndex + 1 + scil; // after SCID len + SCID
-          let tokenLength = raw[tokenLenIndex];
+          const tokenLength = raw[tokenLenIndex];
           let cursor = tokenLenIndex + 1;
-          let lengthField: number | undefined;
+          let lengthField: number | undefined; // stays let: assigned conditionally
           const lenDecoded = decodeVarInt(raw, cursor);
           if (lenDecoded) {
             lengthField = lenDecoded.value;

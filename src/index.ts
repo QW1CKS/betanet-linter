@@ -347,6 +347,7 @@ export class BetanetComplianceChecker {
         if (govObj.governanceHistoricalDiversity) {
           analyzerAny.evidence.governanceHistoricalDiversity = govObj.governanceHistoricalDiversity;
           try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires -- dynamic import for optional governance parsing
             const { evaluateHistoricalDiversity, evaluateHistoricalDiversityAdvanced } = require('./governance-parser');
             const result = evaluateHistoricalDiversity(govObj.governanceHistoricalDiversity.series || []);
             analyzerAny.evidence.governanceHistoricalDiversity.stable = result.stable;

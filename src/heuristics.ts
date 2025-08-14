@@ -41,7 +41,7 @@ export function detectNetwork(src: TextSources) {
   const hasHTX = /\/betanet\/htx/.test(blob) || wordBoundary('htx').test(blob);
   const hasECH = /encrypted[_-]?client[_-]?hello/.test(blob) || /\bech\b/.test(blob);
   // Port 443: require separator before & non-digit after
-  const port443 = /[:\[\s]443([^0-9]|$)/.test(blob);
+  const port443 = /[:\s[]443([^0-9]|$)/.test(blob); // simplified character class without unnecessary escape
 
   const hasWebRTC = /\/betanet\/webrtc\//.test(blob) || /webrtc/.test(blob);
   return { hasTLS, hasQUIC, hasHTX, hasECH, port443, hasWebRTC };
@@ -64,7 +64,10 @@ export function detectDHT(src: TextSources) {
   const deterministicBootstrap = hasDHT && /(deterministic.*bootstrap|stable.*seed)/.test(blob); // legacy 1.0 heuristic
   const rotationTokens = /(rendezvous|beaconset|epoch|rotate|rotation|bn-seed|schedule)/g;
   let match; let rotationHits = 0; const seen = new Set<string>();
-  while ((match = rotationTokens.exec(blob)) !== null) {
+  // eslint-disable-next-line no-constant-condition -- deliberate regex iteration using exec until null
+  while (true) {
+    match = rotationTokens.exec(blob);
+    if (!match) break;
     const token = match[0];
     if (!seen.has(token + match.index)) { rotationHits++; seen.add(token + match.index); }
   }

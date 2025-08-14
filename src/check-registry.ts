@@ -37,7 +37,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   const tmpl = ev.clientHelloTemplate; // static template evidence
   const dyn = ev.dynamicClientHelloCapture; // dynamic calibration evidence
       // Determine evidence type escalation
-      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
+  let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
       if (tmpl) evidenceType = 'static-structural';
       if (dyn && (dyn.alpn || dyn.extOrderSha256)) evidenceType = 'dynamic-protocol';
       // Baseline transport feature checks
@@ -344,7 +344,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       }
       // Artifact escalation conditional: only when ALL artifact evidences present
       const haveAllArtifact = !!(voucherCrypto && pow && rateLimit);
-      let evidenceType: 'heuristic' | 'artifact' = haveAllArtifact ? 'artifact' : 'heuristic';
+  const evidenceType: 'heuristic' | 'artifact' = haveAllArtifact ? 'artifact' : 'heuristic';
       const artifactIssues: string[] = [];
       if (haveAllArtifact) {
         const frost = voucherCrypto.frostThreshold || {};
@@ -559,7 +559,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       // If mix evidence present, treat as dynamic-protocol upgrade and enforce hop depth
       let dynamicUpgrade = false;
       let passed = evaluation.passed;
-      let detailParts: string[] = [];
+  const detailParts: string[] = [];
       if (mix && typeof mix === 'object') {
         dynamicUpgrade = true;
   const minLen = Math.min(...(mix.pathLengths || []));
@@ -743,10 +743,10 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       const ev: any = (analyzer as any).evidence;
       // Normalize evidence: prefer new noiseTranscript structure, fallback to legacy noiseTranscriptDynamic / noiseExtended
       const n = ev?.noiseTranscript || ev?.noiseTranscriptDynamic || ev?.noiseExtended;
-      let passed = false;
+  let passed = false;
       let details = '❌ No dynamic transcript evidence';
       const failureCodes: string[] = [];
-      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = n ? 'dynamic-protocol' : 'heuristic';
+  const evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = n ? 'dynamic-protocol' : 'heuristic';
       if (n) {
         // Extract messages pattern (legacy messagesObserved array vs new messages objects)
         let msgs: string[] = [];
@@ -855,7 +855,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const patterns = await (analyzer as any).getStaticPatterns?.();
       const noise = patterns?.noise;
-      let passed = !!(noise && noise.pattern === 'XK');
+  let passed = !!(noise && noise.pattern === 'XK');
       let details = passed ? '✅ Noise_XK pattern detected' : '❌ Noise_XK pattern not found';
       // Step 10 enhancement: leverage noisePatternDetail evidence for stronger structural validation
       const ev: any = (analyzer as any).evidence;
@@ -886,17 +886,17 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
       const patterns = await (analyzer as any).getStaticPatterns?.();
-      const voucher = patterns?.voucher;
+  const voucher = patterns?.voucher;
   const ev: any = (analyzer as any).evidence;
   // Allow external voucherCrypto evidence to satisfy structLikely when static tokens absent
   const voucherCrypto = ev?.voucherCrypto;
   const structLikely = voucher?.structLikely || voucherCrypto?.structLikely;
-      const passed = !!(voucher && voucher.structLikely);
+  const passed = structLikely === true; // use unified structLikely evaluation
       return {
         id: 14,
         name: 'Voucher Struct Heuristic',
-        description: 'Detects presence of 128B voucher struct token triad',
-    passed: structLikely === true,
+  description: 'Detects presence of 128B voucher struct token triad',
+  passed,
   details: structLikely ? (voucher ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : '✅ Struct evidence (voucherCrypto)') : (voucher ? `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : '❌ No voucher struct tokens'),
         severity: 'minor',
         evidenceType: 'static-structural'
@@ -914,12 +914,13 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const ev: any = (analyzer as any).evidence;
       const gov = ev?.governance;
-      let passed = false;
+  let passed = false;
       let details = '❌ No governance evidence';
       if (gov && typeof gov === 'object') {
         // Derive caps if raw weights present
         if (!('maxASShare' in gov) && Array.isArray(gov.weights)) {
           try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             const { deriveGovernanceMetrics } = require('./governance-parser');
             const derived = deriveGovernanceMetrics(gov.weights);
             gov.maxASShare = derived.maxASShare;
@@ -934,7 +935,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         // Advanced historical diversity enforcement
         // Require: (a) basic stability, (b) advancedStable true, (c) volatility <=0.05, (d) maxWindowShare <=0.2, (e) maxDeltaShare <=0.05, (f) avgTop3 <=0.24
         let diversityOk = true;
-        let diversityReasons: string[] = [];
+  const diversityReasons: string[] = [];
         if (hist) {
           const stableBasic = hist.stable === true;
           const adv = typeof hist.advancedStable === 'boolean' ? hist.advancedStable : true;
@@ -980,12 +981,13 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const ev: any = (analyzer as any).evidence;
       const ledger = ev?.ledger;
-      let passed = false;
+  let passed = false;
       let details = '❌ No ledger evidence';
       if (ledger && typeof ledger === 'object') {
         // Parse CBOR quorum certs if provided as base64 array
         if (!ledger.quorumCertificatesValid && Array.isArray(ledger.quorumCertificatesCbor)) {
           try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
             const { parseQuorumCertificates, validateQuorumCertificates } = require('./governance-parser');
             const buffers = ledger.quorumCertificatesCbor.map((b: string) => Buffer.from(b, 'base64'));
             const qcs = parseQuorumCertificates(buffers);
@@ -1037,7 +1039,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const ev: any = (analyzer as any).evidence;
       const mix = ev?.mix;
-      let passed = false;
+  let passed = false;
       let details = '❌ No mix diversity evidence';
       if (mix && typeof mix === 'object') {
         const samples: number = mix.samples || 0;
@@ -1091,10 +1093,9 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       ];
       const presentCount = categories.filter(c => c.present).length;
       // Baseline pass threshold
-      let passed = presentCount >= 2;
+  let passed = presentCount >= 2;
       // Evasion rule: extremely high keyword stuffing with only minimal category corroboration
-      const severeStuffing = stuffingRatio > 0.6 && presentCount < 3; // two categories but heavy stuffing => suspect
-      const moderateStuffing = stuffingRatio > 0.45 && presentCount < 2; // already would fail threshold but annotate reason
+  const severeStuffing = stuffingRatio > 0.6 && presentCount < 3; // two categories but heavy stuffing => suspect
       let evasionFlag = false;
       if (severeStuffing) { passed = false; evasionFlag = true; }
       return {
@@ -1152,8 +1153,8 @@ export const STEP_10_CHECKS = [
       const ch = ev.clientHelloTemplate;
       const dyn = ev.dynamicClientHelloCapture;
       const h2 = ev.h2Adaptive || ev.h2AdaptiveDynamic; // potential SETTINGS evidence for SETTINGS_DRIFT code
-      let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic';
-      let passed = false;
+  let evidenceType: 'heuristic' | 'static-structural' | 'dynamic-protocol' = 'heuristic'; // will be reassigned based on evidence
+  let passed = false;
       let details = '❌ No ClientHello template';
       if (ch) {
         evidenceType = 'static-structural';
@@ -1478,7 +1479,7 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
   const anyAuth = (detachedValid === true) || (bundleValid === true);
       // Pass policy: if strictAuth mode enabled, require anyAuth true. If not strict, informational pass if authenticity present.
   const passed = anyAuth; // bool
-      let evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
+  const evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
   const details = anyAuth ? `✅ authenticity ${detachedValid ? 'detached-signature' : 'bundle'} verified` : (strictAuth ? '❌ EVIDENCE_UNSIGNED' : '❌ EVIDENCE_UNSIGNED (not enforced)');
   return { id: 35, name: 'Evidence Authenticity', description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode', passed, details, severity: 'major', evidenceType };
     }
@@ -1498,7 +1499,7 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       if (!vc) return { id: 29, name: 'Voucher/FROST Struct Validation', description: 'Validates voucher cryptographic struct base64 components & FROST threshold hints', passed: false, details: '❌ No voucherCrypto evidence', severity: 'minor', evidenceType: 'heuristic' };
       const baseOk = vc.signatureValid === true;
       const thresholdOk = vc.frostThreshold ? ((vc.frostThreshold.n || 0) >= 5 && (vc.frostThreshold.t || 0) >= 3 && (vc.frostThreshold.t || 0) <= (vc.frostThreshold.n || 0)) : false;
-      const passed = baseOk && thresholdOk;
+  const passed = baseOk && thresholdOk;
       const details = passed ? `✅ struct base64 sizes ok n=${vc.frostThreshold?.n} t=${vc.frostThreshold?.t}` : `❌ Voucher struct issues: ${missingList([
         !baseOk && 'invalid base64 component sizes',
         !thresholdOk && 'threshold n>=5 t>=3 not satisfied'
@@ -1526,8 +1527,8 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const paddingOk = (at.paddingVariety || 0) >= 2;
       const rateLimitOk = at.rateLimitTokensPresent === true;
       const confidenceOk = (at.structConfidence || 0) >= 0.5; // slightly higher threshold for dedicated policy check
-      let passed = fieldsOk && hexOk && rotationOk && paddingOk && rateLimitOk && confidenceOk;
-      let evidenceType: 'static-structural' | 'dynamic-protocol' = 'static-structural';
+  const passed = fieldsOk && hexOk && rotationOk && paddingOk && rateLimitOk && confidenceOk;
+  let evidenceType: 'static-structural' | 'dynamic-protocol' = 'static-structural';
       if (passed && atDyn) {
         // Require dynamic policy window criteria to claim dynamic upgrade
         const dynOk = atDyn.withinPolicy === true && (atDyn.uniquePadding || 0) >= 2 && (atDyn.rotationIntervalSec || 0) <= 600 && (atDyn.replayWindowSec || 0) <= 120;
@@ -1568,7 +1569,7 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const keysetPresent = !!vc.keysetIdB64;
       if (!keysetPresent) failureCodes.push('INSUFFICIENT_KEYS');
       // Synthetic aggregated signature validation: emulate expected hash prefix match
-      let sigStructuralOk = vc.signatureValid === true;
+  const sigStructuralOk = vc.signatureValid === true;
       if (!sigStructuralOk) failureCodes.push('AGG_SIG_INVALID');
       const passed = failureCodes.length === 0;
       const details = passed ? `✅ aggregatedSig valid n=${n} t=${t}` : `❌ Aggregated signature issues: ${failureCodes.join(',')}`;
