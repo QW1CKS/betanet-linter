@@ -797,6 +797,40 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
+  // Task 16: Keyword Stuffing Advanced Heuristic Refinement (Check 18)
+  describe('Task 16: Keyword Stuffing Advanced Heuristic Refinement (Check 18)', () => {
+    function analyzerWithStrings(strs: string[], evidence: any = {}) {
+      return {
+        analyze: () => Promise.resolve({ strings: strs, symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        getDiagnostics: () => ({}),
+        evidence
+      } as any;
+    }
+    it('passes with sufficient category diversity and moderate keyword density', async () => {
+      const strs = ['betanet','rotation','scion','diversity','mix','voucher','random','entropy','noise','governance','ledger','frost','alpha','beta','gamma','delta','epsilon'];
+      const ev = { governance: {}, provenance: {} };
+      const result = await runWithAnalyzer(analyzerWithStrings(strs, ev));
+      const check18 = result.checks.find(c => c.id === 18)!;
+      expect(check18.passed).toBe(true);
+    });
+    it('fails with KEYWORD_STUFFING_HIGH and low entropy distribution', async () => {
+      const repeated = Array(60).fill('betanet voucher governance finality mix hop kyber');
+      const ev = { provenance: {} }; // only one category
+      const result = await runWithAnalyzer(analyzerWithStrings(repeated, ev));
+      const check18 = result.checks.find(c => c.id === 18)!;
+      expect(check18.passed).toBe(false);
+      expect(check18.details).toMatch(/KEYWORD_STUFFING_HIGH|KEYWORD_STUFFING_EXTREME/);
+    });
+    it('fails with KEYWORD_STUFFING_EXTREME when extreme density and low categories', async () => {
+      const repeated = Array(100).fill('betanet governance ledger finality kyber x25519 pow diversity voucher frost ech quic');
+      const ev = { mix: {} }; // single category
+      const result = await runWithAnalyzer(analyzerWithStrings(repeated, ev));
+      const check18 = result.checks.find(c => c.id === 18)!;
+      expect(check18.passed).toBe(false);
+      expect(check18.details).toMatch(/KEYWORD_STUFFING_EXTREME/);
+    });
+  });
+
   // Task 12: Adaptive PoW & Rate-Limit Statistical Validation
   describe('Task 12: Adaptive PoW & Rate-Limit Statistical Validation (Check 36)', () => {
     function analyzerForPow(pow: any, rl?: any) {

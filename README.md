@@ -121,7 +121,12 @@ Authenticity (Check 35) granular failure codes:
 Pass conditions: either a verified detached signature OR a bundle with `multiSignerThresholdMet=true` and (if provided) a valid hash chain (bundleSha256 matches recomputed). Evidence type is elevated to `artifact` only when authenticity satisfied; otherwise remains heuristic in reports. Future enhancements (non-blocking) include canonical JSON normalization before hash/sign, real public key allow/deny lists, multi-format (minisign/cosign) verification, signature caching, and Merkle-style tamper paths.
 
 ### Multi-Signal Scoring & Anti-Evasion
-JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Keyword stuffing detection flags excessive spec-token density with insufficient category diversity and can fail the multi-signal anti‑evasion check (ID 18).
+JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Advanced keyword stuffing detection (Check 18) now evaluates:
+- Keyword density (% of filtered tokens hitting spec keywords)
+- Keyword distribution Shannon entropy & entropy ratio
+- Non-keyword token diversity ratio
+Failure codes: KEYWORD_STUFFING_HIGH, KEYWORD_STUFFING_EXTREME, KEYWORD_DISTRIBUTION_LOW_ENTROPY, LOW_NON_KEYWORD_DIVERSITY, INSUFFICIENT_CATEGORIES.
+Stuffing triggers when high/extreme density combines with low corroborating categories and low entropy/diversity.
 
 ### Evidence Schema Versioning
 Schema v2 fields: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative`, plus prior `mix`, `noiseExtended`, `h2Adaptive`, `provenance`, `governance`, `ledger`. Phase 7 adds fallback distribution statistics and dynamicClientHelloCapture JA3/ja3Hash + raw capture placeholders ahead of schema v3 bump. See `docs/evidence-schema.md`.

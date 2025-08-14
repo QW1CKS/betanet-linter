@@ -1325,12 +1325,34 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       const analysis = await analyzer.analyze();
       const strings: string[] = analysis.strings || [];
       const SPEC_KEYWORDS = ['betanet','htx','quic','ech','ticket','rotation','scion','chacha20','poly1305','cashu','lightning','federation','slsa','reproducible','provenance','kyber','kyber768','x25519','beacon','diversity','voucher','frost','pow','governance','ledger','quorum','finality','mix','hop'];
+      // Normalize strings (filter out very short tokens)
+      const filtered = strings.filter(s => s && s.length >= 4).slice(0, 2000); // cap to avoid skew & performance
       let keywordHits = 0;
-      for (const s of strings) {
+      const keywordFreq: Record<string, number> = {};
+      for (const s of filtered) {
         const lower = s.toLowerCase();
-        if (SPEC_KEYWORDS.some(k => lower.includes(k))) keywordHits++;
+        for (const k of SPEC_KEYWORDS) {
+          if (lower.includes(k)) {
+            keywordHits++;
+            keywordFreq[k] = (keywordFreq[k] || 0) + 1;
+          }
+        }
       }
-      const stuffingRatio = strings.length ? keywordHits / strings.length : 0;
+      const stuffingRatio = filtered.length ? keywordHits / filtered.length : 0;
+      // Compute keyword distribution entropy (Shannon) to detect repeated padding of a narrow subset
+      const totalKw = Object.values(keywordFreq).reduce((a,b)=>a+b,0);
+      let kwEntropy = 0;
+      if (totalKw > 0) {
+        for (const c of Object.values(keywordFreq)) {
+          const p = c / totalKw; kwEntropy += -p * Math.log2(p);
+        }
+      }
+      const maxEntropy = totalKw > 0 ? Math.log2(Object.keys(keywordFreq).length || 1) : 0;
+      const entropyRatio = maxEntropy > 0 ? kwEntropy / maxEntropy : 1; // 1 = diverse, 0 = single keyword repeated
+      // Text diversity proxy: unique non-keyword tokens ratio
+      const nonKwTokens = filtered.filter(s => !SPEC_KEYWORDS.some(k => s.toLowerCase().includes(k)));
+      const uniqueNonKw = new Set(nonKwTokens.map(s => s.toLowerCase())).size;
+      const nonKwDiversity = filtered.length ? uniqueNonKw / filtered.length : 0;
       // Category presence (artifact/dynamic/static) derived from existing evidence objects
       const categories: { name: string; present: boolean }[] = [
         { name: 'provenance', present: !!ev.provenance },
@@ -1342,21 +1364,40 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       ];
       const presentCount = categories.filter(c => c.present).length;
       // Baseline pass threshold
-  let passed = presentCount >= 2;
-      // Evasion rule: extremely high keyword stuffing with only minimal category corroboration
-  const severeStuffing = stuffingRatio > 0.6 && presentCount < 3; // two categories but heavy stuffing => suspect
+      let passed = presentCount >= 2;
+      const failureCodes: string[] = [];
+      // Advanced heuristics thresholds
+  const HIGH_STUFF_RATIO = 0.60; // tighten slightly to reduce FPs
+  const EXTREME_STUFF_RATIO = 0.80; // extreme threshold higher to preserve legacy ok cases
+      const LOW_ENTROPY_RATIO = 0.45; // keyword distribution concentrated (<45% of possible entropy)
+      const LOW_NONKW_DIVERSITY = 0.20; // <20% unique non-keyword tokens
+      const lowSignal = presentCount < 3; // insufficient corroborating categories
+      const extremeStuffing = stuffingRatio >= EXTREME_STUFF_RATIO && lowSignal;
+      const highStuffing = stuffingRatio >= HIGH_STUFF_RATIO && lowSignal;
+      const concentrated = entropyRatio < LOW_ENTROPY_RATIO && keywordHits > 12; // at least some volume
+      const lowNonKw = nonKwDiversity < LOW_NONKW_DIVERSITY && keywordHits > 8;
       let evasionFlag = false;
-      if (severeStuffing) { passed = false; evasionFlag = true; }
+      if (extremeStuffing || (highStuffing && (concentrated || lowNonKw))) {
+        passed = false; evasionFlag = true;
+        if (extremeStuffing) failureCodes.push('KEYWORD_STUFFING_EXTREME');
+        else failureCodes.push('KEYWORD_STUFFING_HIGH');
+        if (concentrated) failureCodes.push('KEYWORD_DISTRIBUTION_LOW_ENTROPY');
+        if (lowNonKw) failureCodes.push('LOW_NON_KEYWORD_DIVERSITY');
+        if (presentCount < 2) failureCodes.push('INSUFFICIENT_CATEGORIES');
+      } else if (!passed) {
+        failureCodes.push('INSUFFICIENT_CATEGORIES');
+      }
       return {
         id: 18,
         name: 'Multi-Signal Anti-Evasion',
         description: 'Requires ≥2 non-heuristic evidence categories for critical spec areas (transport, privacy, provenance, governance)',
         passed,
-        details: passed ? `✅ Multi-signal categories=${presentCount} (${categories.filter(c=>c.present).map(c=>c.name).join(', ')}) keywordDensity=${(stuffingRatio*100).toFixed(1)}%` : (
-          evasionFlag ? `❌ Suspected keyword stuffing (density ${(stuffingRatio*100).toFixed(1)}% with only ${presentCount} category evidences)` : `❌ Insufficient multi-signal evidence (${presentCount}/2) keywordDensity=${(stuffingRatio*100).toFixed(1)}%`
+        details: passed ? `✅ Multi-signal categories=${presentCount} (${categories.filter(c=>c.present).map(c=>c.name).join(', ')}) kwDensity=${(stuffingRatio*100).toFixed(1)}% kwEntropyRatio=${entropyRatio.toFixed(2)} nonKwDiv=${nonKwDiversity.toFixed(2)}` : (
+          evasionFlag ? `❌ Suspected keyword stuffing codes=[${failureCodes.join(',')}] kwDensity=${(stuffingRatio*100).toFixed(1)}% kwEntropyRatio=${entropyRatio.toFixed(2)} nonKwDiv=${nonKwDiversity.toFixed(2)} cats=${presentCount}` : `❌ Insufficient multi-signal evidence (${presentCount}/2) kwDensity=${(stuffingRatio*100).toFixed(1)}%`
         ),
         severity: 'major',
-        evidenceType: presentCount ? 'artifact' : 'heuristic'
+        evidenceType: presentCount ? 'artifact' : 'heuristic',
+        failureCodes: passed ? [] : failureCodes
       };
     }
   }

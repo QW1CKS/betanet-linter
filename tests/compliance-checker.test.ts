@@ -1277,7 +1277,7 @@ describe('BetanetComplianceChecker', () => {
       const multi = result.checks.find(c => c.id === 18);
       expect(multi).toBeDefined();
       expect(multi?.passed).toBe(false);
-      expect(multi?.details).toMatch(/Suspected keyword stuffing/);
+  expect(multi?.details).toMatch(/Suspected keyword stuffing/);
       await fs.remove(tmp);
     });
   });

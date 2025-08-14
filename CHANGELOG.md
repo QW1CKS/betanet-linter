@@ -84,6 +84,11 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 
 Post‑1.1 optional enhancements and polish items (see deferred list above). No breaking changes scheduled; future work will aim for additive schema expansions and optional flags.
 
+### Task 16 Completion: Keyword Stuffing Advanced Heuristic Refinement
+- Check 18 upgraded with advanced keyword stuffing detection: filtered token set, keyword frequency map, Shannon entropy & entropy ratio, non-keyword diversity ratio.
+- New failure codes: KEYWORD_STUFFING_HIGH, KEYWORD_STUFFING_EXTREME, KEYWORD_DISTRIBUTION_LOW_ENTROPY, LOW_NON_KEYWORD_DIVERSITY, INSUFFICIENT_CATEGORIES.
+- README & ROADMAP updated; tests added covering pass, high stuffing, extreme stuffing scenarios.
+
 ### Added (since 1.0 baseline, historical aggregation)
 - Evidence schema v2+ (binaryMeta, clientHelloTemplate hash, noisePatternDetail, negative assertions) and later authenticity / adaptive PoW / jitter evidence fields.
 - Multi-signal scoring (artifact=3, dynamic=2, static=1) + anti-evasion keyword stuffing (Check 18) -> expanded to full authenticity & corroboration policies.
