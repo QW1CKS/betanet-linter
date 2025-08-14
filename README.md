@@ -134,6 +134,63 @@ JSON schema excerpt:
 
 Snapshot table (see `dist/spec-mapping.md` for current content) is not embedded to avoid churn in the README diff noise.
 
+### Performance & Scalability Benchmarking (Task 31)
+The linter now includes first-class performance instrumentation and reproducible benchmarking utilities:
+
+Artifacts & Scripts:
+- `npm run bench:perf -- --binary ./your-binary` generates `dist/perf-report.json` with environment metadata, per-check durations, aggregate latency stats (p50/p90/p99/mean/min/max), slowest 5 check IDs, and overall pass/fail counts.
+- Inline CLI: add `--perf-report dist/perf-inline.json` to `betanet-lint check` to emit a lightweight per-run performance snapshot without regression diffing.
+
+Regression Detection:
+You can compare against a saved baseline:
+```
+npm run bench:perf -- --binary ./your-binary --baseline dist/perf-baseline.json --fail-on-regression
+```
+Thresholds (defaults):
+- p90 duration regression if new_p90 > old_p90 * (1 + 0.50)
+- total wall clock regression if new_total > old_total * (1 + 0.40)
+- per-check regression flagged if any check’s duration grows >50% vs baseline
+
+Report JSON shape (schema v1):
+```json
+{
+  "schema": 1,
+  "timestamp": "...",
+  "nodeVersion": "v18.x",
+  "platform": "linux",
+  "cpuModel": "...",
+  "logicalCores": 8,
+  "memoryGb": 31.36,
+  "binaryPath": "/abs/path/bin",
+  "fileSizeBytes": 123456,
+  "sha256": "<hex>",
+  "totalWallMs": 842,
+  "parallelChecksWallMs": 615,
+  "analyzerAnalysisMs": 104,
+  "perCheck": [ { "id": 1, "name": "Transport Calibration", "durationMs": 18.4, "severity": "major", "passed": true, "evidenceType": "static-structural" } ],
+  "stats": { "p50": 7.2, "p90": 19.5, "p99": 42.7, "max": 45.3, "min": 2.1, "mean": 9.4 },
+  "slowestIds": [32,16,35,19,31],
+  "totalPassed": 41,
+  "totalFailed": 2,
+  "regression": {
+    "p90DeltaPct": 0.12,
+    "p90Regressed": false,
+    "totalWallDeltaPct": -0.05,
+    "wallRegressed": false,
+    "perCheckRegressions": [],
+    "hasRegression": false
+  }
+}
+```
+
+Typical Workflow:
+1. Generate baseline on a stable host: `npm run bench:perf -- --binary ./bin/your-app --out dist/perf-baseline.json`
+2. Commit `dist/perf-baseline.json` (optional) or store as a CI artifact.
+3. In CI, run benchmark with `--baseline dist/perf-baseline.json --fail-on-regression` to guard against accidental performance degradation.
+
+Planned (deferred) enhancements: multi-run statistical smoothing (variance & confidence intervals), automatic baseline refresh on improvement, flamegraph/CPU sampling integration, signature verification batching benchmarks, dynamic large-evidence synthesis scenario.
+
+
 ### Provenance, Reproducible Build & Sandbox Hardening
 An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 1. Deterministic build with fixed `SOURCE_DATE_EPOCH`.

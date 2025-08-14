@@ -1,0 +1,379 @@
+{
+  "schema": 1,
+  "timestamp": "2025-08-14T23:02:42.033Z",
+  "nodeVersion": "v22.12.0",
+  "platform": "win32",
+  "arch": "x64",
+  "cpuModel": "Intel(R) Core(TM) i5-7300HQ CPU @ 2.50GHz",
+  "logicalCores": 4,
+  "memoryGb": 7.92,
+  "binaryPath": "P:\\GITHUB\\betanet-linter\\bin\\cli.js",
+  "fileSizeBytes": 16649,
+  "sha256": "9b39e35da4b3bc213b888dacc72f25520bc9eb426f4a9a28433ac6f23ecb5e0b",
+  "totalWallMs": 690.2239999999999,
+  "parallelChecksWallMs": 363.26210000000015,
+  "analyzerAnalysisMs": 282.9938,
+  "perCheck": [
+    {
+      "id": 15,
+      "name": "Governance Anti-Concentration",
+      "durationMs": 14.47339999999997,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 16,
+      "name": "Ledger Finality Observation",
+      "durationMs": 14.23210000000006,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 17,
+      "name": "Mix Diversity Sampling",
+      "durationMs": 13.663999999999987,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 19,
+      "name": "Noise Rekey Policy",
+      "durationMs": 12.933700000000044,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 20,
+      "name": "HTTP/2 Adaptive Emulation",
+      "durationMs": 12.63900000000001,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 24,
+      "name": "Adaptive Rate-Limit Buckets",
+      "durationMs": 12.12360000000001,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 25,
+      "name": "Fallback Timing Policy",
+      "durationMs": 11.975300000000061,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 26,
+      "name": "Padding Jitter Variance",
+      "durationMs": 11.6952,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 27,
+      "name": "Mix Advanced Variance",
+      "durationMs": 11.598500000000058,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 28,
+      "name": "HTTP/3 Adaptive Emulation",
+      "durationMs": 11.639699999999948,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 32,
+      "name": "ECH Verification",
+      "durationMs": 11.26870000000008,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 33,
+      "name": "SCION Control Stream",
+      "durationMs": 11.155999999999949,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 34,
+      "name": "Algorithm Agility Registry",
+      "durationMs": 10.899499999999989,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 35,
+      "name": "Evidence Authenticity",
+      "durationMs": 10.727999999999952,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 36,
+      "name": "Adaptive PoW & Rate-Limit Statistics",
+      "durationMs": 10.441599999999994,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 37,
+      "name": "Statistical Jitter Randomness",
+      "durationMs": 9.794899999999984,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 39,
+      "name": "Forbidden Artifact Hashes",
+      "durationMs": 8.923199999999952,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 40,
+      "name": "Extended QUIC Initial Parsing & Calibration",
+      "durationMs": 8.676199999999994,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 41,
+      "name": "HTTP/2 & HTTP/3 Jitter Statistical Tests",
+      "durationMs": 8.322400000000016,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 42,
+      "name": "Runtime Calibration & Behavioral Instrumentation",
+      "durationMs": 8.088399999999979,
+      "severity": "major",
+      "passed": true,
+      "evidenceType": "dynamic-protocol"
+    },
+    {
+      "id": 43,
+      "name": "Security & Sandbox Hardening",
+      "durationMs": 7.854799999999955,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 5,
+      "name": "Transport Endpoints",
+      "durationMs": 330.84940000000006,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 11,
+      "name": "Privacy Hop Enforcement",
+      "durationMs": 330.8139000000001,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 18,
+      "name": "Multi-Signal Anti-Evasion",
+      "durationMs": 328.8299999999999,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 1,
+      "name": "HTX over TCP-443 & QUIC-443",
+      "durationMs": 332.76830000000007,
+      "severity": "critical",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 3,
+      "name": "Inner Frame Encryption",
+      "durationMs": 332.2605,
+      "severity": "critical",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 6,
+      "name": "DHT Seed Bootstrap",
+      "durationMs": 331.95529999999997,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 7,
+      "name": "Alias Ledger Verification",
+      "durationMs": 331.8139,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 8,
+      "name": "Payment System",
+      "durationMs": 331.6423,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 9,
+      "name": "Build Provenance",
+      "durationMs": 331.3611000000001,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 10,
+      "name": "Post-Quantum Cipher Suites",
+      "durationMs": 331.00980000000004,
+      "severity": "minor",
+      "passed": true,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 38,
+      "name": "Post-Quantum Date Boundary",
+      "durationMs": 324.79689999999994,
+      "severity": "major",
+      "passed": true,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 12,
+      "name": "TLS ClientHello Static Template",
+      "durationMs": 357.47720000000004,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "static-structural"
+    },
+    {
+      "id": 13,
+      "name": "Noise XK Pattern",
+      "durationMs": 357.58500000000004,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "static-structural"
+    },
+    {
+      "id": 21,
+      "name": "Binary Structural Meta",
+      "durationMs": 355.65009999999995,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "static-structural"
+    },
+    {
+      "id": 14,
+      "name": "Voucher Struct Heuristic",
+      "durationMs": 358.10019999999986,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "static-structural"
+    },
+    {
+      "id": 23,
+      "name": "Negative Assertions",
+      "durationMs": 355.8338000000001,
+      "severity": "major",
+      "passed": true,
+      "evidenceType": "static-structural"
+    },
+    {
+      "id": 22,
+      "name": "TLS Static Template Calibration",
+      "durationMs": 356.3894,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "static-structural"
+    },
+    {
+      "id": 31,
+      "name": "Voucher Aggregated Signature",
+      "durationMs": 355.3572999999999,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 29,
+      "name": "Voucher/FROST Struct Validation",
+      "durationMs": 355.8149000000001,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 30,
+      "name": "Access Ticket Rotation Policy",
+      "durationMs": 356.0688,
+      "severity": "minor",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 2,
+      "name": "Rotating Access Tickets",
+      "durationMs": 361.7853,
+      "severity": "major",
+      "passed": false,
+      "evidenceType": "heuristic"
+    },
+    {
+      "id": 4,
+      "name": "SCION Bridging via HTX Tunnel",
+      "durationMs": 362.48849999999993,
+      "severity": "critical",
+      "passed": false,
+      "evidenceType": "heuristic"
+    }
+  ],
+  "stats": {
+    "p50": 324.79689999999994,
+    "p90": 356.3894,
+    "p99": 361.7853,
+    "max": 362.48849999999993,
+    "min": 7.854799999999955,
+    "mean": 181.48325813953488
+  },
+  "slowestIds": [
+    4,
+    2,
+    14,
+    13,
+    12
+  ],
+  "totalPassed": 4,
+  "totalFailed": 39
+}

@@ -74,6 +74,8 @@ program
   .option('--sandbox-memory-budget-mb <mb>', 'Sandbox RSS memory budget in MB before violation', v => parseInt(v,10))
   .option('--sandbox-fs-deny', 'Deny filesystem write operations (records violations)')
   .option('--sandbox-network-deny', 'Force deny network operations even if --enable-network specified (records blocked attempts)')
+  // Task 31 Performance benchmarking inline option
+  .option('--perf-report <file>', 'Write performance JSON report (per-check durations, aggregates)')
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -146,6 +148,32 @@ program
       }
       
       checker.displayResults(results, options.output);
+
+      // Task 31: emit optional performance report
+      if (options.perfReport) {
+        try {
+          const perf = {
+            schema: 1,
+            timestamp: new Date().toISOString(),
+            binaryPath: results.binaryPath,
+            totalWallMs: Date.now() - Date.parse(results.timestamp), // coarse wall (since start timestamp) fallback
+            parallelChecksWallMs: results.parallelDurationMs,
+            perCheck: (results.checkTimings||[]).map(t => ({
+              id: t.id,
+              name: (results.checks.find(c=>c.id===t.id)||{}).name,
+              durationMs: t.durationMs,
+              severity: (results.checks.find(c=>c.id===t.id)||{}).severity,
+              passed: (results.checks.find(c=>c.id===t.id)||{}).passed,
+              evidenceType: (results.checks.find(c=>c.id===t.id)||{}).evidenceType
+            }))
+          };
+          require('fs').mkdirSync(require('path').dirname(options.perfReport), { recursive: true });
+          require('fs').writeFileSync(options.perfReport, JSON.stringify(perf, null, 2));
+          console.log(`🕒 Performance report written: ${options.perfReport}`);
+        } catch (e) {
+          console.warn(`⚠️  Failed to write perf report: ${e.message}`);
+        }
+      }
       
       // Fail if network attempts occurred while disabled and user requested strict failure
       if (!options.enableNetwork && options.failOnNetwork && results.diagnostics?.networkOps?.some(op => op.blocked)) {

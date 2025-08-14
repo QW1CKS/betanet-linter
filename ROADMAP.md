@@ -424,9 +424,13 @@ These are required to transition from “spec gap tasks complete” to a bounty�
   - Initial heuristic mapping intentionally excludes low-level constant lines (wire numeric values) unless captured by existing checks; unmapped lines now visible for future check expansion or explicit out-of-scope classification.
   - Deferred enhancements: explicit override YAML (manual associations & caveats), PASS/FAIL/CAVEAT synthesis using actual test outcomes, CI gate on coveragePct, auto-regeneration of Compliance Matrix, operator troubleshooting matrix & evidence glossary (to be added in docs/evidence-schema.md follow-up).
 
-31. [ ] Performance & Scalability Benchmarking
-  - Add micro + end-to-end benchmarks (large evidence, high-mix samples) with target runtime budget (< X sec baseline). Optimize hotspots (algorithm agility diff, JSON canonicalization, signature verification). Track performance regressions in CI with threshold deltas.
-  - Emit performance summary in JSON report (timings per check) and guard major regressions.
+31. [x] Performance & Scalability Benchmarking
+  - Implemented performance benchmarking script `scripts/performance-benchmark.js` producing machine-readable JSON (`dist/perf-report.json`) with environment metadata (nodeVersion, cpuModel, logicalCores, memoryGb), binary fingerprint (size, sha256), aggregate stats (p50/p90/p99/max/mean), per-check durations, slowest check IDs, and summary pass/fail counts.
+  - Added regression comparison support: `--baseline <file>` computes p90 & total wall deltas; flags per-check regressions when duration deltaPct > threshold (default 50%). Optional `--fail-on-regression` causes non-zero exit on regression.
+  - Added npm script: `npm run bench:perf -- --binary <path> [--baseline dist/perf-baseline.json]` for CI integration. Allows storing baseline under version control to ratchet performance.
+  - Added inline CLI support for `betanet-lint check` via `--perf-report <file>` to write a lightweight per-run performance JSON without running a separate script.
+  - Utilizes existing per-check timing instrumentation (durationMs & parallelDurationMs) plus analyzer diagnostics (analysis time). No code path duplication; reuse `checkCompliance`.
+  - Deferred (non-blocking) enhancements: automatic baseline update on improvement, statistical variance over multiple runs (stability coefficient), CPU/heap sampling for hotspot attribution, signature verification batch optimization metrics, optional flamegraph integration, integration with quality gates (fail build when p90 regression > threshold), streaming large evidence scenario generator. These can be appended post-Definition A.
 
 Frozen Stable Gap List (Definition A – Linter Coverage Completion)
 -----------------------------------------------------------------

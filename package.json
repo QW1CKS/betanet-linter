@@ -18,7 +18,8 @@
     "prepare": "npm run build",
   "reaudit:actions": "node scripts/reaudit-actions.js",
   "repro:verify": "node bin/repro-verify.js",
-  "spec:mapping": "node scripts/generate-spec-mapping.js > dist/spec-mapping.md"
+  "spec:mapping": "node scripts/generate-spec-mapping.js > dist/spec-mapping.md",
+  "bench:perf": "node scripts/performance-benchmark.js"
   },
   "keywords": [
     "betanet",
