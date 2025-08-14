@@ -69,6 +69,11 @@ program
   .option('--checksum-manifest-signature <path>', 'Detached signature over checksum manifest')
   .option('--checksum-manifest-public-key <path>', 'Public key for checksum manifest signature (base64 raw 32B ed25519 or PEM)')
   .option('--environment-lock-file <path>', 'Environment/toolchain lock file (JSON) to record build inputs (Task 28)')
+  // Task 29 Security & Sandbox Hardening flags
+  .option('--sandbox-cpu-budget-ms <ms>', 'Sandbox CPU elapsed time budget (wall clock) in ms before violation', v => parseInt(v,10))
+  .option('--sandbox-memory-budget-mb <mb>', 'Sandbox RSS memory budget in MB before violation', v => parseInt(v,10))
+  .option('--sandbox-fs-deny', 'Deny filesystem write operations (records violations)')
+  .option('--sandbox-network-deny', 'Force deny network operations even if --enable-network specified (records blocked attempts)')
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -120,6 +125,10 @@ program
   checksumManifestSignatureFile: options.checksumManifestSignature,
   checksumManifestPublicKeyFile: options.checksumManifestPublicKey,
   environmentLockFile: options.environmentLockFile
+  , sandboxCpuBudgetMs: options.sandboxCpuBudgetMs,
+  sandboxMemoryBudgetMb: options.sandboxMemoryBudgetMb,
+  sandboxFsWriteDeny: options.sandboxFsDeny,
+  sandboxNetworkDeny: options.sandboxNetworkDeny
       });
       
       if (options.sbom) {

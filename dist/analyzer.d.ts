@@ -15,9 +15,46 @@ export declare class BinaryAnalyzer {
     private networkOps;
     private networkAllowlist;
     private userAgent;
+    private signatureVerifyCache;
+    private sandboxEnabled;
+    private sandboxCpuBudgetMs;
+    private sandboxMemoryBudgetMb;
+    private sandboxFsReadOnly;
+    private sandboxTempDir;
+    private sandboxStats;
     constructor(binaryPath: string, verbose?: boolean);
+    canonicalize(obj: any): {
+        json: string;
+        digest: string;
+    };
+    verifySignatureCached(algo: string, signer: string, canonicalJson: string, signatureB64: string, publicKey: Buffer): boolean;
     setNetworkAllowed(allowed: boolean, allowlist?: string[]): void;
+    configureSandbox(opts: {
+        cpuMs?: number;
+        memoryMb?: number;
+        fsReadOnly?: boolean;
+        tempDir?: string;
+        forceDisableNetwork?: boolean;
+    }): void;
+    private sandboxCheckBudgets;
     attemptNetwork(url: string, method?: string, fn?: () => Promise<any>): Promise<any>;
+    getSandboxSnapshot(): {
+        cpuBudgetMs: number | undefined;
+        memoryBudgetMb: number | undefined;
+        cpuUsedMs: number;
+        memoryPeakMb: number;
+        fsWrites: {
+            path: string;
+            bytes: number;
+        }[];
+        fsWriteCount: number;
+        fsWriteBytesTotal: number;
+        blockedNetworkAttempts: number;
+        blockedWriteAttempts: number;
+        diagnostics: string[];
+        violations: string[];
+        enforced: boolean;
+    } | undefined;
     getBinarySha256(): Promise<string>;
     getStaticPatterns(): Promise<StaticPatterns>;
     setDynamicProbe(flag: boolean): void;

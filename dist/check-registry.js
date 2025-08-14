@@ -73,7 +73,14 @@ exports.CHECK_REGISTRY = [
                 failureCodes.push('QUIC_VERSION_UNEXPECTED');
             }
             if (qi.calibrationMismatch) {
-                failureCodes.push('QUIC_CALIBRATION_MISMATCH');
+                // Add granular mismatch codes if present
+                if (qi.parsed?.mismatchCodes && qi.parsed.mismatchCodes.length) {
+                    for (const mc of qi.parsed.mismatchCodes)
+                        failureCodes.push(mc);
+                }
+                else {
+                    failureCodes.push('QUIC_CALIBRATION_MISMATCH');
+                }
             }
             if (p.versionNegotiation)
                 failureCodes.push('QUIC_VERSION_NEGOTIATION');
@@ -127,11 +134,34 @@ exports.CHECK_REGISTRY = [
                 failureCodes.push('PING_STDDEV_LOW');
             if (jm.stdDevPadding !== undefined && jm.stdDevPadding < 0.1)
                 failureCodes.push('PADDING_STDDEV_LOW');
+            // Task 25: additional anomaly detection using distribution shape when collected
+            if (jm.sourceType === 'collected') {
+                // Padding anomaly: excessive repetition (low entropy but many samples) OR stddev extremely high (bursting)
+                if (jm.paddingSizes && jm.paddingSizes.length >= 10) {
+                    const uniquePad = new Set(jm.paddingSizes).size;
+                    if (uniquePad <= Math.max(3, Math.floor(jm.paddingSizes.length * 0.15)) && (jm.entropyBitsPerSample || 0) < 0.30) {
+                        failureCodes.push('PADDING_DISTRIBUTION_ANOMALY');
+                    }
+                }
+                // Priority rate anomaly: if average gap > 5x median ping interval or extremely low variance (suggest scripted)
+                if (jm.priorityFrameGaps && jm.priorityFrameGaps.length >= 5 && jm.pingIntervalsMs && jm.pingIntervalsMs.length >= 5) {
+                    const avgPri = jm.priorityFrameGaps.reduce((a, b) => a + b, 0) / jm.priorityFrameGaps.length;
+                    const avgPing = jm.pingIntervalsMs.reduce((a, b) => a + b, 0) / jm.pingIntervalsMs.length;
+                    if (avgPing > 0 && (avgPri / avgPing > 5 || avgPri / avgPing < 0.1))
+                        failureCodes.push('PRIORITY_RATE_ANOMALY');
+                }
+                // HTTP/3 jitter randomness weak umbrella when any primary randomness code present & collected
+                if (failureCodes.some(c => ['CHI_SQUARE_P_LOW', 'RUNS_TEST_P_LOW', 'KS_P_LOW', 'ENTROPY_LOW'].includes(c))) {
+                    failureCodes.push('H3_JITTER_RANDOMNESS_WEAK');
+                }
+            }
             const passed = failureCodes.length === 0;
-            const evidenceType = passed ? 'artifact' : 'heuristic';
+            const evidenceType = passed
+                ? (jm.sourceType === 'collected' ? 'dynamic-protocol' : 'artifact')
+                : 'heuristic';
             const details = passed
-                ? `✅ jitter stats ok pingN=${jm.pingIntervalsMs?.length || 0} padN=${jm.paddingSizes?.length || 0} priN=${jm.priorityFrameGaps?.length || 0} chiP=${jm.chiSquareP?.toExponential(2)} runsP=${jm.runsP?.toExponential(2)} ksP=${jm.ksP?.toExponential(2)} entropy=${jm.entropyBitsPerSample?.toFixed(3)}`
-                : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] chiP=${jm.chiSquareP} runsP=${jm.runsP} ksP=${jm.ksP} entropy=${jm.entropyBitsPerSample} n=${totalSamples}`;
+                ? `✅ jitter stats (${jm.sourceType || 'unknown'}) ok pingN=${jm.pingIntervalsMs?.length || 0} padN=${jm.paddingSizes?.length || 0} priN=${jm.priorityFrameGaps?.length || 0} chiP=${jm.chiSquareP?.toExponential(2)} runsP=${jm.runsP?.toExponential(2)} ksP=${jm.ksP?.toExponential(2)} entropy=${jm.entropyBitsPerSample?.toFixed(3)}`
+                : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] src=${jm.sourceType} chiP=${jm.chiSquareP} runsP=${jm.runsP} ksP=${jm.ksP} entropy=${jm.entropyBitsPerSample} n=${totalSamples}`;
             return { id: 41, name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests', description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy', passed, details, severity: 'major', evidenceType };
         }
     },
@@ -729,6 +759,138 @@ exports.CHECK_REGISTRY = [
                 severity: 'major',
                 evidenceType: dynamicUpgrade ? 'dynamic-protocol' : 'heuristic'
             };
+        }
+    },
+    // Task 29: Security & Sandbox Hardening (Check 43)
+    {
+        id: 43,
+        key: 'security-sandbox-hardening',
+        name: 'Security & Sandbox Hardening',
+        description: 'Evaluates sandbox enforcement (CPU/memory budgets, network restrictions, write constraints) and flags risk diagnostics',
+        severity: 'minor',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            // Attempt to pull sandbox snapshot from analyzer if not already attached
+            try {
+                if (!ev.securitySandbox && analyzer.getSandboxSnapshot) {
+                    ev.securitySandbox = analyzer.getSandboxSnapshot();
+                }
+            }
+            catch { /* ignore */ }
+            const ss = ev.securitySandbox;
+            if (!ss)
+                return { id: 43, key: 'security-sandbox-hardening', name: 'Security & Sandbox Hardening', description: 'Evaluates sandbox enforcement (CPU/memory budgets, network restrictions, write constraints) and flags risk diagnostics', passed: false, details: '❌ Sandbox not active', severity: 'minor', evidenceType: 'heuristic' };
+            const failureCodes = [];
+            const cpuOk = !ss.cpuBudgetMs || (ss.cpuUsedMs || 0) <= ss.cpuBudgetMs * 1.2; // 20% grace
+            if (!cpuOk)
+                failureCodes.push('RISK_CPU_BUDGET_EXCEEDED');
+            const memOk = !ss.memoryBudgetMb || (ss.memoryPeakMb || 0) <= ss.memoryBudgetMb * 1.2;
+            if (!memOk)
+                failureCodes.push('RISK_MEMORY_BUDGET_EXCEEDED');
+            // Network violations
+            if ((ss.blockedNetworkAttempts || 0) > 0)
+                failureCodes.push('RISK_NETWORK_BLOCKED_ATTEMPT');
+            // File-system write restrictions (placeholder - if count>0 and read-only)
+            if (ss.violations?.some((v) => v === 'RISK_FS_WRITE_BLOCKED'))
+                failureCodes.push('RISK_FS_WRITE_BLOCKED');
+            const passed = failureCodes.length === 0;
+            const detailParts = [];
+            detailParts.push(`cpu=${Math.round(ss.cpuUsedMs || 0)}ms${ss.cpuBudgetMs ? '/' + ss.cpuBudgetMs + 'ms' : ''}`);
+            if (ss.memoryPeakMb)
+                detailParts.push(`mem=${ss.memoryPeakMb.toFixed(1)}MB${ss.memoryBudgetMb ? '/' + ss.memoryBudgetMb + 'MB' : ''}`);
+            if (ss.blockedNetworkAttempts)
+                detailParts.push(`netBlocked=${ss.blockedNetworkAttempts}`);
+            if (ss.fsWriteCount)
+                detailParts.push(`writes=${ss.fsWriteCount}`);
+            if (ss.violations?.length)
+                detailParts.push(`viol=[${ss.violations.join(',')}]`);
+            const details = (passed ? '✅ sandbox ok ' : '❌ sandbox issues ') + detailParts.join(' ');
+            return { id: 43, key: 'security-sandbox-hardening', name: 'Security & Sandbox Hardening', description: 'Evaluates sandbox enforcement (CPU/memory budgets, network restrictions, write constraints) and flags risk diagnostics', passed, details, severity: 'minor', evidenceType: passed ? 'artifact' : 'heuristic' };
+        }
+    },
+    {
+        id: 42,
+        key: 'runtime-calibration-behavior',
+        name: 'Runtime Calibration & Behavioral Instrumentation',
+        description: 'Correlates baseline vs dynamic TLS calibration, POP co-location, SCION path switch latency distribution, probe backoff, and cover connection start timing',
+        severity: 'major',
+        introducedIn: '1.1',
+        mandatoryIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const rc = ev.runtimeCalibration || (ev.runtimeCalibration = {});
+            const baseline = ev.calibrationBaseline;
+            const dyn = ev.dynamicClientHelloCapture;
+            const sc = ev.scionControl;
+            const ft = ev.fallbackTiming;
+            const failureCodes = [];
+            // Baseline ALPN & extension ordering correlation
+            if (baseline && dyn) {
+                if (Array.isArray(baseline.alpn) && Array.isArray(dyn.alpn)) {
+                    rc.baselineAlpnMatch = baseline.alpn.join(',') === dyn.alpn.join(',');
+                    if (!rc.baselineAlpnMatch)
+                        failureCodes.push('ALPN_CALIBRATION_MISMATCH');
+                }
+                else {
+                    failureCodes.push('ALPN_BASELINE_MISSING');
+                }
+                if (baseline.extOrderSha256 && dyn.extOrderSha256) {
+                    rc.baselineExtHashMatch = baseline.extOrderSha256 === dyn.extOrderSha256;
+                    if (!rc.baselineExtHashMatch)
+                        failureCodes.push('EXT_ORDER_CALIBRATION_MISMATCH');
+                }
+                else {
+                    failureCodes.push('EXT_HASH_BASELINE_MISSING');
+                }
+                rc.popIdBaseline = baseline.popIdBaseline || baseline.popId; // support future rename
+                rc.popIdDynamic = dyn.popId;
+                if (rc.popIdBaseline && rc.popIdDynamic) {
+                    rc.popMatch = rc.popIdBaseline === rc.popIdDynamic;
+                    if (!rc.popMatch)
+                        failureCodes.push('POP_MISMATCH');
+                }
+            }
+            else {
+                failureCodes.push('CALIBRATION_BASELINE_OR_DYNAMIC_MISSING');
+            }
+            // SCION path switch latency distribution
+            if (sc && Array.isArray(sc.pathSwitchLatenciesMs) && sc.pathSwitchLatenciesMs.length) {
+                const sorted = sc.pathSwitchLatenciesMs.slice().sort((a, b) => a - b);
+                const p95Index = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95));
+                const p95 = sorted[p95Index];
+                const max = Math.max(...sorted);
+                rc.maxPathSwitchLatencyMs = max;
+                rc.pathSwitchLatencyP95Ms = p95;
+                if (max > 300)
+                    failureCodes.push('PATH_SWITCH_LATENCY_SLOW');
+            }
+            else {
+                failureCodes.push('PATH_SWITCH_LATENCY_MISSING');
+            }
+            if (sc) {
+                rc.probeBackoffOk = sc.rateBackoffOk;
+                if (sc.rateBackoffOk === false)
+                    failureCodes.push('PROBE_BACKOFF_VIOLATION');
+                if (sc.rateBackoffOk == null)
+                    failureCodes.push('PROBE_BACKOFF_UNKNOWN');
+            }
+            // Cover connection start delay
+            if (ft && typeof ft.coverStartDelayMs === 'number') {
+                rc.coverStartDelayMs = ft.coverStartDelayMs;
+                rc.coverStartDelayWithin = ft.coverStartDelayMs >= 0 && ft.coverStartDelayMs <= 1000; // policy window 0..1000ms
+                if (!rc.coverStartDelayWithin)
+                    failureCodes.push('COVER_START_DELAY_OUT_OF_RANGE');
+            }
+            else {
+                failureCodes.push('COVER_START_DELAY_MISSING');
+            }
+            rc.failureCodes = failureCodes;
+            const hard = failureCodes.filter(c => !c.endsWith('_MISSING') && !c.endsWith('_UNKNOWN'));
+            const passed = hard.length === 0;
+            const details = passed ? `✅ runtime calibration ok p95Latency=${rc.pathSwitchLatencyP95Ms}ms maxLatency=${rc.maxPathSwitchLatencyMs}ms` : `❌ runtime calibration issues: ${failureCodes.join(',')}`;
+            const evidenceType = passed ? 'dynamic-protocol' : 'heuristic';
+            return { id: 42, name: 'Runtime Calibration & Behavioral Instrumentation', description: 'Correlates baseline vs dynamic TLS calibration, POP co-location, SCION path switch latency distribution, probe backoff, and cover connection start timing', passed, details, severity: 'major', evidenceType };
         }
     },
     // Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes (Check 39)
@@ -2202,7 +2364,7 @@ exports.PHASE_7_CONT_CHECKS = [
         id: 35,
         key: 'evidence-authenticity',
         name: 'Evidence Authenticity',
-        description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode',
+        description: 'Validates signed evidence authenticity (detached signature, multi-signer bundle, provenance & SBOM attestations) in strictAuth mode',
         severity: 'major',
         introducedIn: '1.1',
         evaluate: async (analyzer) => {
@@ -2236,8 +2398,21 @@ exports.PHASE_7_CONT_CHECKS = [
                 bundle.multiSignerThresholdMet = uniqueSigners.size >= (bundle.thresholdRequired || 2);
             }
             const bundleThresholdMet = bundle?.multiSignerThresholdMet === true;
-            const anyAuth = detachedValid || bundleThresholdMet;
+            // Task 28: provenance & SBOM attestation signals (count toward authenticity if verified)
+            const provAttOk = provenance.provenanceAttestationSignatureVerified === true;
+            const sbomAttOk = provenance.sbomAttestationSignatureVerified === true;
+            const manifestOk = provenance.checksumManifestSignatureVerified === true;
+            const anyAuth = detachedValid || bundleThresholdMet || provAttOk || sbomAttOk || manifestOk;
             const failureCodes = [];
+            // Task 26: detect canonical JSON mismatch (recompute canonical digest and compare)
+            if (provenance.canonicalDigest && analyzer.canonicalize) {
+                try {
+                    const recomputed = analyzer.canonicalize(ev).digest;
+                    if (recomputed !== provenance.canonicalDigest)
+                        failureCodes.push('CANONICAL_JSON_MISMATCH');
+                }
+                catch { /* ignore */ }
+            }
             if (!anyAuth) {
                 if (strictAuth) {
                     if (bundlePresent) {
@@ -2261,12 +2436,32 @@ exports.PHASE_7_CONT_CHECKS = [
                     failureCodes.push('EVIDENCE_UNSIGNED');
                 }
             }
+            // Task 28: explicit provenance / SBOM attestation related failure codes
+            if (strictAuth) {
+                if (provenance.provenanceAttestationSignatureVerified === false)
+                    failureCodes.push('PROVENANCE_SIGNATURE_INVALID');
+                if (provenance.provenanceAttestationSignatureVerified === undefined)
+                    failureCodes.push('PROVENANCE_ATTESTATION_MISSING');
+                if (provenance.sbomAttestationSignatureVerified === false)
+                    failureCodes.push('SBOM_SIGNATURE_INVALID');
+                if (provenance.sbomAttestationSignatureVerified === undefined)
+                    failureCodes.push('SBOM_ATTESTATION_MISSING');
+            }
+            // Unsupported format if signatureAlgorithm present & not recognized
+            if (provenance.signatureAlgorithm && !['ed25519'].includes(provenance.signatureAlgorithm)) {
+                failureCodes.push('SIGNATURE_FORMAT_UNSUPPORTED');
+            }
             const evidenceType = anyAuth ? 'artifact' : 'heuristic';
             let details;
             if (anyAuth) {
-                const mode = detachedValid ? 'detached-signature' : 'bundle';
+                const mode = detachedValid ? 'detached-signature'
+                    : bundleThresholdMet ? 'bundle'
+                        : provAttOk ? 'provenance-attestation'
+                            : sbomAttOk ? 'sbom-attestation'
+                                : manifestOk ? 'checksum-manifest' : 'unknown';
                 const chainInfo = bundlePresent ? ` hashChain=${bundle?.hashChainValid === false ? 'invalid' : 'ok'}` : '';
-                details = `✅ authenticity ${mode} verified${chainInfo}`;
+                const attInfo = [provAttOk && 'provAtt', sbomAttOk && 'sbomAtt', manifestOk && 'manifest'].filter(Boolean).join('+');
+                details = `✅ authenticity ${mode} verified${chainInfo}${attInfo ? ' att=[' + attInfo + ']' : ''}`;
             }
             else {
                 const codeStr = failureCodes.length ? ` codes=[${failureCodes.join(',')}]` : '';

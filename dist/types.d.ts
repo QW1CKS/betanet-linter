@@ -198,6 +198,8 @@ export interface AnalyzerDiagnostics {
         blocked?: boolean;
     }[];
     evidenceSignatureValid?: boolean;
+    signatureCacheHits?: number;
+    signatureCacheMisses?: number;
 }
 export interface CheckOptions {
     verbose?: boolean;
@@ -226,6 +228,19 @@ export interface CheckOptions {
     dsseThreshold?: number;
     evidenceBundleFile?: string;
     strictAuthMode?: boolean;
+    provenanceAttestationSignatureFile?: string;
+    provenanceAttestationPublicKeyFile?: string;
+    sbomAttestationSignatureFile?: string;
+    sbomAttestationPublicKeyFile?: string;
+    checksumManifestFile?: string;
+    checksumManifestSignatureFile?: string;
+    checksumManifestPublicKeyFile?: string;
+    environmentLockFile?: string;
+    sandboxCpuMs?: number;
+    sandboxMemoryMb?: number;
+    sandboxNoNetwork?: boolean;
+    sandboxFsReadOnly?: boolean;
+    sandboxTempDir?: string;
 }
 export interface SBOMOptions {
     format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json';
@@ -260,6 +275,8 @@ export interface IngestedEvidence {
         signatureError?: string;
         signatureAlgorithm?: string;
         signaturePublicKeyFingerprint?: string;
+        canonicalDigest?: string;
+        canonicalizationMode?: string;
         dsseEnvelopeVerified?: boolean;
         dsseSignerCount?: number;
         dsseVerifiedSignerCount?: number;
@@ -275,6 +292,30 @@ export interface IngestedEvidence {
         dssePolicyReasons?: string[];
         pqHybridVerified?: boolean;
         pqHybridError?: string;
+        provenanceAttestationSignatureVerified?: boolean;
+        provenanceAttestationSignatureError?: string;
+        sbomAttestationSignatureVerified?: boolean;
+        sbomAttestationSignatureError?: string;
+        checksumManifestDigest?: string;
+        checksumManifestSignatureVerified?: boolean;
+        checksumManifestSignatureError?: string;
+    };
+    securitySandbox?: {
+        cpuBudgetMs?: number;
+        memoryBudgetMb?: number;
+        cpuUsedMs?: number;
+        memoryPeakMb?: number;
+        fsWrites?: {
+            path: string;
+            bytes: number;
+        }[];
+        fsWriteCount?: number;
+        fsWriteBytesTotal?: number;
+        blockedNetworkAttempts?: number;
+        blockedWriteAttempts?: number;
+        diagnostics?: string[];
+        violations?: string[];
+        enforced?: boolean;
     };
     signedEvidenceBundle?: {
         entries?: {
@@ -674,6 +715,13 @@ export interface IngestedEvidence {
             retry?: boolean;
             versionsOffered?: string[];
             odcil?: number;
+            transportParams?: {
+                idleTimeout?: number;
+                maxUdpPayloadSize?: number;
+                initialMaxData?: number;
+                initialMaxStreamDataBidiLocal?: number;
+            };
+            mismatchCodes?: string[];
         };
         calibrationHash?: string;
         calibrationMismatch?: boolean;
@@ -691,8 +739,40 @@ export interface IngestedEvidence {
         stdDevPing?: number;
         stdDevPadding?: number;
         stdDevPriorityGap?: number;
+        sourceType?: 'synthetic' | 'collected';
+        captureWindowMs?: number;
+        derivedStats?: {
+            buckets?: number;
+            entropyMax?: number;
+        };
+    };
+    runtimeCalibration?: {
+        baselineAlpnMatch?: boolean;
+        baselineExtHashMatch?: boolean;
+        popIdBaseline?: string;
+        popIdDynamic?: string;
+        popMatch?: boolean;
+        maxPathSwitchLatencyMs?: number;
+        pathSwitchLatencyP95Ms?: number;
+        probeBackoffOk?: boolean;
+        coverStartDelayMs?: number;
+        coverStartDelayWithin?: boolean;
+        failureCodes?: string[];
     };
     [k: string]: any;
+}
+export interface ChecksumManifestEntry {
+    file: string;
+    sha256?: string;
+    raw?: string;
+}
+export interface EnvironmentLock {
+    components?: {
+        name: string;
+        version: string;
+    }[];
+    diffCount?: number;
+    verified?: boolean;
 }
 export interface EvidenceMeta {
     generated: string;

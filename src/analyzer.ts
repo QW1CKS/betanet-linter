@@ -36,6 +36,13 @@ export class BinaryAnalyzer {
   private userAgent: string = 'betanet-linter/1.x';
   // Task 26: signature verification cache (digest|signer|algo -> boolean)
   private signatureVerifyCache: Map<string, boolean> = new Map();
+  // Task 29 sandbox controls
+  private sandboxCpuBudgetMs?: number;
+  private sandboxMemoryBudgetMb?: number;
+  private sandboxFsWriteDeny = false;
+  private sandboxNetworkDeny = false;
+  private sandboxStartHr: [number, number] | null = null;
+  private sandboxStats: { elapsedMs?: number; rssMb?: number; blockedNetworkAttempts?: number; fsWrites?: number; violations: string[] } = { violations: [] };
 
   constructor(binaryPath: string, verbose: boolean = false) {
     this.binaryPath = binaryPath;
@@ -92,7 +99,11 @@ export class BinaryAnalyzer {
 
   // Phase 6: allow external enabling of network usage
   setNetworkAllowed(allowed: boolean, allowlist?: string[]) {
-    this.networkAllowed = allowed;
+    if (this.sandboxNetworkDeny) {
+      this.networkAllowed = false;
+    } else {
+      this.networkAllowed = allowed;
+    }
     this.networkAllowlist = allowlist && allowlist.length ? allowlist.map(h=>h.toLowerCase()) : null;
     this.diagnostics.networkAllowed = allowed;
   }
@@ -103,6 +114,7 @@ export class BinaryAnalyzer {
     const host = (() => { try { return new URL(url).hostname.toLowerCase(); } catch { return ''; } })();
     if (!this.networkAllowed) {
       this.networkOps.push({ url, method, durationMs: 0, blocked: true });
+      this.sandboxStats.blockedNetworkAttempts = (this.sandboxStats.blockedNetworkAttempts||0)+1;
       this.diagnostics.networkOps = this.networkOps;
       if (this.verbose) console.warn(`⚠️  Blocked network attempt (disabled): ${method} ${url}`);
       throw new Error('network-disabled');
@@ -235,6 +247,14 @@ export class BinaryAnalyzer {
 
   getDiagnostics(): AnalyzerDiagnostics {
   this.diagnostics.networkOps = this.networkOps;
+  // attach sandbox stats into provenance for checks (lightweight surface)
+  try {
+    const anySelf: any = this as any;
+    if (anySelf.evidence) {
+      anySelf.evidence.provenance = anySelf.evidence.provenance || {};
+      anySelf.evidence.provenance.sandboxStats = { ...this.sandboxStats };
+    }
+  } catch {/* ignore */}
   return this.diagnostics;
   }
 
@@ -286,6 +306,7 @@ export class BinaryAnalyzer {
   }
 
   async analyze(): Promise<{ strings: string[]; symbols: string[]; fileFormat: string; architecture: string; dependencies: string[]; size: number; }> {
+  if (!this.sandboxStartHr) this.sandboxStartHr = process.hrtime();
     // Ensure tool detection finished (especially for tests manipulating env)
     if (this.toolsReady) {
       try { await this.toolsReady; } catch { /* ignore */ }
@@ -312,9 +333,48 @@ export class BinaryAnalyzer {
         const diff = process.hrtime(this.analysisStartHr);
         this.diagnostics.totalAnalysisTimeMs = (diff[0] * 1e3) + (diff[1] / 1e6);
       }
+      // sandbox budget checks (approx wall time + RSS) recorded lazily
+      try {
+        if (this.sandboxStartHr) {
+          const diff2 = process.hrtime(this.sandboxStartHr);
+          const elapsedMs = (diff2[0] * 1e3) + (diff2[1] / 1e6);
+          this.sandboxStats.elapsedMs = elapsedMs;
+          const rssMb = process.memoryUsage().rss / (1024*1024);
+          this.sandboxStats.rssMb = rssMb;
+          if (this.sandboxCpuBudgetMs !== undefined && elapsedMs > this.sandboxCpuBudgetMs && !this.sandboxStats.violations.includes('CPU_BUDGET_EXCEEDED')) this.sandboxStats.violations.push('CPU_BUDGET_EXCEEDED');
+          if (this.sandboxMemoryBudgetMb !== undefined && rssMb > this.sandboxMemoryBudgetMb && !this.sandboxStats.violations.includes('MEMORY_BUDGET_EXCEEDED')) this.sandboxStats.violations.push('MEMORY_BUDGET_EXCEEDED');
+        }
+      } catch {/* ignore sandbox metrics errors */}
       return { strings, symbols, fileFormat, architecture, dependencies, size };
     })();
     return this.cachedAnalysis;
+  }
+
+  // Task 29: configure sandbox (called from checker ensureAnalyzer)
+  configureSandbox(opts: { cpuMs?: number; memMb?: number; fsWriteDeny?: boolean; networkDeny?: boolean }) {
+    if (opts.cpuMs) this.sandboxCpuBudgetMs = opts.cpuMs;
+    if (opts.memMb) this.sandboxMemoryBudgetMb = opts.memMb;
+    if (opts.fsWriteDeny) {
+      this.sandboxFsWriteDeny = true;
+      // Monkey patch fs write methods (best-effort) to count & block writes (excluding temp dirs path containing 'temp' or 'tmp')
+      const deny = (name: string) => {
+        const orig: any = (fs as any)[name];
+        if (typeof orig !== 'function') return;
+        (fs as any)[name] = (...args: any[]) => {
+          const p = args[0];
+            if (typeof p === 'string' && !/tmp|temp|cache/i.test(p)) {
+              this.sandboxStats.fsWrites = (this.sandboxStats.fsWrites||0)+1;
+              if (!this.sandboxStats.violations.includes('FS_WRITE_BLOCKED')) this.sandboxStats.violations.push('FS_WRITE_BLOCKED');
+              const cb = args.find(a => typeof a === 'function');
+              if (cb) return cb(new Error('sandbox-fs-deny'));
+              throw new Error('sandbox-fs-deny');
+            }
+          return orig.apply(fs, args);
+        };
+      };
+      ['writeFile','writeFileSync','appendFile','appendFileSync','createWriteStream','mkdir','mkdirSync','rm','rmSync','unlink','unlinkSync'].forEach(deny);
+    }
+    if (opts.networkDeny) this.sandboxNetworkDeny = true;
   }
 
   private async extractStrings(dynamicProbe: boolean): Promise<string[]> {

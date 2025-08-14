@@ -59,15 +59,116 @@ class BinaryAnalyzer {
         this.networkOps = [];
         this.networkAllowlist = null; // host allowlist when network enabled
         this.userAgent = 'betanet-linter/1.x';
+        // Task 26: signature verification cache (digest|signer|algo -> boolean)
+        this.signatureVerifyCache = new Map();
+        // Task 29 sandbox state
+        this.sandboxEnabled = false;
+        this.sandboxFsReadOnly = false;
+        this.sandboxStats = {
+            cpuStart: 0,
+            cpuUsedMs: 0,
+            memoryPeakMb: 0,
+            fsWrites: [],
+            fsWriteCount: 0,
+            fsWriteBytesTotal: 0,
+            blockedNetworkAttempts: 0,
+            blockedWriteAttempts: 0,
+            diagnostics: [],
+            violations: []
+        };
         this.binaryPath = binaryPath;
         this.verbose = verbose;
         this.toolsReady = this.detectTools();
+    }
+    // Task 26: canonical JSON normalization (stable key ordering, UTF-8 NFC normalization)
+    canonicalize(obj) {
+        const normalizeUnicode = (s) => s.normalize('NFC');
+        const stableStringify = (value) => {
+            if (value === null || typeof value !== 'object') {
+                if (typeof value === 'string')
+                    return JSON.stringify(normalizeUnicode(value));
+                return JSON.stringify(value);
+            }
+            if (Array.isArray(value)) {
+                return '[' + value.map(v => stableStringify(v)).join(',') + ']';
+            }
+            const keys = Object.keys(value).sort();
+            return '{' + keys.map(k => JSON.stringify(normalizeUnicode(k)) + ':' + stableStringify(value[k])).join(',') + '}';
+        };
+        const json = stableStringify(obj);
+        const digest = crypto.createHash('sha256').update(json).digest('hex');
+        return { json, digest };
+    }
+    // Task 26: verify signature with cache support
+    verifySignatureCached(algo, signer, canonicalJson, signatureB64, publicKey) {
+        const digest = crypto.createHash('sha256').update(canonicalJson).digest('hex');
+        const cacheKey = `${algo}|${signer}|${digest}`;
+        if (this.signatureVerifyCache.has(cacheKey)) {
+            this.diagnostics.signatureCacheHits = (this.diagnostics.signatureCacheHits || 0) + 1;
+            return this.signatureVerifyCache.get(cacheKey);
+        }
+        this.diagnostics.signatureCacheMisses = (this.diagnostics.signatureCacheMisses || 0) + 1;
+        let valid = false;
+        try {
+            if (algo === 'ed25519') {
+                let keyForVerify = publicKey;
+                if (publicKey.length === 32) {
+                    // Wrap raw 32-byte Ed25519 key into SPKI DER (RFC 8410)
+                    const prefix = Buffer.from('302a300506032b6570032100', 'hex');
+                    keyForVerify = Buffer.concat([prefix, publicKey]);
+                }
+                valid = crypto.verify(null, Buffer.from(canonicalJson), { key: keyForVerify, format: 'der', type: 'spki' }, Buffer.from(signatureB64, 'base64'));
+            }
+            else {
+                // unsupported algorithms flagged later by check
+                valid = false;
+            }
+        }
+        catch {
+            valid = false;
+        }
+        this.signatureVerifyCache.set(cacheKey, valid);
+        return valid;
     }
     // Phase 6: allow external enabling of network usage
     setNetworkAllowed(allowed, allowlist) {
         this.networkAllowed = allowed;
         this.networkAllowlist = allowlist && allowlist.length ? allowlist.map(h => h.toLowerCase()) : null;
         this.diagnostics.networkAllowed = allowed;
+    }
+    // Task 29: enable sandbox with provided budgets
+    configureSandbox(opts) {
+        this.sandboxEnabled = true;
+        this.sandboxCpuBudgetMs = opts.cpuMs;
+        this.sandboxMemoryBudgetMb = opts.memoryMb;
+        this.sandboxFsReadOnly = !!opts.fsReadOnly;
+        this.sandboxTempDir = opts.tempDir;
+        if (opts.forceDisableNetwork) {
+            this.networkAllowed = false; // override
+        }
+        this.sandboxStats.cpuStart = performance.now();
+    }
+    sandboxCheckBudgets() {
+        if (!this.sandboxEnabled)
+            return;
+        // Approximate CPU via wall clock diff (single-threaded assumption)
+        const elapsed = performance.now() - this.sandboxStats.cpuStart;
+        this.sandboxStats.cpuUsedMs = elapsed;
+        if (this.sandboxCpuBudgetMs && elapsed > this.sandboxCpuBudgetMs && !this.sandboxStats.violations.includes('RISK_CPU_BUDGET_EXCEEDED')) {
+            this.sandboxStats.violations.push('RISK_CPU_BUDGET_EXCEEDED');
+            this.sandboxStats.diagnostics.push(`CPU time budget exceeded: ${Math.round(elapsed)}ms > ${this.sandboxCpuBudgetMs}ms`);
+        }
+        // Memory rough estimation: process rss (shared for process; coarse)
+        try {
+            const rssMb = (process.memoryUsage().rss / (1024 * 1024));
+            if (rssMb > this.sandboxStats.memoryPeakMb)
+                this.sandboxStats.memoryPeakMb = rssMb;
+            if (this.sandboxMemoryBudgetMb && rssMb > this.sandboxMemoryBudgetMb && !this.sandboxStats.violations.includes('RISK_MEMORY_BUDGET_EXCEEDED')) {
+                this.sandboxStats.violations.push('RISK_MEMORY_BUDGET_EXCEEDED');
+                this.sandboxStats.diagnostics.push(`Memory budget exceeded: ${rssMb.toFixed(1)}MB > ${this.sandboxMemoryBudgetMb}MB`);
+            }
+        }
+        catch { /* ignore */ }
     }
     // Placeholder network fetch wrapper to centralize logging if added in future phases
     async attemptNetwork(url, method = 'GET', fn) {
@@ -83,6 +184,13 @@ class BinaryAnalyzer {
             this.diagnostics.networkOps = this.networkOps;
             if (this.verbose)
                 console.warn(`⚠️  Blocked network attempt (disabled): ${method} ${url}`);
+            if (this.sandboxEnabled) {
+                this.sandboxStats.blockedNetworkAttempts++;
+                if (!this.sandboxStats.violations.includes('RISK_NETWORK_BLOCKED_ATTEMPT')) {
+                    this.sandboxStats.violations.push('RISK_NETWORK_BLOCKED_ATTEMPT');
+                    this.sandboxStats.diagnostics.push('Network attempt blocked under sandbox');
+                }
+            }
             throw new Error('network-disabled');
         }
         if (this.networkAllowlist && host && !this.networkAllowlist.includes(host)) {
@@ -90,6 +198,13 @@ class BinaryAnalyzer {
             this.diagnostics.networkOps = this.networkOps;
             if (this.verbose)
                 console.warn(`⚠️  Blocked network attempt (host not allowlisted): ${host}`);
+            if (this.sandboxEnabled) {
+                this.sandboxStats.blockedNetworkAttempts++;
+                if (!this.sandboxStats.violations.includes('RISK_NETWORK_NOT_ALLOWLISTED')) {
+                    this.sandboxStats.violations.push('RISK_NETWORK_NOT_ALLOWLISTED');
+                    this.sandboxStats.diagnostics.push(`Network host not allowlisted: ${host}`);
+                }
+            }
             throw new Error('network-host-blocked');
         }
         const maxRetries = 2;
@@ -120,6 +235,26 @@ class BinaryAnalyzer {
                 await new Promise(r => setTimeout(r, base + jitter));
             }
         }
+    }
+    // Task 29: expose snapshot of sandbox stats for ingestion
+    getSandboxSnapshot() {
+        this.sandboxCheckBudgets();
+        if (!this.sandboxEnabled)
+            return undefined;
+        return {
+            cpuBudgetMs: this.sandboxCpuBudgetMs,
+            memoryBudgetMb: this.sandboxMemoryBudgetMb,
+            cpuUsedMs: this.sandboxStats.cpuUsedMs,
+            memoryPeakMb: this.sandboxStats.memoryPeakMb,
+            fsWrites: this.sandboxStats.fsWrites.slice(0, 50),
+            fsWriteCount: this.sandboxStats.fsWriteCount,
+            fsWriteBytesTotal: this.sandboxStats.fsWriteBytesTotal,
+            blockedNetworkAttempts: this.sandboxStats.blockedNetworkAttempts,
+            blockedWriteAttempts: this.sandboxStats.blockedWriteAttempts,
+            diagnostics: this.sandboxStats.diagnostics,
+            violations: this.sandboxStats.violations,
+            enforced: true
+        };
     }
     async getBinarySha256() {
         if (this.binarySha256)

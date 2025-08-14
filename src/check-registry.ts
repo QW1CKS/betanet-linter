@@ -1643,6 +1643,46 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       };
     }
   }
+  ,
+  // Task 29: Security & Sandbox Hardening
+  {
+    id: 43,
+    key: 'security-sandbox-hardening',
+    name: 'Security & Sandbox Hardening',
+    description: 'Enforces resource limits & sandbox deny policies; reports risk violations',
+    severity: 'major',
+    introducedIn: '1.1',
+    evaluate: async (analyzer: any) => {
+      const ev = analyzer.evidence || {};
+      const prov = ev.provenance || {};
+      const stats = prov.sandboxStats || {};
+      const violations: string[] = Array.isArray(stats.violations) ? stats.violations.slice() : [];
+      const failureCodes: string[] = [];
+      // Map violations -> failure codes (stable)
+      for (const v of violations) {
+        if (v === 'CPU_BUDGET_EXCEEDED') failureCodes.push('RISK_CPU_BUDGET_EXCEEDED');
+        else if (v === 'MEMORY_BUDGET_EXCEEDED') failureCodes.push('RISK_MEMORY_BUDGET_EXCEEDED');
+        else if (v === 'FS_WRITE_BLOCKED') failureCodes.push('RISK_FS_WRITE_BLOCKED');
+        else if (v === 'NETWORK_BLOCKED_ATTEMPT') failureCodes.push('RISK_NETWORK_BLOCKED_ATTEMPT');
+        else if (typeof v === 'string') failureCodes.push('RISK_' + v.toUpperCase());
+      }
+      // Derive additional signals
+      if ((stats.blockedNetworkAttempts || 0) > 0 && !failureCodes.includes('RISK_NETWORK_BLOCKED_ATTEMPT')) {
+        failureCodes.push('RISK_NETWORK_BLOCKED_ATTEMPT');
+      }
+      const passed = failureCodes.length === 0;
+      const detailParts: string[] = [];
+      if (stats.elapsedMs !== undefined) detailParts.push(`elapsed=${stats.elapsedMs}ms`);
+      if (stats.rssMb !== undefined) detailParts.push(`rss=${stats.rssMb}MB`);
+      if (stats.blockedNetworkAttempts !== undefined) detailParts.push(`netBlocked=${stats.blockedNetworkAttempts}`);
+      if (stats.fsWrites !== undefined) detailParts.push(`fsWrites=${stats.fsWrites}`);
+      const details = passed ? `✅ sandbox ok (${detailParts.join(' ')||'no-stats'})` : `❌ sandbox risk (${failureCodes.join(',')}) ${detailParts.join(' ')}`;
+      // Attach failureCodes back onto stats for downstream diagnostics / tests
+      stats.failureCodes = failureCodes;
+      prov.sandboxStats = stats;
+      return { id: 43, name: 'Security & Sandbox Hardening', description: 'Enforces resource limits & sandbox deny policies; reports risk violations', passed, details, severity: 'major', evidenceType: 'heuristic' };
+    }
+  }
 ];
 
 // Step 10 appended checks (IDs 21-23) added after existing registry for stability

@@ -35,6 +35,9 @@ export interface HarnessOptions {
         greaseAnomaly?: boolean;
         innerAddsPrivateAlpn?: boolean;
     };
+    collectH2?: boolean;
+    collectH3?: boolean;
+    collectWindowMs?: number;
 }
 export interface HarnessEvidence {
     noiseTranscriptDynamic?: {

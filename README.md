@@ -1,7 +1,7 @@
 # Betanet Compliance Linter
 
-> **Status: Strict Normative Full Betanet 1.1 Compliance**  
-> All 13 §11 normative specification items plus auxiliary security / anti‑evasion requirements are enforced by a consolidated **39‑check registry (IDs 1–39)** spanning heuristic, static‑structural, dynamic‑protocol, and artifact evidence. Each failure code has ≥1 negative test; coverage thresholds are enforced in CI; authenticity (detached signature or multi‑signer bundle) is validated in strict‑auth mode. This document and the roadmap have been updated to remove transitional/pending qualifiers. Historical sections are retained for provenance only.
+> **Status: Strict Normative Full Betanet 1.1 Compliance + Sandbox Hardening**  
+> All 13 §11 normative specification items plus auxiliary security / anti‑evasion and sandbox hardening requirements are enforced by a consolidated **43‑check registry (IDs 1–43)** spanning heuristic, static‑structural, dynamic‑protocol, artifact, and sandbox risk evidence. Each failure code has ≥1 negative test; coverage thresholds are enforced in CI; authenticity (detached signature or multi‑signer bundle) is validated in strict‑auth mode. Task 29 added a dedicated Security & Sandbox Hardening check (ID 43) surfacing controlled resource usage and deny‑policy violations. Historical sections are retained for provenance only.
 
 
 > **Quickstart (from source):**
@@ -23,7 +23,7 @@
 > sudo rm -rf /usr/local/bin/betanet-lint
 >```
 
-A CLI tool that enforces the Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) by decomposing the **13 high‑level normative items** into a finer‑grained **39 check registry**. Each registry entry isolates a distinct evidence surface (static‑structural, dynamic‑protocol, artifact, heuristic) or a defensive / integrity dimension (negative assertions, anti‑evasion, provenance authenticity, algorithm agility, PQ boundary, forbidden hashes). This decomposition makes failures more actionable (granular root cause) and prevents “one big checkbox” passes based on a single weak signal.
+A CLI tool that enforces the Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) by decomposing the **13 high‑level normative items** into a finer‑grained **43 check registry**. Each registry entry isolates a distinct evidence surface (static‑structural, dynamic‑protocol, artifact, heuristic, sandbox-risk) or a defensive / integrity dimension (negative assertions, anti‑evasion, provenance authenticity, algorithm agility, PQ boundary, forbidden hashes, resource sandboxing). This decomposition makes failures more actionable (granular root cause) and prevents “one big checkbox” passes based on a single weak signal.
 
 The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
 
@@ -46,6 +46,7 @@ High‑level §11 item groups and their principal check IDs (non‑exhaustive; s
 | 12 Privacy hop enforcement (balanced/strict) | 11, 17 | 27 (variance), 18 |
 | 13 Reproducible builds & provenance authenticity | 9, 35 | 18, 21 |
 | Cross‑cutting registries (algorithm agility, forbidden hashes) | 34, 39 | 23 (negative assertions) |
+| Sandbox security (resource / deny policy) | 43 | 18 (multi‑signal gate context) |
 
 Scoring: Strict mode counts only non‑heuristic evidence (static / dynamic / artifact). Heuristic passes are reported but excluded unless `--allow-heuristic` is provided. Multi‑signal gate (check 18) prevents superficial keyword stuffing from yielding a compliant score without diversity of evidence categories.
 
@@ -100,7 +101,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 
 Legend: All items have ≥1 non‑heuristic evidence path; historical simulated scaffolds remain only where sufficient for normative acceptance.
 
-### Provenance & Reproducible Build
+### Provenance, Reproducible Build & Sandbox Hardening
 An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 1. Deterministic build with fixed `SOURCE_DATE_EPOCH`.
 2. Per-file SHA256 manifest + aggregate digest.
@@ -123,6 +124,27 @@ Authenticity & Attestations (Check 35) failure codes (Task 28):
 - EVIDENCE_UNSIGNED – (non-strict mode) authenticity not enforced (informational).
 
 Authenticity pass conditions (any one): detached evidence signature, multi-signer bundle threshold met (+ optional hash chain), provenance attestation signature, SBOM attestation signature, or signed checksum manifest.
+
+Sandbox (Task 29) adds runtime resource & mutation surface controls with recorded diagnostics:
+```
+provenance.sandboxStats = {
+  elapsedMs,       // wall-clock elapsed analysis time
+  rssMb,           // resident set size at analysis completion
+  blockedNetworkAttempts,
+  fsWrites,        // blocked writes when deny active
+  violations[]     // generic codes: CPU_BUDGET_EXCEEDED, MEMORY_BUDGET_EXCEEDED, FS_WRITE_BLOCKED, NETWORK_BLOCKED_ATTEMPT
+}
+```
+Mapped failure codes (Check 43): RISK_CPU_BUDGET_EXCEEDED, RISK_MEMORY_BUDGET_EXCEEDED, RISK_FS_WRITE_BLOCKED, RISK_NETWORK_BLOCKED_ATTEMPT.
+
+Sandbox CLI flags:
+```
+--sandbox-cpu-budget-ms <ms>
+--sandbox-memory-budget-mb <mb>
+--sandbox-fs-deny
+--sandbox-network-deny  # overrides --enable-network
+```
+If any RISK_* violations are present Check 43 fails (major severity); absence of violations reports baseline stats.
 
 CLI flags (Task 28 additions):
 --provenance-attestation-signature / --provenance-attestation-public-key
@@ -191,7 +213,8 @@ Current capabilities (heuristic unless noted):
 - 🏷️ **SBOM Feature Tagging**: Adds `betanet.feature` properties (e.g. `transport-quic`, `crypto-pq-hybrid`, `payment-lightning`, `privacy-hop`) to CycloneDX / SPDX outputs for downstream audit traceability
  - 📥 **External Evidence Ingestion (Phase 1)**: Supply provenance JSON via `--evidence-file` to upgrade Build Provenance (check 9) from heuristic to artifact evidence
  - 🧪 **Strict vs Heuristic Accounting**: `--strict` (default) + `--allow-heuristic` gate scoring so heuristic-only passes surface as exit code 2 (gap) rather than a silent pass
- - 🔒 **Network Hermetic Mode**: Disabled by default; opt-in with `--enable-network`, constrain hosts via `--network-allow`, fail on blocked attempts with `--fail-on-network`.
+- 🔒 **Network Hermetic Mode**: Disabled by default; opt-in with `--enable-network`, constrain hosts via `--network-allow`, fail on blocked attempts with `--fail-on-network` or force deny regardless of enable with `--sandbox-network-deny`.
+ - 🛡️ **Sandbox Resource Controls (Task 29)**: CPU wall-time & memory budgets, filesystem write deny, and forced network deny; surfaced via Check 43 with RISK_* failure codes for policy breaches.
  - ✍️ **Detached Evidence Signature Verification**: `--evidence-signature` + `--evidence-public-key` (ed25519) validate evidence JSON integrity (Phase 7 foundation).
 - 🔐 **Heuristic JA3 Fingerprint Hash & Raw Capture Scaffold**: Dynamic ClientHello capture emits `ja3` + `ja3Hash` with optional `rawClientHelloB64` placeholder for full packet-calibrated JA3/JA4 (future v3).
 - 📡 **QUIC Initial Raw Scaffold**: `quicInitial` now can include partial parsed fields and `rawInitialB64` (deeper raw packet parsing optional future enhancement).

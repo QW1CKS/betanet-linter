@@ -217,6 +217,11 @@ export interface CheckOptions {
   checksumManifestSignatureFile?: string; // detached signature over checksum manifest
   checksumManifestPublicKeyFile?: string; // public key for checksum manifest signature
   environmentLockFile?: string; // lock file capturing build environment/toolchain versions
+  // Task 29: Security & Sandbox Hardening
+  sandboxCpuBudgetMs?: number; // soft CPU time budget (wall elapsed approximation) for analysis
+  sandboxMemoryBudgetMb?: number; // soft RSS memory ceiling
+  sandboxFsWriteDeny?: boolean; // deny filesystem writes (best-effort) during analysis
+  sandboxNetworkDeny?: boolean; // force network disabled regardless of enableNetwork flag
 }
 
 export interface SBOMOptions {
@@ -256,6 +261,8 @@ export interface IngestedEvidence {
   dsseRequiredSignerCount?: number; // Task 10 required signers present
   dsseSignerDetails?: { keyid?: string; verified: boolean; reason?: string }[]; // Per-signer diagnostics
   dssePolicyReasons?: string[]; // Aggregate failure reasons if policy not met
+  // Task 29 sandbox stats snapshot (populated when sandbox hardening options used)
+  sandboxStats?: { elapsedMs?: number; rssMb?: number; blockedNetworkAttempts?: number; fsWrites?: number; violations?: string[] };
   pqHybridVerified?: boolean; // Task 22: PQ hybrid handshake transcript proof verified
   pqHybridError?: string; // Task 22: error reason if PQ hybrid verification failed
   // Task 28 provenance & SBOM attestation extensions

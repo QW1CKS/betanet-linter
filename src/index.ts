@@ -42,6 +42,8 @@ export class BetanetComplianceChecker {
   try { (this._analyzer as any).options = { ...(this._analyzer as any).options, ...options }; } catch { /* ignore */ }
   // Phase 6: Apply network allowance (default deny)
   try { (this._analyzer as any).setNetworkAllowed?.(!!options.enableNetwork, options.networkAllowlist); } catch { /* ignore */ }
+  // Task 29: configure sandbox early
+  try { (this._analyzer as any).configureSandbox?.({ cpuMs: options.sandboxCpuBudgetMs, memMb: options.sandboxMemoryBudgetMb, fsWriteDeny: options.sandboxFsWriteDeny, networkDeny: options.sandboxNetworkDeny }); } catch {/* ignore */}
     // Evidence ingestion (Phase 1 start)
     if (options.evidenceFile && fs.existsSync(options.evidenceFile)) {
       try {
