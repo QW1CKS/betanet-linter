@@ -76,6 +76,12 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 - Added edge-case tests: exact boundary epoch pass/fail, override pre-date pass, metadata presence assertion
 - README updated to reflect PQ boundary codes and contextual metadata emission
 
+### Task 15 Completion: Evidence Authenticity Hash Chain Verification
+- Check 35 enhanced to recompute multi-signer bundle hash chain (concatenated canonicalSha256 entry hashes → sha256) and compare against provided bundleSha256.
+- Added failure code: BUNDLE_HASH_CHAIN_INVALID when mismatch detected (backward compatible; existing scenarios unchanged). Additional metadata: computedBundleSha256, hashChainValid, thresholdRequired.
+- Types extended with computedBundleSha256, hashChainValid, thresholdRequired; README & ROADMAP updated.
+- Tests: Added negative case exercising BUNDLE_HASH_CHAIN_INVALID in final-compliance-tasks suite.
+
 Post‑1.1 optional enhancements and polish items (see deferred list above). No breaking changes scheduled; future work will aim for additive schema expansions and optional flags.
 
 ### Added (since 1.0 baseline, historical aggregation)

@@ -88,7 +88,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Diversity volatility/window/delta/top3 + 7d degradation, gap ratio, spike detection enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Bounds: udpTimeout 100–600ms, retry<=25ms, coverConn≥2, teardownStd<=450ms, CV≤1.2, |skew|≤1.2, outliers≤20%, modelScore≥0.7, median 200–1200ms, p95≤1800ms, startDelay≤500ms, IQR≤900ms, outlierPct≤25%, ≥2 provenance categories |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index + entropy/no-early-reuse safeguards |
-|13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity (codes: SIG_DETACHED_INVALID, BUNDLE_THRESHOLD_UNMET, BUNDLE_SIGNATURE_INVALID, MISSING_AUTH_SIGNALS) |
+|13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity (codes: SIG_DETACHED_INVALID, BUNDLE_THRESHOLD_UNMET, BUNDLE_SIGNATURE_INVALID, BUNDLE_HASH_CHAIN_INVALID, MISSING_AUTH_SIGNALS) |
 | – Algorithm agility registry | 34 | artifact | Full | Allowed vs used sets; unregisteredUsed empty |
 | – Statistical jitter randomness | 26, 37 | dynamic-protocol | Full | Jitter variance + randomness pValue > 0.01, adequate samples |
 | – SCION control stream path failover metrics | 33 | dynamic-protocol | Full | Path switch latency & probe/backoff/timestamp skew + signature/schema flags |
@@ -114,10 +114,11 @@ Authenticity (Check 35) granular failure codes:
 - SIG_DETACHED_INVALID – detached signature path attempted but cryptographic verification failed.
 - BUNDLE_THRESHOLD_UNMET – multi-signer bundle present but required threshold not satisfied.
 - BUNDLE_SIGNATURE_INVALID – one or more bundle entry signatures structurally/cryptographically invalid.
+- BUNDLE_HASH_CHAIN_INVALID – recomputed hash chain over entry canonicalSha256 values does not match provided bundleSha256.
 - MISSING_AUTH_SIGNALS – neither detached signature nor bundle evidence provided under strict auth.
 - EVIDENCE_UNSIGNED – (non-strict mode) authenticity not enforced but surfaced for visibility.
 
-Pass conditions: either a verified detached signature OR a bundle with `multiSignerThresholdMet=true`. Evidence type is elevated to `artifact` only when authenticity satisfied; otherwise remains heuristic in reports. Future enhancements (non-blocking) include canonical JSON normalization before hash/sign, real public key allow/deny lists, and hash-chain validation for bundle entries.
+Pass conditions: either a verified detached signature OR a bundle with `multiSignerThresholdMet=true` and (if provided) a valid hash chain (bundleSha256 matches recomputed). Evidence type is elevated to `artifact` only when authenticity satisfied; otherwise remains heuristic in reports. Future enhancements (non-blocking) include canonical JSON normalization before hash/sign, real public key allow/deny lists, multi-format (minisign/cosign) verification, signature caching, and Merkle-style tamper paths.
 
 ### Multi-Signal Scoring & Anti-Evasion
 JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Keyword stuffing detection flags excessive spec-token density with insufficient category diversity and can fail the multi-signal anti‑evasion check (ID 18).

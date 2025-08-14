@@ -748,7 +748,7 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       expect(check35.details).toMatch(/authenticity/);
     });
     it('passes when multi-signer bundle threshold met', async () => {
-      const ev = { signedEvidenceBundle: { multiSignerThresholdMet: true, entries: [{ signatureValid: true }, { signatureValid: true }] } };
+      const ev = { signedEvidenceBundle: { multiSignerThresholdMet: true, entries: [{ signatureValid: true, signer: 'signerA' }, { signatureValid: true, signer: 'signerB' }] } };
       const result = await runWithAnalyzer(analyzerForAuth(ev));
       const check35 = result.checks.find(c => c.id === 35)!;
       expect(check35.passed).toBe(true);
@@ -780,6 +780,13 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       const check35 = result.checks.find(c => c.id === 35)!;
       expect(check35.passed).toBe(false);
       expect(check35.details).toMatch(/BUNDLE_SIGNATURE_INVALID/);
+    });
+    it('fails with BUNDLE_HASH_CHAIN_INVALID when bundle hash chain does not match', async () => {
+      const ev = { signedEvidenceBundle: { multiSignerThresholdMet: false, bundleSha256: 'deadbeef', entries: [ { signatureValid: true, canonicalSha256: 'aa' }, { signatureValid: true, canonicalSha256: 'bb' } ] } };
+      const result = await runWithAnalyzer(analyzerForAuth(ev));
+      const check35 = result.checks.find(c => c.id === 35)!;
+      expect(check35.passed).toBe(false);
+      expect(check35.details).toMatch(/BUNDLE_HASH_CHAIN_INVALID|deadbeef/);
     });
     it('fails with MISSING_AUTH_SIGNALS when neither detached nor bundle present', async () => {
       const ev = { other: true }; // no provenance.signatureVerified nor bundle

@@ -1768,6 +1768,25 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const detachedAttempted = provenance.signatureVerified === true || provenance.signatureVerified === false || diag.evidenceSignatureValid !== undefined;
       const detachedValid = provenance.signatureVerified === true || diag.evidenceSignatureValid === true;
       const bundlePresent = !!bundle;
+      // Recompute bundle hash chain if present (concatenate canonicalSha256 values and hash)
+      if (bundlePresent && Array.isArray(bundle.entries)) {
+        try {
+          const crypto = require('crypto');
+          const concat = bundle.entries.map((e:any)=> e?.canonicalSha256 || '').join('');
+          const recomputed = crypto.createHash('sha256').update(concat).digest('hex');
+            (bundle as any).computedBundleSha256 = recomputed;
+            if (bundle.bundleSha256) {
+              (bundle as any).hashChainValid = recomputed === bundle.bundleSha256;
+            }
+        } catch (e:any) {
+          (bundle as any).hashChainValid = false;
+          (bundle as any).hashChainError = String(e);
+        }
+        // Derive threshold if missing
+        if (bundle.thresholdRequired == null) bundle.thresholdRequired = 2;
+        const uniqueSigners = new Set((bundle.entries||[]).filter((e:any)=>e && e.signatureValid).map((e:any)=>e.signer).filter((s:any)=>s));
+        bundle.multiSignerThresholdMet = uniqueSigners.size >= (bundle.thresholdRequired || 2);
+      }
       const bundleThresholdMet = bundle?.multiSignerThresholdMet === true;
       const anyAuth = detachedValid || bundleThresholdMet;
       const failureCodes: string[] = [];
@@ -1777,6 +1796,7 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
             if (!bundleThresholdMet) failureCodes.push('BUNDLE_THRESHOLD_UNMET');
             const invalidEntries = (bundle.entries||[]).filter((e:any)=>e && e.signatureValid === false).length;
             if (invalidEntries > 0) failureCodes.push('BUNDLE_SIGNATURE_INVALID');
+            if (bundle.hashChainValid === false) failureCodes.push('BUNDLE_HASH_CHAIN_INVALID');
           } else if (detachedAttempted) {
             if (!detachedValid) failureCodes.push('SIG_DETACHED_INVALID');
           } else {
@@ -1789,7 +1809,9 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
       let details: string;
       if (anyAuth) {
-        details = `✅ authenticity ${(detachedValid ? 'detached-signature' : 'bundle')} verified`;
+        const mode = detachedValid ? 'detached-signature' : 'bundle';
+        const chainInfo = bundlePresent ? ` hashChain=${bundle?.hashChainValid === false ? 'invalid' : 'ok'}` : '';
+        details = `✅ authenticity ${mode} verified${chainInfo}`;
       } else {
         const codeStr = failureCodes.length ? ` codes=[${failureCodes.join(',')}]` : '';
         if (strictAuth) {

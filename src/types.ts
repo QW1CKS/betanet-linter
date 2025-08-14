@@ -244,9 +244,12 @@ export interface IngestedEvidence {
   };
   // Phase 7: multi-signer evidence bundle (canonical hash chain) placeholder
   signedEvidenceBundle?: {
-    entries?: { canonicalSha256?: string; signatureValid?: boolean; signer?: string }[];
-    bundleSha256?: string; // hash over concatenated entry hashes
-    multiSignerThresholdMet?: boolean; // >=2 signers present
+  entries?: { canonicalSha256?: string; signatureValid?: boolean; signer?: string; signatureError?: string }[];
+  bundleSha256?: string; // hash over concatenated entry hashes
+  computedBundleSha256?: string; // recomputed hash for verification
+  multiSignerThresholdMet?: boolean; // >=2 signers present
+  hashChainValid?: boolean; // all entry hashes concatenated hash matches bundleSha256
+  thresholdRequired?: number; // policy threshold (default 2)
   };
   // Task 12: Algorithm agility registry artifact
   algorithmAgility?: {
