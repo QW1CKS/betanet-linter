@@ -355,12 +355,13 @@ The following additional items were identified as still incomplete for a strictl
 20. [x] Mix Diversity Variance & Entropy Metrics
   - Implemented: Extended mix evidence schema with pathLengthMean, pathLengthStdErr, pathLengthCI95Width, varianceMetricsComputed, entropyConfidence. Harness computes mean/stddev/stdErr/CI width + entropy confidence heuristic (sample-size based). Check 17 now enforces variance sanity (non-zero & ≤1.5x mean; CI width ≤ max(2, 1.2x mean)) and entropy confidence ≥0.5 when provided, in addition to existing uniqueness, entropy (≥4 bits), reuse threshold, diversity, AS/Org, VRF proof validity, and aggregated beacon entropy checks. Details string surfaces plStd, ci95W, entConf.
   - Caveats: Variance thresholds heuristic; no bootstrap resampling yet; entropyConfidence is a simple monotonic function of sample count (not true statistical CI); future upgrade may add explicit failure codes (VARIANCE_EXCESS, ENTROPY_CONFIDENCE_LOW) instead of reason strings and integrate configurable policy parameters.
-21. [ ] Lint & Type Hygiene Hardening
-  - Added ESLint config (`.eslintrc.cjs`) with TS recommended rules; baseline explicit `any` surfaced as warnings (inventory phase). Future pass to escalate to errors post Tasks 22–25 when schema stabilizes.
-  - Added scripts: `lint` (report) & `lint:strict` (0‑warning gate). TS compiler already strict.
-  - Converted representative broad `catch (e: any)` to `unknown` in `safe-exec.ts`, `analyzer.ts`, `harness.ts` (governance parser already narrow) improving safety while preserving enriched error metadata via local casts.
-  - Retained intentional dynamic `any` only in heterogeneous evidence aggregation hot spots (forward‑compatible). Plan: migrate to discriminated unions & refined interfaces after authenticity/calibration expansion; then enable no‑explicit‑any=error.
-  - Caveats: Not all legacy anys removed to avoid churn pre Tasks 22–25; CI ratchet to shrink allowed zones incrementally.
+21. [x] Lint & Type Hygiene Hardening
+  - Escalated ESLint configuration: added `recommended-requiring-type-checking`, promoted `no-explicit-any`, `explicit-module-boundary-types`, `no-unused-vars`, `consistent-type-imports`, `ban-types`, promise safety (`no-floating-promises`, `no-misused-promises`) and `no-console` to errors.
+  - Introduced transitional override allow‑list (dynamic interoperability zones) limited to a handful of files (`index.ts`, `analyzer.ts`, `safe-exec.ts`, `static-parsers.ts`, `sbom.ts`, `sbom-validators.ts`) with intent to eliminate post schema refinement.
+  - Added `lint:report` script generating structured JSON (`scripts/lint-report.js`) for CI artifact & future trend gating (captures per-file message inventory, totals, metadata).
+  - Zero‑warning gate via `lint:strict` retained; quality gates can incorporate lint JSON later (future minor enhancement).
+  - Any usage now prohibited outside allow‑list; future tasks will replace remaining dynamic surfaces with discriminated unions before removing overrides entirely.
+  - Outcome: Type hygiene violations now fail CI early; provides machine‑readable lint report enabling longitudinal reduction of override zone.
 
 Essential Final Polish (Post 21 Gap Tasks)
 ------------------------------------------

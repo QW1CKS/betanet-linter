@@ -665,9 +665,26 @@ npm test
 
 ### Linting
 
+Task 21 hardened lint & type hygiene: strict TS + ESLint (type-aware) with errors on explicit `any`, unused vars, floating promises, implicit boundary types, unsafe console usage (warn/error only). A narrow transitional allow‑list keeps dynamic interoperability zones until schema refinement removes them.
+
+Commands:
 ```bash
-npm run lint
+npm run lint          # run ESLint (errors fail)
+npm run lint:strict   # enforce zero warnings (CI gate)
+npm run lint:report   # emits lint-report.json (machine-readable)
 ```
+
+Example lint-report.json structure:
+```json
+{
+  "meta": { "generatedAt": "2025-08-14T12:00:00.000Z", "gitSha": "<sha>", "node": "v20.x" },
+  "totals": { "errorCount": 0, "warningCount": 2, "fixableErrorCount": 0, "fixableWarningCount": 1 },
+  "files": [
+    { "filePath": "src/example.ts", "errorCount": 0, "warningCount": 1, "messages": [ { "ruleId": "@typescript-eslint/no-explicit-any", "severity": 1, "line": 10, "column": 5, "message": "Unexpected any." } ] }
+  ]
+}
+```
+CI can consume this artifact for longitudinal tracking (future enhancement: gate on shrinking override zone & total warnings).
 
 ## Contributing
 
