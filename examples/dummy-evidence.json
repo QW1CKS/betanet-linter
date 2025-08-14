@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 2,
+  "bootstrap": {
+    "rotationEpochs": 3,
+    "beaconSetEntropySources": 3,
+    "deterministicSeedDetected": false
+  },
+  "provenance": {
+    "builderId": "https://builder.example/betanet",
+    "predicateType": "slsa-provenance",
+    "materialsValidated": true,
+    "materialsMismatchCount": 0,
+    "reproducible": true,
+    "subjects": [
+      {
+        "name": "dummy-betanet-compliant",
+        "digest": {
+          "sha256": "<REPLACE_WITH_BINARY_SHA256>"
+        }
+      }
+    ]
+  },
+  "voucherCrypto": {
+    "signatureValid": true,
+    "frostThreshold": { "n": 5, "t": 3 }
+  },
+  "rateLimit": {
+    "buckets": [
+      { "name": "global", "capacity": 1000, "intervalMs": 60000 },
+      { "name": "session", "capacity": 100, "intervalMs": 60000 }
+    ]
+  },
+  "powAdaptive": {
+    "difficultySamples": [22, 22, 23, 22],
+    "targetBits": 22,
+    "monotonicTrend": true
+  },
+  "governance": {
+    "asDiversity": 0.45,
+    "windowShare": 0.18,
+    "deltaShare": 0.07,
+    "avgTop3": 0.41,
+    "volatility": 0.11,
+    "partitionRisk": 0.02
+  },
+  "ledger": {
+    "quorumCertificates": 5,
+    "emergencyAdvanceAllowed": false,
+    "consensusType": "2-of-3",
+    "chainValidated": true
+  },
+  "mix": {
+    "uniqueness": 0.85,
+    "diversityIndex": 0.5,
+    "hopDepthMean": 3,
+    "entropyBits": 5,
+    "pathLengthStddev": 1.2
+  },
+  "h2Adaptive": {
+    "mean": 120,
+    "p95": 300,
+    "stddev": 40,
+    "randomnessOk": true
+  },
+  "h3Adaptive": {
+    "mean": 130,
+    "p95": 310,
+    "stddev": 42,
+    "randomnessOk": true
+  },
+  "fallback": {
+    "retryDelayMs": 10,
+    "udpTimeoutMs": 300,
+    "coverConnections": 3,
+    "stddev": 200,
+    "cv": 0.9,
+    "modelScore": 0.8,
+    "anomalies": 0
+  },
+  "jitter": {
+    "stddev": 55,
+    "mean": 200,
+    "pValue": 0.12
+  },
+  "algorithmAgility": {
+    "allowedSets": ["chacha20-poly1305", "x25519-kyber768"] ,
+    "usedSets": ["chacha20-poly1305"],
+    "unregisteredUsed": []
+  },
+  "negative": {
+    "forbiddenPresent": []
+  },
+  "accessTicket": {
+    "detected": true,
+    "fieldsPresent": ["ticket", "nonce", "exp", "sig"],
+    "rotationTokenPresent": true,
+    "paddingVariety": 3,
+    "rateLimitTokensPresent": true,
+    "structConfidence": 0.8
+  },
+  "voucherCryptoExtended": {
+    "aggregatedSignatureValid": true,
+    "participantKeys": 5
+  }
+}

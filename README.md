@@ -8,6 +8,8 @@
 > ```bash
 > git clone <repository-url>
 > cd betanet-linter
+> rm -rf node_modules package-lock.json
+> npm cache verify
 > npm install
 > npm run build
 > npm link
@@ -31,6 +33,14 @@
 > betanet-lint check .\dummy-betanet-compliant.exe --sbom --format cyclonedx-json --output json | Tee-Object dummy-compliance.json
 > ```
 > Explanation: the C file embeds all keyword tokens used by the heuristic/static checks (transport endpoints, TLS 1.3, QUIC, ECH, access ticket rotation, ChaCha20/Poly1305, SCION/path, deterministic DHT seed, alias ledger + 2of3 consensus, Cashu + Lightning, reproducible build/provenance markers, X25519/Kyber). This allows validating the linter itself without a real Betanet implementation. Use `--allow-heuristic` if you want heuristic-only passes counted where applicable.
+>
+> To simulate a near full pass (artifact / dynamic style) without a real node, edit `examples/dummy-evidence.json` and replace `<REPLACE_WITH_BINARY_SHA256>` with the SHA256 of the compiled dummy binary, then run:
+> ```bash
+> sha256sum dummy-betanet-compliant | cut -d' ' -f1
+> # copy hash into examples/dummy-evidence.json
+> betanet-lint check ./dummy-betanet-compliant --evidence-file examples/dummy-evidence.json --allow-heuristic --sbom --format cyclonedx-json --output json | tee dummy-compliance-evidence.json
+> ```
+> (This supplies artifact-style evidence objects so most checks upgrade beyond heuristic; intended purely for harness validation.)
 
 A CLI tool enumerating Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) with a blend of heuristic, static‑structural, dynamic (captured / simulated), and artifact evidence. The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
 
