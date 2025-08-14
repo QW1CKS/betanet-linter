@@ -22,8 +22,6 @@
 > sudo rm -rf /usr/local/bin/betanet-lint
 >```
 
-<!-- Dummy quick test fixture section removed per user request -->
-
 A CLI tool enumerating Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) with a blend of heuristic, static‑structural, dynamic (captured / simulated), and artifact evidence. The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
 
 > **Flag Naming:**
