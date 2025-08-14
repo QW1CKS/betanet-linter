@@ -2073,6 +2073,13 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const bundleThresholdMet = bundle?.multiSignerThresholdMet === true;
       const anyAuth = detachedValid || bundleThresholdMet;
       const failureCodes: string[] = [];
+      // Task 26: detect canonical JSON mismatch (recompute canonical digest and compare)
+      if (provenance.canonicalDigest && (analyzer as any).canonicalize) {
+        try {
+          const recomputed = (analyzer as any).canonicalize(ev).digest;
+            if (recomputed !== provenance.canonicalDigest) failureCodes.push('CANONICAL_JSON_MISMATCH');
+        } catch {/* ignore */}
+      }
       if (!anyAuth) {
         if (strictAuth) {
           if (bundlePresent) {
@@ -2088,6 +2095,10 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
         } else {
           failureCodes.push('EVIDENCE_UNSIGNED');
         }
+      }
+      // Unsupported format if signatureAlgorithm present & not recognized
+      if (provenance.signatureAlgorithm && !['ed25519'].includes(provenance.signatureAlgorithm)) {
+        failureCodes.push('SIGNATURE_FORMAT_UNSUPPORTED');
       }
       const evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
       let details: string;

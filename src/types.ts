@@ -177,6 +177,8 @@ export interface AnalyzerDiagnostics {
   networkAllowed?: boolean; // whether network operations permitted (Phase 6)
   networkOps?: { url: string; method: string; durationMs: number; status?: number; error?: string; blocked?: boolean }[]; // recorded network attempts
   evidenceSignatureValid?: boolean; // Phase 7: detached evidence signature verification result
+  signatureCacheHits?: number; // Task 26: count of signature verification cache hits
+  signatureCacheMisses?: number; // Task 26: count of cache misses
 }
 
 export interface CheckOptions {
@@ -234,6 +236,8 @@ export interface IngestedEvidence {
   signatureError?: string; // capture signature verification error reason
   signatureAlgorithm?: string; // e.g., 'ed25519'
   signaturePublicKeyFingerprint?: string; // sha256 fingerprint of verifying public key
+  canonicalDigest?: string; // Task 26: canonical JSON digest (stable ordering + NFC)
+  canonicalizationMode?: string; // Task 26: description of canonicalization strategy used
   dsseEnvelopeVerified?: boolean; // Phase 7: DSSE envelope signature(s) verified
   dsseSignerCount?: number; // Phase 7: number of DSSE signers validated
   dsseVerifiedSignerCount?: number; // Count of signatures that cryptographically verified

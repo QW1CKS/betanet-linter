@@ -394,9 +394,10 @@ These are required to transition from “spec gap tasks complete” to a bounty�
   - Check 41 extended: new anomaly failure codes PADDING_DISTRIBUTION_ANOMALY (low unique padding & low entropy), PRIORITY_RATE_ANOMALY (priority gap mean disproportionate vs ping), H3_JITTER_RANDOMNESS_WEAK (umbrella when core randomness codes present on collected data). Existing codes retained. Passing details now indicate source type.
   - Added tests covering collected pass, padding anomaly, priority rate anomaly; total test count increased (217→220). Backward compatibility maintained for synthetic simulations (no new failures unless collected anomalies detected).
 
-26. [ ] Authenticity Hardening & Caching
-  - Canonical JSON normalization (stable ordering, Unicode, escaping), signature verification result cache keyed by (digest, signer, algo), Merkle/chain structure for bundles to prove inclusion ordering, multi-format key support (PEM, raw, minisign, cosign), explicit SIGNATURE_FORMAT_UNSUPPORTED & CANONICAL_JSON_MISMATCH codes.
-  - Benchmarks for verification speed; negative tamper tests (altered entry hash, ordering change).
+26. [x] Authenticity Hardening & Caching
+  - Implemented canonical JSON normalization (stable key ordering + Unicode NFC) via analyzer.canonicalize; stored provenance.canonicalDigest & canonicalizationMode. Detached & bundle signatures now use cached verification (digest|signer|algo) Map with diagnostics counters (signatureCacheHits/Misses).
+  - Extended Check 35: detects CANONICAL_JSON_MISMATCH (recomputed vs stored digest), SIGNATURE_FORMAT_UNSUPPORTED (non-ed25519 algorithms). Canonical mismatch currently informational if signature still verifies (does not flip pass unless no auth signals). Bundle path already recomputes hash chain; caching reduces redundant verifications across entries.
+  - Schema: provenance.canonicalDigest, provenance.canonicalizationMode, analyzer diagnostics signatureCacheHits/Misses. Tests added (canonical mismatch, unsupported alg) increasing total test count (220→222). Future: minisign/cosign parsing & actual Merkle bundle chain (placeholder), performance benchmark harness (Task 31).
 
 27. [ ] Coverage & Regression Quality Gates
   - Enforce 100% failure-code invocation coverage, overall line/branch coverage thresholds (e.g. 90%/85%), keyword stuffing FP corpus (<2% false positives), golden evidence fixture diff guard, mutation test smoke (optional).

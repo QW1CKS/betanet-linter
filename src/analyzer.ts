@@ -34,11 +34,54 @@ export class BinaryAnalyzer {
   private networkOps: { url: string; method: string; durationMs: number; status?: number; error?: string; blocked?: boolean }[] = [];
   private networkAllowlist: string[] | null = null; // host allowlist when network enabled
   private userAgent: string = 'betanet-linter/1.x';
+  // Task 26: signature verification cache (digest|signer|algo -> boolean)
+  private signatureVerifyCache: Map<string, boolean> = new Map();
 
   constructor(binaryPath: string, verbose: boolean = false) {
     this.binaryPath = binaryPath;
     this.verbose = verbose;
   this.toolsReady = this.detectTools();
+  }
+
+  // Task 26: canonical JSON normalization (stable key ordering, UTF-8 NFC normalization)
+  canonicalize(obj: any): { json: string; digest: string } {
+    const normalizeUnicode = (s: string) => s.normalize('NFC');
+    const stableStringify = (value: any): string => {
+      if (value === null || typeof value !== 'object') {
+        if (typeof value === 'string') return JSON.stringify(normalizeUnicode(value));
+        return JSON.stringify(value);
+      }
+      if (Array.isArray(value)) {
+        return '[' + value.map(v => stableStringify(v)).join(',') + ']';
+      }
+      const keys = Object.keys(value).sort();
+      return '{' + keys.map(k => JSON.stringify(normalizeUnicode(k)) + ':' + stableStringify(value[k])).join(',') + '}';
+    };
+    const json = stableStringify(obj);
+    const digest = crypto.createHash('sha256').update(json).digest('hex');
+    return { json, digest };
+  }
+
+  // Task 26: verify signature with cache support
+  verifySignatureCached(algo: string, signer: string, canonicalJson: string, signatureB64: string, publicKey: Buffer): boolean {
+    const digest = crypto.createHash('sha256').update(canonicalJson).digest('hex');
+    const cacheKey = `${algo}|${signer}|${digest}`;
+    if (this.signatureVerifyCache.has(cacheKey)) {
+      this.diagnostics.signatureCacheHits = (this.diagnostics.signatureCacheHits||0)+1;
+      return this.signatureVerifyCache.get(cacheKey)!;
+    }
+    this.diagnostics.signatureCacheMisses = (this.diagnostics.signatureCacheMisses||0)+1;
+    let valid = false;
+    try {
+      if (algo === 'ed25519') {
+        valid = crypto.verify(null, Buffer.from(canonicalJson), { key: publicKey, format: 'der', type: 'spki' }, Buffer.from(signatureB64,'base64'));
+      } else {
+        // unsupported algorithms flagged later by check
+        valid = false;
+      }
+    } catch { valid = false; }
+    this.signatureVerifyCache.set(cacheKey, valid);
+    return valid;
   }
 
   // Phase 6: allow external enabling of network usage

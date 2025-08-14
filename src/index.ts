@@ -134,12 +134,13 @@ export class BetanetComplianceChecker {
             } else {
               throw new Error('Unsupported public key format');
             }
-            // Canonical JSON: stable stringify (keys sorted)
-            const canonical = JSON.stringify(evidence, Object.keys(evidence).sort());
+            // Canonical JSON (Task 26): stable ordering + Unicode normalization via analyzer.canonicalize
+            const canon = (this._analyzer as any).canonicalize ? (this._analyzer as any).canonicalize(evidence) : { json: JSON.stringify(evidence, Object.keys(evidence).sort()), digest: crypto.createHash('sha256').update(JSON.stringify(evidence)).digest('hex') };
+            const canonical = canon.json;
             let valid = false;
             try {
               // Attempt ed25519 verification via Node 18+ crypto.verify first (SPKI DER)
-              try { valid = crypto.verify(null, Buffer.from(canonical), { key: pubKey, format: 'der', type: 'spki' }, signature); } catch { valid = false; }
+              try { valid = (this._analyzer as any).verifySignatureCached?.('ed25519', 'detached-evidence', canonical, sigB64, pubKey); } catch { valid = false; }
               // Fallback: if noble ed25519 available and raw 32-byte public key (not DER) attempt verification
             } catch {
               // Fallback: try sodium-style 32B key (ed25519) via subtle if available
@@ -151,10 +152,14 @@ export class BetanetComplianceChecker {
               evidence.provenance.signatureVerified = true;
               evidence.provenance.signatureAlgorithm = 'ed25519';
               evidence.provenance.signaturePublicKeyFingerprint = crypto.createHash('sha256').update(pubKey).digest('hex').slice(0,32);
+              evidence.provenance.canonicalDigest = canon.digest;
+              evidence.provenance.canonicalizationMode = 'stable-key-order-nfc';
             } else {
               evidence.provenance = evidence.provenance || {};
               evidence.provenance.signatureVerified = false;
               evidence.provenance.signatureError = 'invalid-signature';
+              evidence.provenance.canonicalDigest = canon.digest;
+              evidence.provenance.canonicalizationMode = 'stable-key-order-nfc';
             }
           } catch (sigErr: any) {
             (this._analyzer as any).diagnostics = (this._analyzer as any).diagnostics || {};
@@ -228,15 +233,16 @@ export class BetanetComplianceChecker {
                   const pk = entry.publicKey;
                   const signer = entry.signer || 'unknown';
                   if (!evPart || !sigB64 || !pk) continue;
-                  const canonical = JSON.stringify(evPart, Object.keys(evPart).sort());
-                  const hash = crypto.createHash('sha256').update(canonical).digest('hex');
+                  const canon = this._analyzer.canonicalize ? this._analyzer.canonicalize(evPart) : { json: JSON.stringify(evPart), digest: crypto.createHash('sha256').update(JSON.stringify(evPart)).digest('hex') };
+                  const canonical = canon.json;
+                  const hash = canon.digest;
                   let pkBuf: Buffer;
                   if (/BEGIN PUBLIC KEY/.test(pk)) {
                     const body = pk.replace(/-----BEGIN PUBLIC KEY-----/,'').replace(/-----END PUBLIC KEY-----/,'').replace(/\s+/g,'');
                     pkBuf = Buffer.from(body, 'base64');
                   } else { pkBuf = Buffer.from(pk, 'base64'); }
                   let valid = false;
-                  try { valid = crypto.verify(null, Buffer.from(canonical), { key: pkBuf, format: 'der', type: 'spki' }, Buffer.from(sigB64,'base64')); } catch { valid = false; }
+                  try { valid = (this._analyzer as any).verifySignatureCached?.('ed25519', signer, canonical, sigB64, pkBuf); } catch { valid = false; }
                   entries.push({ canonicalSha256: hash, signatureValid: valid, signer });
                   concatHashes.push(hash);
                 } catch {/* per entry */}
