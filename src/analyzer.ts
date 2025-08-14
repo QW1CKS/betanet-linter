@@ -74,7 +74,13 @@ export class BinaryAnalyzer {
     let valid = false;
     try {
       if (algo === 'ed25519') {
-        valid = crypto.verify(null, Buffer.from(canonicalJson), { key: publicKey, format: 'der', type: 'spki' }, Buffer.from(signatureB64,'base64'));
+        let keyForVerify = publicKey;
+        if (publicKey.length === 32) {
+          // Wrap raw 32-byte Ed25519 key into SPKI DER (RFC 8410)
+          const prefix = Buffer.from('302a300506032b6570032100','hex');
+          keyForVerify = Buffer.concat([prefix, publicKey]);
+        }
+        valid = crypto.verify(null, Buffer.from(canonicalJson), { key: keyForVerify, format: 'der', type: 'spki' }, Buffer.from(signatureB64,'base64'));
       } else {
         // unsupported algorithms flagged later by check
         valid = false;

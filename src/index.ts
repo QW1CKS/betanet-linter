@@ -140,8 +140,43 @@ export class BetanetComplianceChecker {
             let valid = false;
             try {
               // Attempt ed25519 verification via Node 18+ crypto.verify first (SPKI DER)
-              try { valid = (this._analyzer as any).verifySignatureCached?.('ed25519', 'detached-evidence', canonical, sigB64, pubKey); } catch { valid = false; }
+              try {
+                // If raw 32-byte key, wrap into minimal SPKI DER for Node verify
+                let keyForVerify = pubKey;
+                if (pubKey.length === 32) {
+                  // Ed25519 public key SPKI DER prefix (from RFC 8410) = 12 bytes header + 32 bytes key
+                  const prefix = Buffer.from('302a300506032b6570032100','hex');
+                  keyForVerify = Buffer.concat([prefix, pubKey]);
+                }
+                valid = (this._analyzer as any).verifySignatureCached?.('ed25519', 'detached-evidence', canonical, sigB64, keyForVerify);
+              } catch { valid = false; }
               // Fallback: if noble ed25519 available and raw 32-byte public key (not DER) attempt verification
+              // If initial verification failed, attempt fallback over original parsed JSON structure
+              if (!valid) {
+                try {
+                  // Reconstruct canonical form of the original parsed JSON (prior to normalization into evidence shape)
+                  // This addresses cases where the detached signature was produced over the raw provenance object
+                  // rather than the transformed internal evidence representation.
+                  // 'parsed' is still in lexical scope from evidence ingestion above.
+                  const originalParsed: any = parsed; // may be undefined if parsing failed earlier
+                  if (originalParsed && typeof originalParsed === 'object') {
+                    const canonOrig = (this._analyzer as any).canonicalize ? (this._analyzer as any).canonicalize(originalParsed) : { json: JSON.stringify(originalParsed, Object.keys(originalParsed).sort()), digest: crypto.createHash('sha256').update(JSON.stringify(originalParsed)).digest('hex') };
+                    const canonicalOrig = canonOrig.json;
+                    try {
+                      let keyForVerify = pubKey;
+                      if (pubKey.length === 32) {
+                        const prefix = Buffer.from('302a300506032b6570032100','hex');
+                        keyForVerify = Buffer.concat([prefix, pubKey]);
+                      }
+                      valid = (this._analyzer as any).verifySignatureCached?.('ed25519', 'detached-evidence', canonicalOrig, sigB64, keyForVerify);
+                    } catch { valid = false; }
+                    if (valid) {
+                      // Overwrite canon reference so downstream provenance records canonicalDigest of the successfully verified form
+                      (canon as any).json = canonicalOrig; (canon as any).digest = canonOrig.digest;
+                    }
+                  }
+                } catch { /* ignore fallback */ }
+              }
             } catch {
               // Fallback: try sodium-style 32B key (ed25519) via subtle if available
             }
