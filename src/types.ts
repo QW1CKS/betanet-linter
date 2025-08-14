@@ -43,6 +43,23 @@ export interface Evidence {
     pqDateOk?: boolean;
     withinPolicy?: boolean;
   };
+  // Full dynamic Noise transcript evidence (Task 3)
+  // Enriched Noise transcript (Task 3 full schema)
+  noiseTranscript?: {
+    messages?: {
+      type: string; // e, ee, s, es, rekey, data
+      nonce?: number; // per-message nonce (resets after rekey)
+      direction?: '->' | '<-'; // optional direction for future validation
+      bytes?: number; // payload size contributing to byte trigger
+      ts?: number; // relative timestamp ms from start
+      keyEpoch?: number; // explicit epoch index (0-based)
+    }[];
+    rekeysObserved?: number; // convenience (can be derived from messages/rekeyEvents)
+    rekeyTriggers?: { bytes?: number; timeMinSec?: number; frames?: number };
+    rekeyEvents?: { atMessage?: number; trigger?: 'bytes' | 'time' | 'frames'; bytes?: number; frames?: number; timeMinSec?: number }[];
+    transcriptHash?: string; // sha256 over canonical message summary
+    pqDateOk?: boolean;
+  };
   scionControl?: {
     offers?: { path: string; latencyMs?: number; expiresAt?: string }[];
     rawCborB64?: string; // original CBOR for auditing

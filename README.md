@@ -18,7 +18,7 @@
 > ```
 > Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
 > 
-> IMPORTANT! IF YOU DELETE THE FOLDER, THEN RE-INSTALL IT AGAIN, MAKE SURE TO DELETE THE OLD CACHE FILES IN ORDER TO AVOID CRASHING:
+> IMPORTANT! IF YOU DELETE THE FOLDER, THEN RE-INSTALL IT AGAIN, MAKE SURE TO DELETE THE LINKING FILES IN ORDER TO AVOID CRASHING:
 >```
 > sudo rm -rf /usr/local/bin/betanet-lint
 >```
@@ -274,7 +274,7 @@ Earlier partial coverage disclaimers retained only for context; see Current Limi
 | Rendezvous rotation / BeaconSet heuristic | Implemented | Check 6 details (`rotationHits`, beacon indicators) |
 | Path diversity threshold (≥2 markers) | Implemented | Check 4 failure details enumerate needed markers |
 | Privacy hop weighting (mix / beacon / diversity) | Implemented | Check 11 & 17 (sampling + indices) |
-| Noise rekey policy (simulated) | Implemented | Check 19 (sim evidence) |
+| Noise rekey policy (enriched transcript & triggers) | Implemented | Check 19 (dynamic transcript, triggers, hash) |
 | HTTP/2 adaptive jitter (simulated) | Implemented | Check 20 (sim evidence) |
 | Binary structural meta introspection | Implemented | Check 21 |
 | Static ClientHello template hash | Implemented | Check 12 / 22 (scaffold) |

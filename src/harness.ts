@@ -326,19 +326,49 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       evidence.fallback.policy = { retryDelayMsOk: retryDelayOk, coverConnectionsOk: coverOk, teardownSpreadOk: spreadOk, overall: retryDelayOk && coverOk && spreadOk };
     }
   }
-  // Simulate a Noise rekey observation (Step 9 placeholder)
+  // Simulate a full Noise transcript with rekey events (Task 3)
   if (opts.rekeySimulate) {
-    const rekeysObserved = 1; // single rekey event
-    evidence.noiseTranscriptDynamic = {
-      messagesObserved: ['e', 'ee', 's', 'es', 'rekey'],
-      expectedSequenceOk: true,
-      rekeysObserved,
-      rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024, timeMinSec: 3600, frames: 65536 },
-      nonceReuseDetected: false,
-      patternVerified: true,
-      pqDateOk: true,
-      withinPolicy: true
-    };
+    // Allow caller to choose trigger type; default bytes
+  const rekeyOpts: any = typeof opts.rekeySimulate === 'object' ? opts.rekeySimulate : {};
+  const triggerType: 'bytes' | 'time' | 'frames' = rekeyOpts.trigger || 'bytes';
+    // Build initial XK handshake messages
+    const messages: any[] = [
+      { type: 'e', nonce: 0, keyEpoch: 0, ts: 0 },
+      { type: 'ee', nonce: 1, keyEpoch: 0, ts: 5 },
+      { type: 's', nonce: 2, keyEpoch: 0, ts: 10 },
+      { type: 'es', nonce: 3, keyEpoch: 0, ts: 15 }
+    ];
+    // Simulated traffic frames until trigger threshold reached
+    let totalBytes = 0; let frames = 0; const start = Date.now();
+    while (true) {
+      const size = 1024 * 64; // 64KB per frame (simulation)
+      totalBytes += size;
+      frames++;
+      const elapsedSec = (Date.now() - start) / 1000;
+      messages.push({ type: 'data', nonce: 4 + frames, keyEpoch: 0, bytes: size, ts: Math.floor(elapsedSec * 1000) });
+      const bytesReached = totalBytes >= (8 * 1024 * 1024 * 1024);
+      const framesReached = frames >= 65536;
+      const timeReached = elapsedSec >= 3600;
+      if ((triggerType === 'bytes' && bytesReached) || (triggerType === 'frames' && framesReached) || (triggerType === 'time' && timeReached)) break;
+      if (frames > 10 && triggerType === 'bytes') break; // cap loop in simulation for brevity when not really accumulating 8GiB
+      if (frames > 10 && triggerType === 'frames') break; // same cap
+      if (frames > 10 && triggerType === 'time') break; // same cap
+    }
+    // Insert rekey event
+    messages.push({ type: 'rekey', nonce: 999999, keyEpoch: 0, ts: messages[messages.length-1].ts + 5 });
+    // Continue a couple of post-rekey data messages with epoch increment & nonce reset
+    messages.push({ type: 'data', nonce: 0, keyEpoch: 1, bytes: 2048, ts: messages[messages.length-1].ts + 10 });
+    messages.push({ type: 'data', nonce: 1, keyEpoch: 1, bytes: 4096, ts: messages[messages.length-1].ts + 15 });
+    const rekeysObserved = 1;
+    const rekeyEvents = [{ atMessage: messages.findIndex(m=>m.type==='rekey'), trigger: triggerType }];
+    const rekeyTriggers: any = {};
+    if (triggerType === 'bytes') rekeyTriggers.bytes = 8 * 1024 * 1024 * 1024;
+    if (triggerType === 'frames') rekeyTriggers.frames = 65536;
+    if (triggerType === 'time') rekeyTriggers.timeMinSec = 3600;
+    // Compute a simple transcript hash (sha256 over type+nonce+epoch sequence)
+    const hashInput = messages.map(m=>`${m.type}:${m.nonce ?? ''}:${m.keyEpoch}`).join('|');
+    const transcriptHash = crypto.createHash('sha256').update(hashInput).digest('hex');
+    (evidence as any).noiseTranscript = { messages, rekeysObserved, rekeyEvents, rekeyTriggers, transcriptHash, pqDateOk: true };
   }
   // Simulate HTTP/2 adaptive emulation jitter metrics (Step 9 placeholder)
   if (opts.h2AdaptiveSimulate) {

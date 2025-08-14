@@ -37,8 +37,10 @@ describe('harness skeleton', () => {
   const out = path.join(__dirname, 'harness-output3.json');
   await runHarness(tmpBin, out, { rekeySimulate: true, h2AdaptiveSimulate: true, jitterSamples: 10 });
   const data = JSON.parse(await fs.readFile(out, 'utf8'));
-  expect(data.noiseTranscriptDynamic).toBeDefined();
-  expect(data.noiseTranscriptDynamic.rekeysObserved).toBeGreaterThanOrEqual(1);
+  // Updated schema: noiseTranscript replaces legacy noiseTranscriptDynamic
+  expect(data.noiseTranscript || data.noiseTranscriptDynamic).toBeDefined();
+  const nt = data.noiseTranscript || data.noiseTranscriptDynamic;
+  expect(nt.rekeysObserved).toBeGreaterThanOrEqual(1);
   expect(data.h2Adaptive).toBeDefined();
   expect(data.h2Adaptive.sampleCount).toBeGreaterThanOrEqual(5);
   await fs.remove(tmpBin); await fs.remove(out);

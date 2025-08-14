@@ -115,23 +115,26 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       } as any;
     }
 
-    it('passes with correct XK prefix, one rekey, large byte trigger', async () => {
+  it('passes with correct XK prefix, one rekey, large byte trigger', async () => {
       const noise = {
         messages: [
-          { type: 'e', nonce: 0 },
-          { type: 'ee', nonce: 1 },
-            { type: 's', nonce: 2 },
-          { type: 'es', nonce: 3 },
-          { type: 'rekey', nonce: 4 }
+          { type: 'e', nonce: 0, keyEpoch: 0 },
+          { type: 'ee', nonce: 1, keyEpoch: 0 },
+          { type: 's', nonce: 2, keyEpoch: 0 },
+          { type: 'es', nonce: 3, keyEpoch: 0 },
+          { type: 'rekey', nonce: 999999, keyEpoch: 0 },
+          { type: 'data', nonce: 0, keyEpoch: 1 },
+          { type: 'data', nonce: 1, keyEpoch: 1 }
         ],
         rekeysObserved: 1,
         rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024 },
+        transcriptHash: 'abc123',
         pqDateOk: true
       };
       const result = await runWithAnalyzer(analyzerForNoise(noise));
       const check19 = result.checks.find(c => c.id === 19)!;
-      expect(check19.passed).toBe(true);
-      expect(check19.details).toMatch(/Noise transcript ok/);
+  expect(check19.passed).toBe(true);
+  expect(check19.details).toMatch(/Noise transcript ok/);
     });
 
     it('fails with NO_REKEY when no rekey events observed', async () => {
@@ -175,7 +178,7 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
 
     it('fails with REKEY_TRIGGER_INVALID when rekey but trigger thresholds unmet', async () => {
       const noise = {
-        messages: [ { type: 'e', nonce: 0 }, { type: 'ee', nonce: 1 }, { type: 's', nonce: 2 }, { type: 'es', nonce: 3 }, { type: 'rekey', nonce: 4 } ],
+        messages: [ { type: 'e', nonce: 0, keyEpoch:0 }, { type: 'ee', nonce: 1, keyEpoch:0 }, { type: 's', nonce: 2, keyEpoch:0 }, { type: 'es', nonce: 3, keyEpoch:0 }, { type: 'rekey', nonce: 4, keyEpoch:0 } ],
         rekeysObserved: 1,
         rekeyTriggers: { bytes: 1024 }, // too small
         pqDateOk: true
@@ -184,6 +187,19 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       const check19 = result.checks.find(c => c.id === 19)!;
       expect(check19.passed).toBe(false);
       expect(check19.details).toMatch(/REKEY_TRIGGER_INVALID/);
+    });
+    
+    it('fails with TRANSCRIPT_HASH_MISSING when messages present but no hash', async () => {
+      const noise = {
+        messages: [ { type: 'e', nonce: 0, keyEpoch:0 }, { type: 'ee', nonce: 1, keyEpoch:0 }, { type: 's', nonce: 2, keyEpoch:0 }, { type: 'es', nonce: 3, keyEpoch:0 }, { type: 'rekey', nonce: 4, keyEpoch:0 } ],
+        rekeysObserved: 1,
+        rekeyTriggers: { bytes: 8 * 1024 * 1024 * 1024 },
+        pqDateOk: true
+      };
+      const result = await runWithAnalyzer(analyzerForNoise(noise));
+      const check19 = result.checks.find(c => c.id === 19)!;
+      expect(check19.passed).toBe(false);
+      expect(check19.details).toMatch(/TRANSCRIPT_HASH_MISSING/);
     });
   });
 
