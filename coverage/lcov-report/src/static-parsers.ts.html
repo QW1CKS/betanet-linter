@@ -1,0 +1,721 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for src/static-parsers.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">src</a> static-parsers.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">81.81% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>99/121</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">52.85% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>37/70</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>16/16</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">82.1% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>78/95</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">203x</span>
+<span class="cline-any cline-yes">203x</span>
+<span class="cline-any cline-yes">203x</span>
+<span class="cline-any cline-yes">204x</span>
+<span class="cline-any cline-yes">1020x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">203x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">17x</span>
+<span class="cline-any cline-yes">323x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">204x</span>
+<span class="cline-any cline-yes">204x</span>
+<span class="cline-any cline-yes">204x</span>
+<span class="cline-any cline-yes">148x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">56x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">55x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">203x</span>
+<span class="cline-any cline-yes">205x</span>
+<span class="cline-any cline-yes">609x</span>
+<span class="cline-any cline-yes">203x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-yes">15x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">16x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">1616x</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">9x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">12x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">202x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Static structural parsers (Phase 1 / Step 4 groundwork)
+// Lightweight pattern extraction from already-extracted strings.
+// Future enhancements will operate on binary sections / parsed protocol templates.
+&nbsp;
+import * as crypto from 'crypto';
+&nbsp;
+export interface ClientHelloStatic {
+  alpn: string[];
+  extOrderSha256?: string; // stable hash over detected extension ordering placeholder
+  detected: boolean;
+  extensions?: number[]; // ordered list of recognized TLS extension numeric codes
+  extensionNames?: string[]; // parallel human-friendly names
+}
+&nbsp;
+export interface NoiseStatic {
+  pattern?: string; // e.g. XK, XX
+  messageCount?: number; // placeholder (future real derivation)
+  detected: boolean;
+}
+&nbsp;
+export interface VoucherStatic {
+  structLikely: boolean;
+  tokenHits: string[];
+  proximityBytes?: number; // span between first and last token occurrence in binary
+}
+&nbsp;
+export interface StaticPatterns {
+  clientHello?: ClientHelloStatic;
+  noise?: NoiseStatic;
+  voucher?: VoucherStatic;
+  accessTicket?: AccessTicketStatic;
+  voucherCrypto?: VoucherCryptoStatic;
+}
+&nbsp;
+export interface AccessTicketStatic {
+  detected: boolean;
+  fieldsPresent: string[]; // e.g., nonce, exp, sig, pad
+  hex16Count?: number;
+  hex32Count?: number;
+  structConfidence?: number; // 0..1 heuristic confidence
+  rotationTokenPresent?: boolean; // presence of rotation related token for policy check
+  paddingLengths?: number[]; // discovered numeric padding indicators
+  paddingVariety?: number; // unique count
+  rateLimitTokensPresent?: boolean; // presence of rate-limit tokens
+}
+&nbsp;
+export interface VoucherCryptoStatic {
+  structLikely: boolean; // from voucher struct
+  keysetIdB64?: string; // 44 char base64 (32 bytes)
+  secretB64?: string;   // 44 char base64 (32 bytes)
+  aggregatedSigB64?: string; // 88 char base64 (64 bytes)
+  signatureValid?: boolean; // true if base64 decodes to expected sizes
+  frostThreshold?: { n?: number; t?: number };
+}
+&nbsp;
+// Naive ALPN extraction: search for well-known ALPN strings and preserve first-seen order.
+export function parseClientHelloStrings(strings: string[]): ClientHelloStatic | undefined {
+  const alpnCandidates = ['h2', 'http/1.1', 'hq-29', 'hq-interop', 'betanet-htx'];
+  const alpn: string[] = [];
+  for (const s of strings) {
+    for (const c of alpnCandidates) {
+      if ((s === c || s.includes(c)) &amp;&amp; !alpn.includes(c)) alpn.push(c);
+    }
+  }
+  if (!alpn.length) return undefined;
+  // TLS extension name -&gt; numeric code (subset sufficient for ordering hash)
+  const extMap: Record&lt;string, number&gt; = {
+    server_name: 0,
+    status_request: 5,
+    supported_groups: 10,
+    ec_point_formats: 11,
+    signature_algorithms: 13,
+    application_layer_protocol_negotiation: 16,
+    signed_certificate_timestamp: 18,
+    padding: 21,
+    encrypt_then_mac: 22,
+    extended_master_secret: 23,
+    record_size_limit: 28,
+    session_ticket: 35,
+    pre_shared_key: 41,
+    early_data: 42,
+    supported_versions: 43,
+    cookie: 44,
+    psk_key_exchange_modes: 45,
+    key_share: 51,
+    renegotiation_info: 0xff01
+  };
+  const extOrder: number[] = [];
+  const extNames: string[] = [];
+  const namePatterns = Object.keys(extMap);
+  for (const s of strings) {
+    for (const n of namePatterns) {
+      if (s.includes(n) &amp;&amp; !extNames.includes(n)) {
+        extNames.push(n);
+        extOrder.push(extMap[n]);
+      }
+    }
+  }
+  const hashBasis = alpn.join('|') + '::' + extOrder.join('-');
+  const extOrderSha256 = crypto.createHash('sha256').update(hashBasis).digest('hex');
+  return { alpn, extOrderSha256, detected: true, extensions: extOrder, extensionNames: extNames };
+}
+&nbsp;
+// Noise pattern detection: look for tokens like 'Noise_XK', 'Noise_XX', or separate 'noise' + pattern markers.
+export function detectNoisePattern(strings: string[]): NoiseStatic | undefined {
+  const joined = strings.join('\n');
+  const direct = joined.match(/Noise_([A-Z]{2})/);
+  if (direct) {
+    return { pattern: direct[1], messageCount: undefined, detected: true };
+  }
+  if (/noise/i.test(joined) &amp;&amp; /XK/.test(joined)) {
+    return { pattern: 'XK', detected: true };
+  }
+  return undefined;
+}
+&nbsp;
+// Voucher struct heuristic: presence of keysetid32 + secret32 + aggregatedsig64 tokens suggests 128B struct usage.
+export function detectVoucherStruct(strings: string[], binary?: Buffer): VoucherStatic | undefined {
+  const tokens = ['keysetid32', 'secret32', 'aggregatedsig64'];
+  const lowerStrings = strings.map(s =&gt; s.toLowerCase());
+  const hits = tokens.filter(t =&gt; lowerStrings.some(s =&gt; s.includes(t)));
+  if (!hits.length) return undefined;
+  let proximity: number | undefined;
+  if (binary) {
+    let min = Number.MAX_SAFE_INTEGER;
+    let max = 0;
+    for (const t of tokens) {
+      const idx = binary.indexOf(Buffer.from(t));
+      if (idx &gt;= 0) {
+        if (idx &lt; min) min = idx;
+        if (idx &gt; max) max = idx;
+      }
+    }
+    if (min !== Number.MAX_SAFE_INTEGER &amp;&amp; max &gt; 0) proximity = max - min;
+  }
+  const structLikely = hits.length === tokens.length &amp;&amp; (proximity === undefined || proximity &lt;= 512);
+  return { structLikely, tokenHits: hits, proximityBytes: proximity };
+}
+&nbsp;
+export function extractStaticPatterns(strings: string[], binary?: Buffer): StaticPatterns {
+  const result: StaticPatterns = {};
+  const ch = parseClientHelloStrings(strings);
+  if (ch) result.clientHello = ch;
+  const noise = detectNoisePattern(strings);
+  if (noise) result.noise = noise;
+  const voucher = detectVoucherStruct(strings, binary as any);
+  if (voucher) result.voucher = voucher;
+  // Access ticket structural signals
+  const lower = strings.map(s =&gt; s.toLowerCase());
+  const ticketTokens = ['ticket','access','nonce','exp','sig','pad','padding','replay'];
+  const fieldsPresent = ticketTokens.filter(t =&gt; lower.some(s =&gt; s.includes(t)));
+  if (fieldsPresent.includes('ticket') &amp;&amp; fieldsPresent.includes('nonce')) {
+    // Count likely hex tokens of length 16/32 (IDs, nonces)
+    const hex16 = strings.filter(s =&gt; /^[0-9a-fA-F]{16}$/.test(s)).length;
+    const hex32 = strings.filter(s =&gt; /^[0-9a-fA-F]{32}$/.test(s)).length;
+    const confidence = Math.min(1, (fieldsPresent.length / 7) * 0.6 + Math.min(1, (hex16+hex32)/4) * 0.4);
+  const rotationTokenPresent = lower.some(s =&gt; s.includes('rotation') || s.includes('rotate'));
+    // Extract padding length indicators like pad16, padding_24, pad_32 etc.
+    const padRegex = /pad(?:ding)?[_-]?(\d{1,3})/i;
+    const paddingLengths: number[] = [];
+    for (const s of strings) {
+      const m = s.match(padRegex);
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (m) {
+        const val = <span class="cstat-no" title="statement not covered" >parseInt(m[1],10);</span>
+<span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (!isNaN(val) &amp;&amp; !paddingLengths.includes(val)) <span class="cstat-no" title="statement not covered" >paddingLengths.push(val);</span></span>
+      }
+    }
+    // Rate-limit token presence
+    const rateLimitTokensPresent = lower.some(s =&gt; /rate[_-]?limit|rl_bucket|quota/.test(s));
+    result.accessTicket = { detected: true, fieldsPresent, hex16Count: hex16, hex32Count: hex32, structConfidence: Number(confidence.toFixed(2)), rotationTokenPresent, paddingLengths, paddingVariety: paddingLengths.length, rateLimitTokensPresent };
+  }
+  // Voucher crypto extraction (base64 components near voucher tokens)
+  if (voucher) {
+    const b64Candidates = strings.filter(s =&gt; /^[A-Za-z0-9+/=]{44}$/.test(s) || /^[A-Za-z0-9+/=]{88}$/.test(s));
+    let keysetIdB64: string | undefined;
+    let secretB64: string | undefined;
+    let aggregatedSigB64: string | undefined;
+    for (const s of b64Candidates) {
+<span class="cstat-no" title="statement not covered" >      if (s.length === 44) {</span>
+<span class="cstat-no" title="statement not covered" >        if (!keysetIdB64) <span class="cstat-no" title="statement not covered" >keysetIdB64 = s; </span>else <span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="if path not taken" >I</span>if (!secretB64 &amp;&amp; s !== keysetIdB64) <span class="cstat-no" title="statement not covered" >secretB64 = s;</span></span></span>
+      } else <span class="cstat-no" title="statement not covered" ><span class="missing-if-branch" title="if path not taken" >I</span>if (s.length === 88 &amp;&amp; !aggregatedSigB64) {</span>
+<span class="cstat-no" title="statement not covered" >        aggregatedSigB64 = s;</span>
+      }
+<span class="cstat-no" title="statement not covered" >      <span class="missing-if-branch" title="if path not taken" >I</span>if (keysetIdB64 &amp;&amp; secretB64 &amp;&amp; aggregatedSigB64) <span class="cstat-no" title="statement not covered" >break;</span></span>
+    }
+    let signatureValid = false;
+    let aggregatedSigComputedValid = false;
+    try {
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (keysetIdB64 &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >secretB64 </span>&amp;&amp; <span class="branch-2 cbranch-no" title="branch not covered" >aggregatedSigB64)</span> {
+        const k = <span class="cstat-no" title="statement not covered" >Buffer.from(keysetIdB64, 'base64');</span>
+        const sec = <span class="cstat-no" title="statement not covered" >Buffer.from(secretB64, 'base64');</span>
+        const sig = <span class="cstat-no" title="statement not covered" >Buffer.from(aggregatedSigB64, 'base64');</span>
+<span class="cstat-no" title="statement not covered" >        signatureValid = k.length === 32 &amp;&amp; sec.length === 32 &amp;&amp; sig.length === 64;</span>
+<span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (signatureValid) {</span>
+          // Placeholder aggregated signature check: require first 16 bytes of sig == first 16 bytes of sha256(keysetId||secret)
+          const h = <span class="cstat-no" title="statement not covered" >crypto.createHash('sha256').update(Buffer.concat([k, sec])).digest();</span>
+<span class="cstat-no" title="statement not covered" >          aggregatedSigComputedValid = sig.slice(0,16).equals(h.slice(0,16));</span>
+        }
+      }
+    } catch { /* ignore */ }
+    // FROST threshold heuristic
+    let frost: { n?: number; t?: number } | undefined;
+    const frostLine = lower.find(l =&gt; l.includes('frost') &amp;&amp; (<span class="branch-1 cbranch-no" title="branch not covered" >l.includes('n=') </span>|| <span class="branch-2 cbranch-no" title="branch not covered" >l.includes('t='))</span>);
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (frostLine) {
+      const nMatch = <span class="cstat-no" title="statement not covered" >frostLine.match(/n=(\d+)/i);</span>
+      const tMatch = <span class="cstat-no" title="statement not covered" >frostLine.match(/t=(\d+)/i);</span>
+<span class="cstat-no" title="statement not covered" >      frost = { n: nMatch ? parseInt(nMatch[1],10) : undefined, t: tMatch ? parseInt(tMatch[1],10) : undefined };</span>
+    }
+  result.voucherCrypto = { structLikely: voucher.structLikely, keysetIdB64, secretB64, aggregatedSigB64, signatureValid: signatureValid &amp;&amp; <span class="branch-1 cbranch-no" title="branch not covered" >aggregatedSigComputedValid,</span> frostThreshold: frost };
+  }
+  return result;
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2025-08-14T21:20:12.875Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

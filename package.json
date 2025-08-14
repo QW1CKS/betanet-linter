@@ -11,9 +11,10 @@
     "build:local": "node ./node_modules/typescript/bin/tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-  "test": "jest",
-  "lint": "eslint \"src/**/*.ts\"",
-  "lint:strict": "eslint \"src/**/*.ts\" --max-warnings=0",
+    "test": "jest --coverage",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:strict": "eslint \"src/**/*.ts\" --max-warnings=0",
+    "quality:gates": "node scripts/quality-gates.js",
     "prepare": "npm run build",
     "repro:verify": "node bin/repro-verify.js"
   },

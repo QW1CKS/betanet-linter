@@ -1,0 +1,385 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for src/sbom/sbom-validators.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../../prettify.css" />
+    <link rel="stylesheet" href="../../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../../index.html">All files</a> / <a href="index.html">src/sbom</a> sbom-validators.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">76.84% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>73/95</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">52.94% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>27/51</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>13/13</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">96.72% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>59/61</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line medium'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a></td><td class="line-coverage quiet"><span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">5x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">57x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-yes">86x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">51x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">7x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">2x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-yes">4x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-yes">3x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">// Lightweight schema shape validators for SBOM outputs (non-exhaustive).
+// These intentionally check only structural essentials to catch regressions
+// without pulling full JSON schemas or external dependencies.
+&nbsp;
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+}
+&nbsp;
+export function validateCycloneDXShape(doc: any): ValidationResult {
+  const errors: string[] = [];
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!doc || typeof doc !== 'object') <span class="cstat-no" title="statement not covered" >errors.push('Document not an object');</span>
+  if (doc.bomFormat !== 'CycloneDX') errors.push('bomFormat must be CycloneDX');
+  if (!doc.specVersion) errors.push('specVersion missing');
+  if (!doc.metadata) errors.push('metadata missing');
+  const comp = doc?.metadata?.component;
+  if (!comp) errors.push('metadata.component missing');
+  else {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!comp.name) <span class="cstat-no" title="statement not covered" >errors.push('component.name missing');</span>
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!comp.version) <span class="cstat-no" title="statement not covered" >errors.push('component.version missing');</span>
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!comp.purl) <span class="cstat-no" title="statement not covered" >errors.push('component.purl missing');</span>
+  }
+  if (doc.components) {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!Array.isArray(doc.components)) <span class="cstat-no" title="statement not covered" >errors.push('components must be array');</span>
+    else {
+      doc.components.forEach((c: any, i: number) =&gt; {
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (!c.name) <span class="cstat-no" title="statement not covered" >errors.push(`components[${i}].name missing`);</span>
+        <span class="missing-if-branch" title="if path not taken" >I</span>if (!c.version) <span class="cstat-no" title="statement not covered" >errors.push(`components[${i}].version missing`);</span>
+      });
+    }
+  }
+  return { valid: errors.length === 0, errors };
+}
+&nbsp;
+export function validateSPDXTagValue(text: string): ValidationResult {
+  const errors: string[] = [];
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!text || typeof text !== 'string') <span class="cstat-no" title="statement not covered" >return { valid: false, errors: ['SPDX text empty'] };</span>
+  const lines = text.split(/\r?\n/).filter(l =&gt; l.trim().length);
+  const requiredKeys = ['SPDXVersion:', 'DocumentNamespace:', 'DocumentName:', 'PackageName:'];
+  for (const key of requiredKeys) {
+    if (!lines.some(l =&gt; l.startsWith(key))) errors.push(`Missing key ${key}`);
+  }
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!lines.some(l =&gt; l.startsWith('PackageLicenseDeclared:'))) {
+<span class="cstat-no" title="statement not covered" >    errors.push('Missing PackageLicenseDeclared');</span>
+  }
+  return { valid: errors.length === 0, errors };
+}
+&nbsp;
+// Strict variants with deeper structural assertions (still lightweight, but tighter)
+export function validateCycloneDXStrict(doc: any): ValidationResult {
+  const base = validateCycloneDXShape(doc);
+  const errors = [...base.errors];
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!base.valid) <span class="cstat-no" title="statement not covered" >return { valid: false, errors };</span>
+  // serialNumber format (UUID urn)
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!/^urn:uuid:[0-9a-fA-F-]{36}$/.test(doc.serialNumber || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>) <span class="cstat-no" title="statement not covered" >errors.push('serialNumber invalid');</span>
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (typeof doc.version !== 'number') <span class="cstat-no" title="statement not covered" >errors.push('version must be number');</span>
+  const comp = doc.metadata?.component;
+  if (comp?.hashes) {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!Array.isArray(comp.hashes)) <span class="cstat-no" title="statement not covered" >errors.push('component.hashes must be array');</span>
+    else comp.hashes.forEach((h: any, i: number) =&gt; {
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (!h.alg) <span class="cstat-no" title="statement not covered" >errors.push(`component.hashes[${i}].alg missing`);</span>
+    // Allow empty content (hash may not be computable on some platforms)
+    <span class="missing-if-branch" title="if path not taken" >I</span>if (h.content === undefined) <span class="cstat-no" title="statement not covered" >errors.push(`component.hashes[${i}].content missing`);</span>
+    });
+  }
+  if (Array.isArray(doc.components)) {
+    doc.components.forEach((c: any, i: number) =&gt; {
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (!['library','application','framework','container','platform','device'].includes(c.type || <span class="branch-1 cbranch-no" title="branch not covered" >'')</span>) <span class="cstat-no" title="statement not covered" >errors.push(`components[${i}].type invalid`);</span>
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (c.hashes) {
+<span class="cstat-no" title="statement not covered" >        <span class="missing-if-branch" title="if path not taken" >I</span>if (!Array.isArray(c.hashes)) <span class="cstat-no" title="statement not covered" >errors.push(`components[${i}].hashes not array`);</span></span>
+      }
+    });
+  }
+  // dependencies refs must exist among component refs or root
+  const componentNames = new Set&lt;string&gt;([comp?.name].filter(Boolean));
+  if (Array.isArray(doc.components)) doc.components.forEach((c: any)=&gt;componentNames.add(c.name));
+  if (Array.isArray(doc.dependencies)) {
+    doc.dependencies.forEach((dep: any, idx: number) =&gt; {
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (!dep.ref) <span class="cstat-no" title="statement not covered" >errors.push(`dependencies[${idx}].ref missing`);</span>
+      <span class="missing-if-branch" title="if path not taken" >I</span>if (dep.dependsOn &amp;&amp; !Array.isArray(dep.dependsOn)) <span class="cstat-no" title="statement not covered" >errors.push(`dependencies[${idx}].dependsOn not array`);</span>
+      if (Array.isArray(dep.dependsOn)) {
+        dep.dependsOn.forEach((r: string) =&gt; { if (!componentNames.has(r)) errors.push(`dependencies[${idx}] unknown dependsOn ref ${r}`); });
+      }
+    });
+  }
+  return { valid: errors.length === 0, errors };
+}
+&nbsp;
+export function validateSPDXTagValueStrict(text: string): ValidationResult {
+  const base = validateSPDXTagValue(text);
+  const errors = [...base.errors];
+  if (!base.valid) return { valid: false, errors };
+  // Check SPDXVersion value presence and correctness
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!/SPDXVersion:\s*SPDX-2\.3/.test(text)) <span class="cstat-no" title="statement not covered" >errors.push('SPDXVersion not 2.3');</span>
+  // DocumentNamespace should look URL-like
+  <span class="missing-if-branch" title="if path not taken" >I</span>if (!/DocumentNamespace:\s*https?:\/\//.test(text)) <span class="cstat-no" title="statement not covered" >errors.push('DocumentNamespace not URL');</span>
+  // Ensure at least one PackageChecksum if hash advertised
+  if (/PackageChecksum:/.test(text) &amp;&amp; !/PackageChecksum: SHA256: [0-9a-f]{64}/i.test(text)) errors.push('Invalid SHA256 checksum format');
+  return { valid: errors.length === 0, errors };
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2025-08-14T21:20:13.105Z
+            </div>
+        <script src="../../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../../sorter.js"></script>
+        <script src="../../block-navigation.js"></script>
+    </body>
+</html>
+    
