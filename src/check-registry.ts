@@ -96,15 +96,14 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     name: 'Rotating Access Tickets',
     description: 'Uses rotating access tickets (§5.2)',
     severity: 'major',
-  introducedIn: '1.0',
-  mandatoryIn: '1.0',
+    introducedIn: '1.0',
+    mandatoryIn: '1.0',
     evaluate: async (analyzer) => {
       const analysis = await analyzer.analyze();
       const strings = analysis.strings.join(' ').toLowerCase();
       const symbols = analysis.symbols.join(' ').toLowerCase();
       const hasTickets = strings.includes('ticket') || strings.includes('access') || symbols.includes('ticket');
       const hasRotation = strings.includes('rotation') || strings.includes('rotate') || symbols.includes('rotate');
-      // Attempt structural evidence from accessTicket (static parser)
       await analyzer.getStaticPatterns?.();
       const ev: any = (analyzer as any).evidence || {};
       const at = ev.accessTicket;
@@ -115,8 +114,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         evidenceType = 'static-structural';
         const fieldsOk = Array.isArray(at.fieldsPresent) && at.fieldsPresent.includes('ticket') && at.fieldsPresent.includes('nonce') && at.fieldsPresent.includes('exp') && at.fieldsPresent.includes('sig');
         const rotationOk = at.rotationTokenPresent === true || hasRotation;
-        const paddingOk = (at.paddingVariety || 0) >= 2; // require ≥2 distinct padding lengths
-        const rateLimitOk = at.rateLimitTokensPresent === true; // presence of rate/limit tokens
+        const paddingOk = (at.paddingVariety || 0) >= 2;
+        const rateLimitOk = at.rateLimitTokensPresent === true;
         const confidenceOk = (at.structConfidence || 0) >= 0.4;
         passed = fieldsOk && rotationOk && paddingOk && rateLimitOk && confidenceOk;
         details = passed ? `✅ accessTickets structural fields=${at.fieldsPresent.length} padVar=${at.paddingVariety} rateLimit=${rateLimitOk}` : `❌ Missing: ${missingList([

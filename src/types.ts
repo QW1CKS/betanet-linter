@@ -387,6 +387,12 @@ export interface IngestedEvidence {
     aggregatedSigB64?: string;
     signatureValid?: boolean;
     frostThreshold?: { n?: number; t?: number };
+  // New cryptographic verification fields (Task 4 full completion)
+  publicKeysB64?: string[]; // individual participant public keys (Ed25519) base64
+  aggregatedPublicKeyB64?: string; // aggregated/combined public key base64
+  sigAlgorithm?: string; // e.g., 'ed25519'
+  verificationMode?: 'synthetic' | 'aggregated-ed25519'; // how signatureValid was derived
+  signatureComputedValid?: boolean; // computed verification result (independent of provided signatureValid)
   };
   calibrationBaseline?: {
     alpn?: string[];
@@ -425,6 +431,22 @@ export interface IngestedEvidence {
     allowedSets?: string[]; // e.g., 'TLS_AES_128_GCM_SHA256+X25519', 'CHACHA20_POLY1305_SHA256+X25519'
     usedSets?: string[]; // sets extracted from binary/evidence
     unregisteredUsed?: string[]; // computed: used - allowed
+  };
+  // SCION control stream evidence (Outstanding Spec Gap Task 4)
+  scionControl?: {
+    offers?: { path?: string; latencyMs?: number; ts?: number; flowId?: string }[]; // parsed offers
+    uniquePaths?: number; // convenience unique path count
+    noLegacyHeader?: boolean; // legacy transition header absent
+    duplicateOfferDetected?: boolean; // duplicate path+flow within window
+    parseError?: string; // CBOR/schema parse error string
+    schemaValid?: boolean; // indicates CBOR schema validated
+    pathSwitchLatenciesMs?: number[]; // measured latencies for path switch events
+    maxPathSwitchLatencyMs?: number; // convenience maximum
+    probeIntervalsMs?: number[]; // intervals between control probes
+    avgProbeIntervalMs?: number; // average interval
+    rateBackoffOk?: boolean; // indicates acceptable backoff / token bucket behavior
+    signatureValid?: boolean; // signature over control stream (future real verification)
+    timestampSkewOk?: boolean; // all offer ts within acceptable skew window
   };
   negative?: {
     forbiddenPresent?: string[]; // list of forbidden tokens discovered
