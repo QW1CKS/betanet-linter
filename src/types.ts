@@ -232,6 +232,8 @@ export interface IngestedEvidence {
   toolchainDiff?: number; // Task 10: count of differing toolchain components between builds
   signatureVerified?: boolean; // DSSE / provenance signature verified with provided key
   signatureError?: string; // capture signature verification error reason
+  signatureAlgorithm?: string; // e.g., 'ed25519'
+  signaturePublicKeyFingerprint?: string; // sha256 fingerprint of verifying public key
   dsseEnvelopeVerified?: boolean; // Phase 7: DSSE envelope signature(s) verified
   dsseSignerCount?: number; // Phase 7: number of DSSE signers validated
   dsseVerifiedSignerCount?: number; // Count of signatures that cryptographically verified
@@ -241,6 +243,8 @@ export interface IngestedEvidence {
   dsseRequiredSignerCount?: number; // Task 10 required signers present
   dsseSignerDetails?: { keyid?: string; verified: boolean; reason?: string }[]; // Per-signer diagnostics
   dssePolicyReasons?: string[]; // Aggregate failure reasons if policy not met
+  pqHybridVerified?: boolean; // Task 22: PQ hybrid handshake transcript proof verified
+  pqHybridError?: string; // Task 22: error reason if PQ hybrid verification failed
   };
   // Phase 7: multi-signer evidence bundle (canonical hash chain) placeholder
   signedEvidenceBundle?: {
@@ -250,6 +254,8 @@ export interface IngestedEvidence {
   multiSignerThresholdMet?: boolean; // >=2 signers present
   hashChainValid?: boolean; // all entry hashes concatenated hash matches bundleSha256
   thresholdRequired?: number; // policy threshold (default 2)
+  aggregatedSignatureValid?: boolean; // Task 22: aggregated multi-signer verification result
+  aggregatedAlgorithm?: string; // e.g., 'ed25519'
   };
   // Task 12: Algorithm agility registry artifact
   algorithmAgility?: {

@@ -45,6 +45,97 @@ const format_1 = require("./format");
 // missingList helper moved to format.ts (ISSUE-027) for reuse across modules
 exports.CHECK_REGISTRY = [
     {
+        id: 40,
+        key: 'quic-initial-extended',
+        name: 'Extended QUIC Initial Parsing & Calibration',
+        description: 'Parses QUIC Initial structural fields & enforces calibration hash stability',
+        severity: 'major',
+        introducedIn: '1.1',
+        mandatoryIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const qi = ev.quicInitial;
+            const baseline = ev.quicInitialBaseline;
+            const failureCodes = [];
+            let evidenceType = 'heuristic';
+            if (qi && qi.parsed)
+                evidenceType = 'dynamic-protocol';
+            if (!qi) {
+                failureCodes.push('QUIC_EVIDENCE_MISSING');
+                return { id: 40, name: 'Extended QUIC Initial Parsing & Calibration', description: 'Parses QUIC Initial structural fields & enforces calibration hash stability', passed: false, details: '❌ QUIC_EVIDENCE_MISSING', severity: 'major', evidenceType };
+            }
+            const p = qi.parsed || {};
+            // Basic completeness checks
+            if (!(p.version && typeof p.dcil === 'number' && typeof p.scil === 'number')) {
+                failureCodes.push('QUIC_PARSE_INCOMPLETE');
+            }
+            if (p.version && p.version !== '0x00000001' && !p.versionNegotiation) {
+                failureCodes.push('QUIC_VERSION_UNEXPECTED');
+            }
+            if (qi.calibrationMismatch) {
+                failureCodes.push('QUIC_CALIBRATION_MISMATCH');
+            }
+            if (p.versionNegotiation)
+                failureCodes.push('QUIC_VERSION_NEGOTIATION');
+            if (p.retry)
+                failureCodes.push('QUIC_RETRY');
+            // Determine pass criteria: no hard failure codes except negotiation/retry (treated informational if alone)
+            const hardFailures = failureCodes.filter(c => !['QUIC_VERSION_NEGOTIATION', 'QUIC_RETRY'].includes(c));
+            const passed = hardFailures.length === 0;
+            let details;
+            if (passed) {
+                details = `✅ QUIC Initial parsed v=${p.version} dcil=${p.dcil} scil=${p.scil}${qi.calibrationMismatch ? ' (mismatch)' : ''}`;
+            }
+            else {
+                details = '❌ ' + failureCodes.join(',');
+            }
+            if (qi)
+                qi.failureCodes = failureCodes;
+            return { id: 40, name: 'Extended QUIC Initial Parsing & Calibration', description: 'Parses QUIC Initial structural fields & enforces calibration hash stability', passed, details, severity: 'major', evidenceType };
+        }
+    },
+    {
+        id: 41,
+        key: 'http-jitter-statistics',
+        name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests',
+        description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy',
+        severity: 'major',
+        introducedIn: '1.1',
+        mandatoryIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const jm = ev.jitterMetrics;
+            if (!jm) {
+                return { id: 41, name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests', description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy', passed: false, details: '❌ JITTER_EVIDENCE_MISSING', severity: 'major', evidenceType: 'heuristic' };
+            }
+            const failureCodes = [];
+            const minSamples = 30; // combined threshold
+            const totalSamples = jm.sampleCount || 0;
+            if (totalSamples < minSamples)
+                failureCodes.push('JITTER_SAMPLES_INSUFFICIENT');
+            const pThreshold = 0.01;
+            if (jm.chiSquareP !== undefined && jm.chiSquareP <= pThreshold)
+                failureCodes.push('CHI_SQUARE_P_LOW');
+            if (jm.runsP !== undefined && jm.runsP <= pThreshold)
+                failureCodes.push('RUNS_TEST_P_LOW');
+            if (jm.ksP !== undefined && jm.ksP <= pThreshold)
+                failureCodes.push('KS_P_LOW');
+            if (jm.entropyBitsPerSample !== undefined && jm.entropyBitsPerSample < 0.25)
+                failureCodes.push('ENTROPY_LOW');
+            // Basic stddev sanity (avoid degenerate distributions)
+            if (jm.stdDevPing !== undefined && jm.stdDevPing < 0.1)
+                failureCodes.push('PING_STDDEV_LOW');
+            if (jm.stdDevPadding !== undefined && jm.stdDevPadding < 0.1)
+                failureCodes.push('PADDING_STDDEV_LOW');
+            const passed = failureCodes.length === 0;
+            const evidenceType = passed ? 'artifact' : 'heuristic';
+            const details = passed
+                ? `✅ jitter stats ok pingN=${jm.pingIntervalsMs?.length || 0} padN=${jm.paddingSizes?.length || 0} priN=${jm.priorityFrameGaps?.length || 0} chiP=${jm.chiSquareP?.toExponential(2)} runsP=${jm.runsP?.toExponential(2)} ksP=${jm.ksP?.toExponential(2)} entropy=${jm.entropyBitsPerSample?.toFixed(3)}`
+                : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] chiP=${jm.chiSquareP} runsP=${jm.runsP} ksP=${jm.ksP} entropy=${jm.entropyBitsPerSample} n=${totalSamples}`;
+            return { id: 41, name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests', description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy', passed, details, severity: 'major', evidenceType };
+        }
+    },
+    {
         id: 1,
         key: 'htx-transports-tls-ech',
         name: 'HTX over TCP-443 & QUIC-443',
@@ -1518,6 +1609,26 @@ exports.CHECK_REGISTRY = [
                     entropyBits = H;
                 }
                 const entropyOk = (entropyBits || 0) >= 4; // baseline threshold
+                // Task 20 variance & entropy stability metrics
+                const pathLenStdDev = typeof mix.pathLengthStdDev === 'number' ? mix.pathLengthStdDev : undefined;
+                const pathLenStdErr = typeof mix.pathLengthStdErr === 'number' ? mix.pathLengthStdErr : undefined;
+                const ci95Width = typeof mix.pathLengthCI95Width === 'number' ? mix.pathLengthCI95Width : undefined;
+                const entropyConfidence = typeof mix.entropyConfidence === 'number' ? mix.entropyConfidence : undefined;
+                const varianceMetricsPresent = mix.varianceMetricsComputed === true && pathLenStdDev !== undefined && pathLenStdErr !== undefined && ci95Width !== undefined;
+                // Heuristic thresholds (subject to future tuning): stddev should not be zero (unless trivial) and not exceed 50% of mean hops*2 ; CI width should be reasonable
+                let varianceOk = true;
+                if (varianceMetricsPresent) {
+                    const mean = typeof mix.pathLengthMean === 'number' ? mix.pathLengthMean : (pathLengths.reduce((a, b) => a + b, 0) / (pathLengths.length || 1));
+                    if (mean > 0) {
+                        if (pathLenStdDev === 0 && samples >= 5 && ratio < 1)
+                            varianceOk = false; // zero variance suspicious unless all unique & small
+                        if (pathLenStdDev !== undefined && pathLenStdDev > mean * 1.5)
+                            varianceOk = false; // too dispersed
+                    }
+                    if (ci95Width !== undefined && ci95Width > Math.max(2, mean * 1.2))
+                        varianceOk = false; // CI too wide
+                }
+                const entropyConfidenceOk = entropyConfidence === undefined || entropyConfidence >= 0.5; // require at least moderate confidence when provided
                 // ASN / Org diversity (derived if mappings and hopSets provided)
                 let asDiv = mix.asDiversityIndex;
                 let orgDiv = mix.orgDiversityIndex;
@@ -1548,7 +1659,7 @@ exports.CHECK_REGISTRY = [
                 const beaconEntropy = mix.aggregatedBeaconEntropyBits;
                 const beaconOk = beaconEntropy === undefined || beaconEntropy >= 8; // aggregated randomness threshold
                 // Overall pass
-                passed = samples >= 5 && depthOk && uniquenessOk && diversityOk && reuseOk && entropyOk && asDivOk && orgDivOk && vrfOk && beaconOk;
+                passed = samples >= 5 && depthOk && uniquenessOk && diversityOk && reuseOk && entropyOk && asDivOk && orgDivOk && vrfOk && beaconOk && varianceOk && entropyConfidenceOk;
                 const failReasons = [];
                 if (samples < 5)
                     failReasons.push('insufficient samples');
@@ -1562,6 +1673,10 @@ exports.CHECK_REGISTRY = [
                     failReasons.push(`reuse before ${requiredUniqueBeforeReuse}`);
                 if (!entropyOk)
                     failReasons.push(`entropy ${(entropyBits || 0).toFixed(2)}<4`);
+                if (!varianceOk)
+                    failReasons.push('path length variance abnormal');
+                if (!entropyConfidenceOk)
+                    failReasons.push('entropy confidence low');
                 if (!asDivOk)
                     failReasons.push('AS diversity low');
                 if (!orgDivOk)
@@ -1570,8 +1685,8 @@ exports.CHECK_REGISTRY = [
                     failReasons.push('VRF proofs invalid');
                 if (!beaconOk)
                     failReasons.push('beacon entropy low');
-                details = passed ? `✅ unique=${unique}/${samples} ${(ratio * 100).toFixed(1)}% (req≥${(required * 100)}%) minHop=${minLen} divIdx=${(diversityIndex * 100).toFixed(1)}% entropy=${(entropyBits || 0).toFixed(2)} bits reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'}bits` :
-                    `❌ Mix diversity issues: ${failReasons.join('; ')} unique=${unique}/${samples} minHop=${minLen} divIdx=${(diversityIndex * 100).toFixed(1)}% entropy=${(entropyBits || 0).toFixed(2)} reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'}`;
+                details = passed ? `✅ unique=${unique}/${samples} ${(ratio * 100).toFixed(1)}% (req≥${(required * 100)}%) minHop=${minLen} divIdx=${(diversityIndex * 100).toFixed(1)}% entropy=${(entropyBits || 0).toFixed(2)} bits reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'}bits plStd=${pathLenStdDev ?? 'n/a'} ci95W=${ci95Width ?? 'n/a'} entConf=${entropyConfidence ?? 'n/a'}` :
+                    `❌ Mix diversity issues: ${failReasons.join('; ')} unique=${unique}/${samples} minHop=${minLen} divIdx=${(diversityIndex * 100).toFixed(1)}% entropy=${(entropyBits || 0).toFixed(2)} reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'} plStd=${pathLenStdDev ?? 'n/a'} ci95W=${ci95Width ?? 'n/a'} entConf=${entropyConfidence ?? 'n/a'}`;
             }
             return { id: 17, name: 'Mix Diversity Sampling', description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth, entropy & AS/Org diversity & VRF/beacon integrity', passed, details, severity: 'major', evidenceType: mix ? 'dynamic-protocol' : 'heuristic' };
         }

@@ -76,13 +76,14 @@ export class BinaryAnalyzer {
         this.networkOps.push({ url, method, durationMs: dur });
         this.diagnostics.networkOps = this.networkOps;
         return res;
-      } catch (e: any) {
+      } catch (e: unknown) {
+        const err = e as any; // network layer or custom error
         attempt++;
         if (attempt > maxRetries) {
           const dur = performance.now() - start;
-            this.networkOps.push({ url, method, durationMs: dur, error: e?.message });
+            this.networkOps.push({ url, method, durationMs: dur, error: err?.message });
             this.diagnostics.networkOps = this.networkOps;
-            throw e;
+            throw err;
         }
         // Exponential backoff with jitter (50-150ms * attempt)
         const base = 50 * attempt;
@@ -218,8 +219,9 @@ export class BinaryAnalyzer {
             this.diagnostics.timedOutTools = [...(this.diagnostics.timedOutTools || []), t.name];
           }
         }
-      } catch (e: any) {
-        this.diagnostics.tools.push({ name: t.name, available: false, error: e?.shortMessage || e?.message });
+      } catch (e: unknown) {
+        const err = e as any;
+        this.diagnostics.tools.push({ name: t.name, available: false, error: err?.shortMessage || err?.message });
       }
     });
     await Promise.all(checks);

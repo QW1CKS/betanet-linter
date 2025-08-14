@@ -47,8 +47,9 @@ async function performTlsProbe(host: string, port: number = 443, offeredAlpn: st
           resolve(outcome);
         }
       });
-    } catch (e: any) {
-      outcome.error = e.message || 'exception';
+    } catch (e: unknown) {
+      const err = e as any;
+      outcome.error = err?.message || 'exception';
       outcome.handshakeMs = Date.now() - start;
       resolve(outcome);
     }
@@ -148,12 +149,14 @@ async function simulateFallback(host: string, udpPort: number, tcpPort: number, 
         try { sock.destroy(); } catch { /* ignore */ }
         resolve();
       });
-      sock.on('error', (e: any) => {
-        fallback.error = fallback.error || e.code || e.message;
+      sock.on('error', (e: unknown) => {
+        const err = e as any;
+        fallback.error = fallback.error || err?.code || err?.message;
         resolve();
       });
     } catch (e: any) {
-      fallback.error = fallback.error || e.message;
+      const err = e as any;
+      fallback.error = fallback.error || err?.message;
       resolve();
     }
   });
@@ -676,9 +679,10 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       if (!evidence.calibrationBaseline && evidence.clientHello) {
         evidence.calibrationBaseline = { alpn: evidence.clientHello.alpn, extOrderSha256: evidence.clientHello.extOrderSha256, source: 'static-template', capturedAt: new Date().toISOString() };
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as any;
       evidence.dynamicClientHelloCapture = {
-        note: 'capture-error:' + (e.message || 'unknown'),
+        note: 'capture-error:' + (err?.message || 'unknown'),
         capturedAt: new Date().toISOString(),
         matchStaticTemplate: false
       } as any;
@@ -717,9 +721,10 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
             resolve();
           }
         });
-        socket.on('error', (e: any) => {
+        socket.on('error', (e: unknown) => {
+          const err = e as any;
           if (!settled) {
-            initial.error = (e && (e.code || e.message)) || 'error';
+            initial.error = (err && (err.code || err.message)) || 'error';
             settled = true;
             try { socket.close(); } catch { /* ignore */ }
             resolve();
@@ -737,8 +742,9 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
             resolve();
           }
         }, timeout);
-      } catch (e: any) {
-        initial.error = e.message;
+      } catch (e: unknown) {
+        const err = e as any;
+        initial.error = err?.message;
         settled = true;
         resolve();
       }

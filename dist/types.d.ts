@@ -258,6 +258,8 @@ export interface IngestedEvidence {
         toolchainDiff?: number;
         signatureVerified?: boolean;
         signatureError?: string;
+        signatureAlgorithm?: string;
+        signaturePublicKeyFingerprint?: string;
         dsseEnvelopeVerified?: boolean;
         dsseSignerCount?: number;
         dsseVerifiedSignerCount?: number;
@@ -271,6 +273,8 @@ export interface IngestedEvidence {
             reason?: string;
         }[];
         dssePolicyReasons?: string[];
+        pqHybridVerified?: boolean;
+        pqHybridError?: string;
     };
     signedEvidenceBundle?: {
         entries?: {
@@ -284,6 +288,8 @@ export interface IngestedEvidence {
         multiSignerThresholdMet?: boolean;
         hashChainValid?: boolean;
         thresholdRequired?: number;
+        aggregatedSignatureValid?: boolean;
+        aggregatedAlgorithm?: string;
     };
     algorithmAgility?: {
         allowedSets?: string[];
@@ -435,6 +441,11 @@ export interface IngestedEvidence {
         diversityIndex?: number;
         nodeEntropyBits?: number;
         pathLengthStdDev?: number;
+        pathLengthMean?: number;
+        pathLengthStdErr?: number;
+        pathLengthCI95Width?: number;
+        varianceMetricsComputed?: boolean;
+        entropyConfidence?: number;
         beaconSources?: {
             drand?: {
                 round?: number;
@@ -636,6 +647,50 @@ export interface IngestedEvidence {
     };
     negative?: {
         forbiddenPresent?: string[];
+    };
+    quicInitialBaseline?: {
+        calibrationHash?: string;
+        capturedAt?: string;
+    };
+    quicInitial?: {
+        host?: string;
+        port?: number;
+        udpSent?: boolean;
+        error?: string;
+        rawInitialB64?: string;
+        responseRawB64?: string;
+        responseBytes?: number;
+        responseWithinMs?: number;
+        parsed?: {
+            version?: string;
+            dcil?: number;
+            scil?: number;
+            dcidHex?: string;
+            scidHex?: string;
+            tokenLength?: number;
+            tokenHex?: string;
+            lengthField?: number;
+            versionNegotiation?: boolean;
+            retry?: boolean;
+            versionsOffered?: string[];
+            odcil?: number;
+        };
+        calibrationHash?: string;
+        calibrationMismatch?: boolean;
+        failureCodes?: string[];
+    };
+    jitterMetrics?: {
+        pingIntervalsMs?: number[];
+        paddingSizes?: number[];
+        priorityFrameGaps?: number[];
+        chiSquareP?: number;
+        runsP?: number;
+        ksP?: number;
+        entropyBitsPerSample?: number;
+        sampleCount?: number;
+        stdDevPing?: number;
+        stdDevPadding?: number;
+        stdDevPriorityGap?: number;
     };
     [k: string]: any;
 }

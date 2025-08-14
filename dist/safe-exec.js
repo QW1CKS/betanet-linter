@@ -50,17 +50,19 @@ async function safeExec(cmd, args = [], timeoutMs) {
         };
     }
     catch (e) {
-        const timedOut = e?.timedOut === true;
+        // External process errors can include non-Error enriched fields (timedOut, exitCode, stdout, shortMessage)
+        const err = e; // narrowed locally; safeExec returns normalized object
+        const timedOut = err?.timedOut === true;
         return {
-            stdout: e?.stdout || '',
-            stderr: e?.stderr || '',
-            code: e?.exitCode ?? null,
-            signal: e?.signal || null,
+            stdout: err?.stdout || '',
+            stderr: err?.stderr || '',
+            code: err?.exitCode ?? null,
+            signal: err?.signal || null,
             timedOut,
             failed: true,
             durationMs: Date.now() - start,
             start,
-            errorMessage: timedOut ? 'timeout' : (e?.shortMessage || e?.message || 'exec-error')
+            errorMessage: timedOut ? 'timeout' : (err?.shortMessage || err?.message || 'exec-error')
         };
     }
 }
