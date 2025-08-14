@@ -262,6 +262,15 @@ export interface IngestedEvidence {
   teardownIqrMs?: number; // interquartile range of teardown times
   outlierPct?: number; // proportion of teardown samples considered outliers
   provenanceCategories?: string[]; // classification labels for connections (e.g., ['real','cover'])
+  // Task 10 advanced statistical fields
+  coverTeardownMedianMs?: number;
+  coverTeardownP95Ms?: number;
+  coverTeardownCv?: number; // coefficient of variation
+  coverTeardownSkewness?: number;
+  coverTeardownOutlierCount?: number;
+  coverTeardownAnomalyCodes?: string[]; // model-detected anomaly codes
+  behaviorModelScore?: number; // ML/heuristic model score [0,1]
+  behaviorWithinPolicy?: boolean; // explicit policy flag
   };
   // Phase 7: enhanced statistical variance metrics (jitter, mix)
   statisticalVariance?: {

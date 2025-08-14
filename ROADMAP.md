@@ -315,9 +315,11 @@ The following additional items were identified as still incomplete for a strictl
   - Check 15 updated to incorporate these metrics and reasons; types extended (seriesGapRatio, degradationComputedPct).
   - Tests: Added (existing suite) positive & negative degradation scenarios; future enhancements can add explicit spike & gap test cases.
   - Caveats (non-blocking): More granular rolling window degradation baseline selection, statistical confidence of spike detection, partition topology inference, explicit gap test coverage.
-10. [ ] Anti-Correlation Fallback Timing Enforcement
-  - Measure UDP→TCP retry delay windows, cover connection counts (≥2), teardown timing (3–15 s) distributions (IQR, CV) & anomaly detection; COVER_DELAY_OUT_OF_RANGE / TEARDOWN_VARIANCE_EXCESS.
-  - Caveats: high‑resolution timing capture, statistical calculation (IQR, CV, skew), anomaly thresholds justification, multi-origin cover validation, min sample size safeguards.
+10. [x] Anti-Correlation Fallback Timing Enforcement
+  - Implemented: Check 25 enforces udpTimeout (100–600ms), retryDelay (≤25ms), coverConnections≥2, teardown stddev≤450ms, CV≤1.2, skew|≤1.2|, outliers≤20%, modelScore≥0.7, median (200–1200ms) & p95≤1800ms, startDelay≤500ms, IQR≤900ms, outlierPct≤25%, provenance categories ≥2. Failure codes: COVER_INSUFFICIENT, COVER_DELAY_OUT_OF_RANGE, TEARDOWN_VARIANCE_EXCESS plus descriptive reasons.
+  - Evidence schema extended with advanced statistical fields (median, p95, cv, skewness, outlier count, anomaly codes, behavior model score, policy flag) and enforced when present (absence treated permissively to preserve backward compatibility).
+  - Tests: Added in `final-compliance-tasks.test.ts` covering pass and each failure scenario (insufficient cover, delay out of range, teardown variance excess, provenance insufficiency).
+  - Caveats (non-blocking): High-resolution timing capture & real network harness integration, statistical justification (confidence intervals) for thresholds, multi-origin cover validation & anomaly classification taxonomy.
 11. [ ] Provenance DSSE Signature & Rebuild Diff Hardening
   - Verify DSSE signatures with trusted keys, enforce materials completeness & toolchain pinning, compare rebuild digest; SIG_INVALID / MATERIAL_GAP / REBUILD_MISMATCH.
   - Caveats: multi-signer threshold logic, key allow/deny lists, reproducible rebuild invocation & diff hashing, per-material digest cross‑reference with SBOM, policy reason aggregation.

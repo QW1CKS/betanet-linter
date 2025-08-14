@@ -581,6 +581,51 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       expect(check25.passed).toBe(false);
       expect(check25.details).toMatch(/insufficient provenance categories/);
     });
+
+    // Advanced statistical field specific negative tests (Task 10 completeness)
+    it('fails with cv high when coverTeardownCv exceeds threshold', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [400,420,430,410], teardownStdDevMs: 100, coverTeardownCv: 1.5, coverStartDelayMs: 50, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/cv high/);
+    });
+    it('fails with skew excessive when coverTeardownSkewness out of range', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [400,410,430,440], teardownStdDevMs: 50, coverTeardownCv: 0.2, coverTeardownSkewness: 2.5, coverStartDelayMs: 50, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/skew excessive/);
+    });
+    it('fails with model score low and behavior model fail', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [400,410,430,440], teardownStdDevMs: 50, behaviorModelScore: 0.3, behaviorWithinPolicy: false, coverStartDelayMs: 50, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/model score low/);
+      expect(check25.details).toMatch(/behavior model fail/);
+    });
+    it('fails with median out of range', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [150,160,170,155], teardownStdDevMs: 5, coverTeardownMedianMs: 150, coverStartDelayMs: 50, teardownIqrMs: 10, outlierPct: 0.05, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/median out of range/);
+    });
+    it('fails with p95 out of range', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [300,500,600,700,2500], teardownStdDevMs: 400, coverTeardownMedianMs: 500, coverTeardownP95Ms: 2500, coverStartDelayMs: 50, teardownIqrMs: 600, outlierPct: 0.2, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/p95 out of range/);
+    });
+    it('fails with unexpected anomaly codes', async () => {
+      const ft = { udpTimeoutMs: 300, retryDelayMs: 10, coverConnections: 2, coverTeardownMs: [400,420,430,410], teardownStdDevMs: 12, coverTeardownAnomalyCodes: ['UNEXPECTED'], coverStartDelayMs: 50, teardownIqrMs: 25, outlierPct: 0.1, provenanceCategories: ['real','cover'] };
+      const result = await runWithAnalyzer(analyzerForFallback(ft));
+      const check25 = result.checks.find(c => c.id === 25)!;
+      expect(check25.passed).toBe(false);
+      expect(check25.details).toMatch(/unexpected anomaly codes/);
+    });
   });
 
   // Task 9: Algorithm Agility Registry Validation (Check 34)
