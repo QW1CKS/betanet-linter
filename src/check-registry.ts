@@ -1031,9 +1031,42 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           const windowOk = hist.maxWindowShare === undefined || hist.maxWindowShare <= 0.2;
           const deltaOk = hist.maxDeltaShare === undefined || hist.maxDeltaShare <= 0.05;
           const avgTop3Ok = hist.avgTop3 === undefined || hist.avgTop3 <= 0.24; // 20% cap * 1.2 = 0.24
-          const pointsOk = !hist.series || hist.series.length >= (7*24); // require ≥7*24 points if series provided
-          const degradationOk = hist.degradationPct === undefined || hist.degradationPct <= 0.20; // Task 7 threshold
-          diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok && pointsOk && degradationOk;
+          // Expect hourly points over 7 days => 7*24. Allow up to 5% gaps.
+          let pointsOk = true;
+          let gapRatioOk = true;
+          if (Array.isArray(hist.series)) {
+            const expected = 7*24;
+            const have = hist.series.length;
+            const gapRatio = have/expected;
+            hist.seriesGapRatio = gapRatio;
+            pointsOk = have >= expected * 0.95; // allow small gaps
+            gapRatioOk = gapRatio >= 0.95;
+          }
+          // Compute degradation if not provided: compare top1 average first 24h vs last 24h
+          if (hist.degradationPct === undefined && Array.isArray(hist.series) && hist.series.length >= 48) {
+            const firstDay = hist.series.slice(0,24);
+            const lastDay = hist.series.slice(-24);
+            function top1Avg(arr: any[]) { return arr.reduce((acc, p)=>{ const vals = Object.values(p.asShares) as number[]; const max = Math.max(...vals); return acc+max; },0)/arr.length; }
+            const firstAvg = top1Avg(firstDay);
+            const lastAvg = top1Avg(lastDay);
+            const degradation = (lastAvg - firstAvg); // absolute increase
+            hist.degradationComputedPct = degradation;
+            if (hist.degradationPct === undefined) hist.degradationPct = degradation; // reuse existing logic threshold 0.2
+          }
+          const degradationOk = hist.degradationPct === undefined || hist.degradationPct <= 0.20; // Task 9 threshold
+          // Detect partitions: sudden large drop (>15% absolute) of dominant AS share or spike (> +15%) within 6h window
+          let partitionSafetyOk = true;
+      if (Array.isArray(hist.series) && hist.series.length > 6) {
+            for (let i=1;i<hist.series.length;i++) {
+        const prevVals = Object.values(hist.series[i-1].asShares) as number[];
+        const curVals = Object.values(hist.series[i].asShares) as number[];
+        const prevMax = Math.max(...prevVals);
+        const curMax = Math.max(...curVals);
+              const delta = curMax - prevMax;
+              if (delta > 0.15 || delta < -0.15) { partitionSafetyOk = false; break; }
+            }
+          }
+      diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok && pointsOk && degradationOk && gapRatioOk && partitionSafetyOk;
           if (!stableBasic) diversityReasons.push('historical basic instability');
           if (!adv) diversityReasons.push('advancedStable=false');
           if (!volatilityOk) diversityReasons.push(`volatility=${hist.volatility}`);
@@ -1043,6 +1076,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           if (!hasAdvMetrics) diversityReasons.push('adv-metrics-missing');
           if (!pointsOk) diversityReasons.push('insufficient-points');
           if (!degradationOk) diversityReasons.push('PARTITION_DEGRADATION');
+          if (!gapRatioOk) diversityReasons.push('SERIES_GAP_EXCESS');
+          if (!partitionSafetyOk) diversityReasons.push('PARTITION_VOLATILITY_SPIKE');
         }
         passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && diversityOk);
         details = passed ? `✅ Caps enforced (AS=${(maxASShare??0).toFixed(3)} org=${(maxOrgShare??0).toFixed(3)}) partitions=none diversity=stable` : `❌ Governance issues: ${missingList([

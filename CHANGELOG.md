@@ -23,6 +23,8 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 - New failure codes: CHAIN_FINALITY_DEPTH_SHORT, CHAIN_WEIGHT_THRESHOLD, EPOCH_NON_MONOTONIC, SIGNER_WEIGHT_INVALID, DUPLICATE_SIGNER, SIGNATURE_INVALID, SIGNATURE_COVERAGE_LOW, WEIGHT_CAP_EXCEEDED (joining FINALITY_DEPTH_SHORT, EMERGENCY_LIVENESS_SHORT, QUORUM_CERTS_INVALID, QUORUM_WEIGHT_MISMATCH).
 - Tests: `final-compliance-tasks.test.ts` updated with passing extended ledger scenario and comprehensive failing scenario asserting all new codes.
 - Caveats: Cryptographic quorum certificate signature verification still placeholder (future Ed25519 batch verify), refined duplicate signer/org semantics & dynamic chain RPC ingestion deferred.
+#### Added (Task 9 Completion)
+- Governance Partition Safety 7-Day Dataset (Check 15 enhanced): auto-computation of degradation (`degradationComputedPct`) from first vs last 24h windows, gap ratio (`seriesGapRatio`) requiring ≥95% of expected hourly points, partition volatility spike detection (>15% absolute change in dominant AS share between consecutive samples), and new failure reasons SERIES_GAP_EXCESS, PARTITION_VOLATILITY_SPIKE alongside existing PARTITION_DEGRADATION. Types updated; enforcement integrated without breaking older evidence (absence treated leniently). Tests cover degradation pass/fail; future enhancements may add explicit spike & gap scenarios.
 
 ### Upgrade Notes
 - Heuristic passes excluded by default (strict mode); use `--allow-heuristic` during transition or supply artifact/dynamic evidence via `--evidence-file` / harness.

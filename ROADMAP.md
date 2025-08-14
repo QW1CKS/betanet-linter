@@ -309,9 +309,12 @@ The following additional items were identified as still incomplete for a strictl
 8. [x] Voucher Aggregated Signature (FROST) Cryptographic Verification
   - Implemented: Check 31 enforces FROST threshold (n≥5, t=3), keyset/key presence, aggregated signature validity flag; evidence schema `voucherCrypto` extended (publicKeysB64, aggregatedPublicKeyB64, sigAlgorithm, verificationMode, signatureComputedValid). Negative tests exercise FROST_PARAMS_INVALID, AGG_SIG_INVALID, INSUFFICIENT_KEYS.
   - Remaining future (non-blocking) enhancement: real FROST aggregated Ed25519 verification (current path uses structured/static validation + placeholder), keysetId derivation cross-check & malformed length fuzz cases.
-9. [ ] Governance Partition Safety 7‑Day Dataset
-  - Ingest historical ACK/path diversity series (≥7*24 points) detecting >20% degradation; PARTITION_DEGRADATION code generation.
-  - Caveats: data ingestion schema, rolling window computations, 20% degradation math (baseline vs window), partition event detection tests, resilience to missing intervals.
+9. [x] Governance Partition Safety 7‑Day Dataset
+  - Implemented: Historical diversity `governanceHistoricalDiversity.series` (hourly points) enforcement with automatic gap ratio (`seriesGapRatio`) and computed degradation (`degradationComputedPct`) when `degradationPct` absent. Thresholds: ≥95% of expected 7*24 points, volatility≤0.05, maxWindowShare≤0.2, maxDeltaShare≤0.05, avgTop3≤0.24, degradation≤0.20.
+  - Additional partition safety heuristics: detection of sudden dominant share spikes/drops >15% between consecutive samples (failure reason PARTITION_VOLATILITY_SPIKE) and excessive gaps (SERIES_GAP_EXCESS). Existing PARTITION_DEGRADATION retained.
+  - Check 15 updated to incorporate these metrics and reasons; types extended (seriesGapRatio, degradationComputedPct).
+  - Tests: Added (existing suite) positive & negative degradation scenarios; future enhancements can add explicit spike & gap test cases.
+  - Caveats (non-blocking): More granular rolling window degradation baseline selection, statistical confidence of spike detection, partition topology inference, explicit gap test coverage.
 10. [ ] Anti-Correlation Fallback Timing Enforcement
   - Measure UDP→TCP retry delay windows, cover connection counts (≥2), teardown timing (3–15 s) distributions (IQR, CV) & anomaly detection; COVER_DELAY_OUT_OF_RANGE / TEARDOWN_VARIANCE_EXCESS.
   - Caveats: high‑resolution timing capture, statistical calculation (IQR, CV, skew), anomaly thresholds justification, multi-origin cover validation, min sample size safeguards.

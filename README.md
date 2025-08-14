@@ -85,7 +85,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | 7 Mix node selection diversity & hops | 11, 17, 27 | dynamic-protocol | Full | Uniqueness ≥80%, diversityIndex ≥0.4, entropy ≥4 bits, no reuse <8 hop sets, AS/Org diversity ≥15%, path length stddev > 0, VRF/beacon entropy ≥8 bits |
 | 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Global & per-chain depth/weight, epoch monotonicity, signer duplication & signature coverage, emergency advance gating |
 | 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31, 36 | artifact + static-structural + dynamic-protocol | Full | Voucher struct + aggregated sig + FROST n≥5 t=3 + advanced PoW convergence (slope/rolling/stability) & multi-bucket stats |
-|10 Governance anti-concentration & partition safety | 15 | artifact | Full | Advanced historical diversity (volatility, window share, delta share, avgTop3) thresholds enforced |
+|10 Governance anti-concentration & partition safety | 15 | artifact | Full | Diversity volatility/window/delta/top3 + 7d degradation, gap ratio, spike detection enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Stricter numeric bounds (retry<=25ms, udpTimeout 100–600ms, std<=450ms, cv<=1.2, model>=0.7, coverConn>=2, anomalies constrained) enforced |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index + entropy/no-early-reuse safeguards |
 |13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity |

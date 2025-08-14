@@ -321,6 +321,8 @@ export interface IngestedEvidence {
   maxDeltaShare?: number; // max change between consecutive windows
   avgTop3?: number; // average of top 3 AS shares across period
   degradationPct?: number; // observed degradation (>0.2 triggers PARTITION_DEGRADATION)
+  degradationComputedPct?: number; // auto-computed if degradationPct absent (baseline vs final window top1 share increase)
+  seriesGapRatio?: number; // fraction of expected hourly points present (for gap detection)
   advancedStable?: boolean; // previously referenced advanced stability flag
   };
   mix?: {
