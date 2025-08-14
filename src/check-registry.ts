@@ -1061,7 +1061,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     id: 16,
     key: 'ledger-finality-observation',
     name: 'Ledger Finality Observation',
-    description: 'Deep validation of 2-of-3 finality, quorum certificate weights, emergency advance prerequisites',
+  description: 'Deep validation of chain-level 2-of-3 finality, quorum certificate weights, epoch monotonicity & emergency advance prerequisites',
     severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
@@ -1103,15 +1103,64 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           const emergencyOk = (typeof emergencyAdvanceLivenessDays === 'number' && emergencyAdvanceLivenessDays >= 14) && !!emergencyAdvanceJustification;
           if (!emergencyOk) failureCodes.push('EMERGENCY_LIVENESS_SHORT');
         }
+        // Task 7 extended validations
+        const chains = Array.isArray(ledger.chains) ? ledger.chains : [];
+        const requiredDepth = ledger.requiredFinalityDepth || 2;
+        const weightThreshold = ledger.weightThresholdPct || 0.66;
+        let chainDepthOk = true;
+        let chainWeightOk = true;
+        let epochMonotonicOk = true;
+        const chainIssues: string[] = [];
+        if (chains.length) {
+          // Check per-chain finality depth and weight sums
+          for (const ch of chains) {
+            if (typeof ch.finalityDepth === 'number' && ch.finalityDepth < requiredDepth) { chainDepthOk = false; chainIssues.push(`${ch.name}:depth<${requiredDepth}`); }
+            if (typeof ch.weightSum === 'number' && typeof ledger.quorumWeights === 'undefined') {
+              // If quorumWeights not provided globally use chain weight vs threshold proportionally (placeholder expecting normalized 0..1)
+              if (ch.weightSum < weightThreshold) { chainWeightOk = false; chainIssues.push(`${ch.name}:weight<${weightThreshold}`); }
+            }
+          }
+          // Epoch monotonicity
+          const epochs = chains.map((c: any) => c.epoch).filter((e: any) => typeof e === 'number') as number[];
+          for (let i=1;i<epochs.length;i++) { if (epochs[i]! >= epochs[i-1]!) continue; epochMonotonicOk = false; chainIssues.push('epoch-non-monotonic'); break; }
+        }
+        if (!chainDepthOk) failureCodes.push('CHAIN_FINALITY_DEPTH_SHORT');
+        if (!chainWeightOk) failureCodes.push('CHAIN_WEIGHT_THRESHOLD');
+        if (!epochMonotonicOk) failureCodes.push('EPOCH_NON_MONOTONIC');
+        // Signer / duplicate detection
+  if (chains.some((c: any) => Array.isArray(c.signatures))) {
+          const signerCounts: Record<string, number> = {};
+          let invalidSig = false;
+          let totalSigners = 0;
+          for (const c of chains) {
+            for (const s of (c.signatures || [])) {
+              totalSigners++;
+              signerCounts[s.signer] = (signerCounts[s.signer]||0)+1;
+              if (s.valid === false) invalidSig = true;
+              if (s.weight && s.weight < 0) failureCodes.push('SIGNER_WEIGHT_INVALID');
+            }
+          }
+          const dup = Object.values(signerCounts).some(v=> v> (chains.length)); // heuristic duplicate across epochs
+          if (dup) failureCodes.push('DUPLICATE_SIGNER');
+          if (invalidSig) failureCodes.push('SIGNATURE_INVALID');
+          ledger.uniqueSignerCount = Object.keys(signerCounts).length;
+          ledger.duplicateSignerDetected = dup;
+        }
+        // Placeholder signature verification coverage metric
+        if (typeof ledger.signatureSampleVerifiedPct === 'number' && ledger.signatureSampleVerifiedPct < 50) {
+          failureCodes.push('SIGNATURE_COVERAGE_LOW');
+        }
+        // Weight cap
+        if (ledger.weightCapExceeded) failureCodes.push('WEIGHT_CAP_EXCEEDED');
         passed = failureCodes.length === 0;
         details = passed
-          ? `✅ Finality sets=${(finalitySets||[]).length} depth=${finalityDepth ?? 'n/a'} quorumCertsOk weights=${quorumWeights ? quorumWeights.length : 0}${emergencyAdvanceUsed ? ' emergencyAdvanceOk' : ''}`
-          : `❌ Ledger issues: ${failureCodes.join(',')}`;
+          ? `✅ Finality sets=${(finalitySets||[]).length} depth=${finalityDepth ?? 'n/a'} chains=${chains.length} quorumCertsOk weights=${quorumWeights ? quorumWeights.length : (chains.length||0)}${emergencyAdvanceUsed ? ' emergencyAdvanceOk' : ''}`
+          : `❌ Ledger issues: ${failureCodes.join(',')}${chainIssues.length? ' details='+chainIssues.join('|'):''}`;
         if (!passed && Array.isArray(ledger.quorumCertificateInvalidReasons) && ledger.quorumCertificateInvalidReasons.length) {
           details += ' reasons=' + ledger.quorumCertificateInvalidReasons.join(',');
         }
       }
-      return { id: 16, name: 'Ledger Finality Observation', description: 'Deep validation of 2-of-3 finality, quorum certificate weights, emergency advance prerequisites', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
+      return { id: 16, name: 'Ledger Finality Observation', description: 'Deep validation of chain-level 2-of-3 finality, quorum certificate weights, epoch monotonicity & emergency advance prerequisites', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
     }
   }
   ,

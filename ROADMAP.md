@@ -270,80 +270,6 @@ Key Caveats & Clarifications (Required for Full Normative Claim)
 14. [ ] PQ Date Boundary: UTC-based comparison with explicit ISO date parsing and logged override usage.
 15. [ ] Algorithm Agility Registry (Spec §2): Document presence/absence; note non-compliance impact though outside §11.
 
-Final Compliance Tasks (Strict Full Betanet 1.1 Normative Closure)
------------------------------------------------------------------
-The following tasks constitute the definitive completion list. Implementing all (with green tests and documented evidence) upgrades the project from "functionally Full" to "strict normative Full" (no advisory caveats). Each task lists: Objective, Scope, Acceptance Criteria (AC), and Suggested Tests. Once every AC is satisfied, declare final compliance.
-
-1. Raw TLS/QUIC Capture & Calibration Engine
-  - Objective: Replace heuristic JA3/JA4 + partial QUIC parse with true packet-level canonicalization.
-  - Scope: Implement pcap or in-process capture (client mode), canonical JA3 & JA4 string/hash, QUIC Initial full varint/TLS ClientHello extraction, SETTINGS tolerance (±15% where allowed) and exact mismatch codes.
-  - AC:
-    * Emit fields: rawClientHelloB64, ja3Canonical, ja3Hash (MD5), ja4, quicInitial.rawInitialB64, quicInitial.parsed (version, dcid, scid, tokenLen, alpn list, transport params subset).
-    * Check 22 fails with specific codes (ALPN_ORDER_MISMATCH, EXT_SEQUENCE_MISMATCH, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH) when deviations present.
-    * Unit tests with synthetic captures covering each failure code.
-    * Integration test demonstrating pass on golden fixture and fail on perturbed traces.
-
-2. Encrypted ClientHello (ECH) Verification
-  - Objective: Confirm real ECH acceptance not just extension token presence.
-  - Scope: Perform dual handshake (outer SNI vs encrypted); verify expected certificate difference or GREASE absence metrics.
-  - AC: Check produces echVerified=true only after differential handshake proof; negative test where extension present but no behavioral change.
-
-3. Noise XK Transcript & Rekey Validation
-  - Objective: Capture real Noise messages & enforce rekey triggers (≥8 GiB OR ≥ 2^16 frames OR ≥1 h) and nonce lifecycle.
-  - AC: Evidence.noiseTranscript.messages length & pattern validated; rekeyObserved boolean with triggerReason; failure codes: NO_REKEY, NONCE_OVERUSE, MSG_PATTERN_MISMATCH. Tests simulating each trigger path + failure.
-
-4. Voucher Aggregated Signature Cryptographic Verification
-  - Objective: Validate aggregatedSig64 over voucher secret/document using supplied mint public key set (FROST n≥5, t=3) with threshold math.
-  - AC: Check 31 requires signatureValid=true; failure codes: FROST_PARAMS_INVALID, AGG_SIG_INVALID, INSUFFICIENT_KEYS. Negative test: altered sig fails.
-
-5. SCION Gateway Control-Stream & CBOR Validation
-  - Objective: Parse gateway CBOR control stream (path offers, rotation notices) and enforce duplicate / timing constraints.
-  - AC: Evidence.scionControl: {offers: ≥3, uniquePaths≥3, noLegacyHeader=true}; failure on duplicate within window or legacy header presence. Tests with malformed CBOR & duplicate path set.
-
-6. Chain Finality & Emergency Advance Deep Validation
-  - Objective: Enforce 2-of-3 finality with per-chain certificate weight sums, epoch monotonicity, emergency advance liveness (≥14 days inactivity) and justification proof.
-  - AC: governance/ledger evidence includes finalityDepth, quorumWeights[], emergencyAdvance {used:boolean, justified:boolean, livenessDays:int}; failure codes: FINALITY_DEPTH_SHORT, EMERGENCY_LIVENESS_SHORT, QUORUM_WEIGHT_MISMATCH.
-
-7. Governance ACK Span & Partition Safety Dataset
-  - Objective: Incorporate 7-day historical ACK diversity (AS / ISD counts & shares) ensuring ≤20% degradation pre-activation.
-  - AC: Evidence.governanceHistoricalDiversity includes series with ≥7*24 points; computed volatility, maxWindowShare, maxDeltaShare thresholds satisfied; failure code PARTITION_DEGRADATION when degradation >20%. Fixture with induced degradation triggers fail.
-
-8. Cover Connection Provenance & Timing Enforcement
-  - Objective: Classify cover vs real connections, enforce min cover count, teardown distribution (stddev, CV) & retry delay window.
-  - AC: Evidence.fallbackTiming.coverConnections ≥2 (already) plus provenance categories enumerated; new metrics: coverStartDelayMs, teardownIqrMs, outlierPct; thresholds documented; failure codes: COVER_INSUFFICIENT, COVER_DELAY_OUT_OF_RANGE, TEARDOWN_VARIANCE_EXCESS.
-
-9. Algorithm Agility Registry Validation (Spec §2)
-  - Objective: Parse registry artifact enumerating allowed cipher/hash/KEM combos & verify binary/evidence only uses registered sets.
-  - AC: Evidence.algorithmAgility {registryDigest, allowedSets[], usedSets[], unregisteredUsed[]} with unregisteredUsed empty on pass. Negative test with injected unsupported combo.
-
-10. Full SLSA 3+ Provenance Chain & Materials Policy
-   - Objective: Enforce DSSE envelope signature with trusted root keys, verify all build steps pinned, materials completeness, toolchain version pinning, reproducible rebuild.
-   - AC: provenance.signatureVerified=true, requiredSigners≥threshold, materialsCompleteness=full, toolchainDiff=0, rebuildDigestMatch=true; failure codes: SIG_INVALID, MISSING_SIGNER, MATERIAL_GAP, REBUILD_MISMATCH. Integration test mocks DSSE envelope.
-
-11. Evidence Authenticity & Bundle Trust
-  - Objective: Require optional signed evidence bundle (minisign/cosign) for artifact upgrades; reject if signature missing in strict-auth mode.
-  - AC: strictAuth mode flag (CLI --strict-auth) triggers Check 35 requiring detached signature OR multi-signer bundle; failure code EVIDENCE_UNSIGNED.
-
-[x] 12. Adaptive PoW & Rate-Limit Statistical Validation
-   - Objective: Analyze powAdaptive.difficultySamples trend toward target acceptance percentile; rateLimit bucket dispersion statistical sanity beyond presence.
-   - AC: Metrics: difficultyTrendStable=true, maxDrop<=configured, acceptancePercentile within tolerance; failure codes: POW_TREND_DIVERGENCE. Test with divergent synthetic series.
-
-[x] 13. Statistical Jitter Randomness Tests
-   - Objective: Apply chi-square or KS test + variance bounds to adaptive jitter & cover teardown distributions.
-   - AC: randomnessTest.pValue > 0.01 on pass; failure code JITTER_RANDOMNESS_WEAK otherwise. Deterministic fixture triggers fail test.
-
-[x] 14. Post-Quantum Date Boundary Reliability
-   - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
-   - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE. Tests with mocked date contexts.
-
-[x] 15. Negative Assertion Expansion & Forbidden Artifact Hashes
-   - Objective: Maintain deny-list (legacy header pattern, deterministic seed, deprecated cipher constants) hashed & compared.
-   - AC: negative.forbiddenPresent=false required; failure codes enumerated per artifact. Test injecting each forbidden token.
-
-[x] 16. Comprehensive Test & Fixture Expansion
-   - Objective: Ensure ≥1 positive + ≥1 negative test per failure code introduced above; code coverage ≥90% for check registries.
-   - AC: CI reports coverage threshold met; all new failure modes demonstrably exercised.
-
 Implementation Guidance
 -----------------------
 Sequence suggestion: (1) Raw capture + ECH → (3) Noise transcript → (4) Voucher sig → (6/7) Ledger/Gov deepening → (10/11) Provenance authenticity → remaining statistical & agility tasks. Parallelize where feasible (capture vs provenance).
@@ -374,9 +300,12 @@ The following additional items were identified as still incomplete for a strictl
   - Implemented: Extended mix evidence schema (beaconSources, aggregatedBeaconEntropyBits, vrfProofs, nodeASNs, nodeOrgs, asDiversityIndex, orgDiversityIndex, firstReuseIndex, requiredUniqueBeforeReuse). Check 17 upgraded to enforce: ≥5 samples, uniqueness adaptive threshold (≥80% default), minimum hop depth, entropy ≥4 bits, no hop set reuse before threshold (default 8), AS & Org diversity (≥15% unique), VRF proof validity, aggregated beacon entropy ≥8 bits. Automatic computation of entropy, first reuse index, and diversity ratios when possible.
   - Tests: Added positive case with VRF proofs + beacon entropy + high diversity; negative case with early reuse, low diversity, low entropy.
   - Caveats (non-blocking): Real-time beacon fetching (drand/NIST/ETH block hash) & cryptographic VRF verification (current proofs simulated), advanced AS/Org classification accuracy (current simple mapping), configurable entropy/diversity thresholds & statistical confidence intervals.
-7. [ ] Alias Ledger 2-of-3 Finality & Emergency Advance Validation
-  - Parse per-chain finality depths, quorum certificate weights & signatures, 14‑day liveness prerequisite, epoch monotonicity; FINALITY_DEPTH_SHORT / EMERGENCY_LIVENESS_SHORT / QUORUM_WEIGHT_MISMATCH codes.
-  - Caveats: real RPC / artifact ingestion for 3 chains, Ed25519 quorum cert signature validation, weight cap enforcement, emergency advance 14‑day liveness gating logic, epoch ordering checks.
+7. [x] Alias Ledger 2-of-3 Finality & Emergency Advance Validation
+  - Implemented: Extended ledger evidence schema (`chains[]`, per-chain `finalityDepth`, `weightSum`, `epoch`, `signatures[]` with signer/weight/valid) plus policy fields (`requiredFinalityDepth`, `weightThresholdPct`, `signatureSampleVerifiedPct`, `weightCapExceeded`).
+  - Check 16 upgraded: validates global + per-chain depth, per-chain weight threshold, epoch monotonicity, signer duplication heuristic, negative signer weights, invalid signature flags, signature coverage %, weight cap, existing quorum certificate validity & emergency advance liveness (≥14 days) with justification.
+  - New failure codes: CHAIN_FINALITY_DEPTH_SHORT, CHAIN_WEIGHT_THRESHOLD, EPOCH_NON_MONOTONIC, SIGNER_WEIGHT_INVALID, DUPLICATE_SIGNER, SIGNATURE_INVALID, SIGNATURE_COVERAGE_LOW, WEIGHT_CAP_EXCEEDED (in addition to FINALITY_DEPTH_SHORT, EMERGENCY_LIVENESS_SHORT, QUORUM_CERTS_INVALID, QUORUM_WEIGHT_MISMATCH).
+  - Tests: Added positive extended pass and comprehensive multi-failure scenario exercising all new codes (`final-compliance-tasks.test.ts`).
+  - Caveats (non-blocking): Real quorum certificate Ed25519 signature verification (placeholder validity flag), external chain RPC ingestion, refined duplicate signer/org detection, dynamic weight normalization & cap policy configuration.
 8. [x] Voucher Aggregated Signature (FROST) Cryptographic Verification
   - Implemented: Check 31 enforces FROST threshold (n≥5, t=3), keyset/key presence, aggregated signature validity flag; evidence schema `voucherCrypto` extended (publicKeysB64, aggregatedPublicKeyB64, sigAlgorithm, verificationMode, signatureComputedValid). Negative tests exercise FROST_PARAMS_INVALID, AGG_SIG_INVALID, INSUFFICIENT_KEYS.
   - Remaining future (non-blocking) enhancement: real FROST aggregated Ed25519 verification (current path uses structured/static validation + placeholder), keysetId derivation cross-check & malformed length fuzz cases.

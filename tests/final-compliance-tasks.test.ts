@@ -430,6 +430,55 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       expect(check16.passed).toBe(false);
       expect(check16.details).toMatch(/QUORUM_WEIGHT_MISMATCH/);
     });
+
+    // Task 7 extended validations (per-chain depth, weight thresholds, epochs, signatures)
+    it('passes extended Task 7 per-chain validations', async () => {
+      const ledger = {
+        finalitySets: ['epoch-1','epoch-2','epoch-3'],
+        finalityDepth: 3,
+        quorumCertificatesValid: true,
+        quorumWeights: [10,11,12],
+        requiredFinalityDepth: 2,
+        weightThresholdPct: 0.66,
+        signatureSampleVerifiedPct: 80,
+        chains: [
+          { name: 'A', finalityDepth: 3, weightSum: 0.70, epoch: 1, signatures: [ { signer: 'S1', weight: 5, valid: true }, { signer: 'S2', weight: 5, valid: true } ] },
+          { name: 'B', finalityDepth: 4, weightSum: 0.72, epoch: 2, signatures: [ { signer: 'S3', weight: 6, valid: true }, { signer: 'S4', weight: 6, valid: true } ] }
+        ]
+      };
+      const result = await runWithAnalyzer(analyzerForLedger(ledger));
+      const check16 = result.checks.find(c => c.id === 16)!;
+      expect(check16.passed).toBe(true);
+    });
+
+    it('fails extended Task 7 with multiple new failure codes', async () => {
+      const ledger = {
+        finalitySets: ['epoch-1','epoch-2'],
+        finalityDepth: 1, // triggers FINALITY_DEPTH_SHORT
+        quorumCertificatesValid: true,
+        requiredFinalityDepth: 2,
+        weightThresholdPct: 0.66,
+        signatureSampleVerifiedPct: 40, // low coverage
+        chains: [
+          { name: 'A', finalityDepth: 1, weightSum: 0.5, epoch: 2, signatures: [ { signer: 'S1', weight: 5, valid: true }, { signer: 'S1', weight: 5, valid: true }, { signer: 'S1', weight: 5, valid: false } ] }, // duplicate signer thrice triggers heuristic
+          { name: 'B', finalityDepth: 1, weightSum: 0.5, epoch: 1, signatures: [ { signer: 'S2', weight: -1, valid: false } ] } // negative weight + invalid sig + epoch regression
+        ],
+        weightCapExceeded: true
+      };
+      const result = await runWithAnalyzer(analyzerForLedger(ledger));
+      const check16 = result.checks.find(c => c.id === 16)!;
+      expect(check16.passed).toBe(false);
+      const d = check16.details || '';
+      expect(d).toMatch(/FINALITY_DEPTH_SHORT/);
+      expect(d).toMatch(/CHAIN_FINALITY_DEPTH_SHORT/);
+      expect(d).toMatch(/CHAIN_WEIGHT_THRESHOLD/);
+      expect(d).toMatch(/EPOCH_NON_MONOTONIC/);
+      expect(d).toMatch(/SIGNER_WEIGHT_INVALID/);
+      expect(d).toMatch(/DUPLICATE_SIGNER/);
+      expect(d).toMatch(/SIGNATURE_INVALID/);
+      expect(d).toMatch(/SIGNATURE_COVERAGE_LOW/);
+      expect(d).toMatch(/WEIGHT_CAP_EXCEEDED/);
+    });
   });
 
   // Task 7: Governance ACK Span & Partition Safety Dataset

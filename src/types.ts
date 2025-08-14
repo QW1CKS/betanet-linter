@@ -298,7 +298,18 @@ export interface IngestedEvidence {
     emergencyAdvanceUsed?: boolean;
     emergencyAdvanceJustification?: string;
     emergencyAdvanceLivenessDays?: number;
-    emergencyAdvance?: { used?: boolean; justified?: boolean; livenessDays?: number };
+  emergencyAdvance?: { used?: boolean; justified?: boolean; livenessDays?: number; chain?: string };
+  // Task 7 extended fields
+  chains?: { name: string; finalityDepth?: number; weightSum?: number; epoch?: number; signatures?: { signer: string; weight?: number; valid?: boolean }[] }[]; // per-chain details
+  requiredFinalityDepth?: number; // policy minimum
+  weightThresholdPct?: number; // e.g., 0.66 for 2-of-3
+  uniqueSignerCount?: number; // computed signers across certificates
+  duplicateSignerDetected?: boolean; // flag duplicates
+  epochMonotonic?: boolean; // aggregate monotonicity validation
+  emergencyAdvanceActiveChains?: string[]; // chains requiring liveness gating
+  signatureValidationMode?: 'placeholder' | 'ed25519'; // cryptographic mode
+  signatureSampleVerifiedPct?: number; // percent of sampled signatures verified
+  weightCapExceeded?: boolean; // if any signer weight beyond cap
   };
   governanceHistoricalDiversity?: {
     // Time-series of AS share distributions: array of { timestamp, asShares: { [as: string]: number } }
