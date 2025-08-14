@@ -76,6 +76,16 @@ program
   .option('--sandbox-network-deny', 'Force deny network operations even if --enable-network specified (records blocked attempts)')
   // Task 31 Performance benchmarking inline option
   .option('--perf-report <file>', 'Write performance JSON report (per-check durations, aggregates)')
+  // Task 5 Caveat Resolution: configurable PoW & rate-limit parameters
+  .option('--pow-window-size <n>', 'Rolling window size for PoW stability metrics (default 5)', v => parseInt(v,10))
+  .option('--pow-tolerance-bits <n>', 'Tolerance ±bits around target for acceptance (default 2)', v => parseInt(v,10))
+  .option('--pow-acceptance-threshold <f>', 'Overall acceptance threshold (0-1, default 0.7)', v => parseFloat(v))
+  .option('--pow-recent-acceptance-threshold <f>', 'Recent window acceptance threshold (0-1, default 0.65)', v => parseFloat(v))
+  .option('--pow-slope-abs-max <f>', 'Maximum absolute slope magnitude (default 0.2)', v => parseFloat(v))
+  .option('--pow-max-drop <n>', 'Maximum allowed single drop in bits (default 4)', v => parseInt(v,10))
+  .option('--pow-window-max-drop <n>', 'Maximum allowed drop within any rolling window (default 3)', v => parseInt(v,10))
+  .option('--rate-dispersion-max <n>', 'Maximum allowed rate-limit capacity dispersion ratio (default 100)', v => parseInt(v,10))
+  .option('--rate-saturation-max <n>', 'Maximum allowed observed bucket saturation percent (default 98)', v => parseInt(v,10))
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -131,6 +141,15 @@ program
   sandboxMemoryBudgetMb: options.sandboxMemoryBudgetMb,
   sandboxFsWriteDeny: options.sandboxFsDeny,
   sandboxNetworkDeny: options.sandboxNetworkDeny
+  , powWindowSize: options.powWindowSize,
+  powToleranceBits: options.powToleranceBits,
+  powAcceptanceThreshold: options.powAcceptanceThreshold,
+  powRecentAcceptanceThreshold: options.powRecentAcceptanceThreshold,
+  powSlopeAbsMax: options.powSlopeAbsMax,
+  powMaxDropBits: options.powMaxDrop,
+  powWindowMaxDropBits: options.powWindowMaxDrop,
+  rateDispersionMax: options.rateDispersionMax,
+  rateSaturationMaxPct: options.rateSaturationMax
       });
       
       if (options.sbom) {

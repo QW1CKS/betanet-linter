@@ -222,6 +222,16 @@ export interface CheckOptions {
   sandboxMemoryBudgetMb?: number; // soft RSS memory ceiling
   sandboxFsWriteDeny?: boolean; // deny filesystem writes (best-effort) during analysis
   sandboxNetworkDeny?: boolean; // force network disabled regardless of enableNetwork flag
+  // Task 5 Caveat Resolution: configurable PoW & rate-limit statistical thresholds
+  powWindowSize?: number; // rolling window size for stability analysis (default 5)
+  powToleranceBits?: number; // tolerance band ±bits around target for acceptance (default 2)
+  powAcceptanceThreshold?: number; // minimum overall acceptance proportion (default 0.7)
+  powRecentAcceptanceThreshold?: number; // minimum recent window acceptance (default 0.65)
+  powSlopeAbsMax?: number; // maximum absolute regression slope magnitude for stability (default 0.2)
+  powMaxDropBits?: number; // maximum allowed single drop across full series (default 4)
+  powWindowMaxDropBits?: number; // maximum allowed drop within any rolling window (default 3)
+  rateDispersionMax?: number; // maximum allowed capacity dispersion ratio (default 100)
+  rateSaturationMaxPct?: number; // maximum allowed observed saturation percentage (default 98)
 }
 
 export interface SBOMOptions {

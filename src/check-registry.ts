@@ -883,14 +883,30 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       const ev = analyzer.evidence || {};
       const pow = ev.powAdaptive;
       const rl = ev.rateLimit;
+      const opt = (analyzer.options||{});
       if (!pow) {
         return { id: 36, name: 'Adaptive PoW & Rate-Limit Statistics', description: 'Analyzes PoW difficulty convergence (slope, acceptance percentile, rolling stability) & multi-bucket rate-limit saturation/dispersion', passed: false, details: '❌ POW_EVIDENCE_MISSING: No powAdaptive evidence', severity: 'major', evidenceType: 'heuristic' };
       }
       const samples: number[] = Array.isArray(pow.difficultySamples) ? pow.difficultySamples.slice() : [];
       const target = typeof pow.targetBits === 'number' ? pow.targetBits : (samples.length ? samples[0] : 0);
-      // Metrics
+      // Configurable thresholds (fallback to defaults when undefined)
+      const windowSizeCfg = Number.isFinite(opt.powWindowSize) && opt.powWindowSize>2 ? opt.powWindowSize : (pow.windowSize && pow.windowSize>2 ? pow.windowSize : 5);
+      const tolBits = Number.isFinite(opt.powToleranceBits) ? opt.powToleranceBits : 2;
+      const acceptanceThreshold = Number.isFinite(opt.powAcceptanceThreshold) ? opt.powAcceptanceThreshold : 0.7;
+      const recentAcceptanceThreshold = Number.isFinite(opt.powRecentAcceptanceThreshold) ? opt.powRecentAcceptanceThreshold : 0.65;
+      const slopeAbsMax = Number.isFinite(opt.powSlopeAbsMax) ? opt.powSlopeAbsMax : 0.2;
+      const maxDropLimit = Number.isFinite(opt.powMaxDropBits) ? opt.powMaxDropBits : 4;
+      const windowMaxDropLimit = Number.isFinite(opt.powWindowMaxDropBits) ? opt.powWindowMaxDropBits : 3;
+      const rateDispersionMax = Number.isFinite(opt.rateDispersionMax) ? opt.rateDispersionMax : 100;
+      const rateSaturationMaxPct = Number.isFinite(opt.rateSaturationMaxPct) ? opt.rateSaturationMaxPct : 98;
+      // Metrics (single-pass constant-time style scanning w/ fixed operations per element)
       let maxDrop = 0;
-      for (let i=1;i<samples.length;i++) { const drop = samples[i-1] - samples[i]; if (drop>maxDrop) maxDrop = drop; }
+      for (let i=1;i<samples.length;i++) {
+        const prev = samples[i-1];
+        const curr = samples[i];
+        const drop = prev - curr;
+        if (drop > maxDrop) maxDrop = drop;
+      }
       // Linear regression slope (simple):
       let slope = 0;
       if (samples.length >= 3) {
@@ -898,11 +914,21 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         let num=0, den=0; for (let i=0;i<n;i++){ num += (xs[i]-meanX)*(samples[i]-meanY); den += (xs[i]-meanX)**2; }
         slope = den ? num/den : 0;
       }
-      // Acceptance percentile: % of samples within ±2 of target
-      const withinTol = samples.filter(v => Math.abs(v - target) <= 2).length;
+      // Acceptance percentile: % of samples within tolerance band
+      const withinTol = samples.filter(v => Math.abs(v - target) <= tolBits).length;
       const acceptancePercentile = samples.length ? withinTol / samples.length : 0;
-      // Rolling window stability (size 5 or specified)
-      const windowSize = pow.windowSize && pow.windowSize>2 ? pow.windowSize : 5;
+      // Wilson score 95% confidence interval for acceptance proportion
+      let acceptanceCI: [number, number] = [0,0];
+      if (samples.length) {
+        const z = 1.96; // 95%
+        const n = samples.length; const phat = acceptancePercentile;
+        const denom = 1 + (z*z)/n;
+        const center = phat + (z*z)/(2*n);
+        const margin = z * Math.sqrt((phat*(1-phat) + (z*z)/(4*n))/n);
+        acceptanceCI = [Math.max(0,(center - margin)/denom), Math.min(1,(center + margin)/denom)];
+      }
+      // Rolling window stability
+      const windowSize = windowSizeCfg;
       let windowMaxDrop = 0;
       if (samples.length >= windowSize) {
         for (let i=0;i<=samples.length-windowSize;i++) {
@@ -917,18 +943,18 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       if (samples.length >= windowSize) {
         for (let i=0;i<=samples.length-windowSize;i++) {
           const win = samples.slice(i,i+windowSize);
-          const wWithin = win.filter(v => Math.abs(v-target) <= 2).length;
+          const wWithin = win.filter(v => Math.abs(v-target) <= tolBits).length;
             rollingAcceptance.push(wWithin / win.length);
         }
       }
       const recentAcceptance = rollingAcceptance.length ? rollingAcceptance[rollingAcceptance.length-1] : acceptancePercentile;
       // Derive recentMeanBits for reporting
       const recentMeanBits = samples.length >= windowSize ? (samples.slice(-windowSize).reduce((a,b)=>a+b,0)/windowSize) : (samples.reduce((a,b)=>a+b,0)/(samples.length||1));
-      const difficultyTrendStable = Math.abs(slope) <= 0.2; // heuristic threshold
-      const maxDropOk = maxDrop <= 4; // reuse earlier PoW evolution tolerance
-      const acceptanceOk = acceptancePercentile >= 0.7; // require 70% within tolerance band
-      const rollingStable = windowMaxDrop <= 3; // tighter bound inside rolling window
-      const recentAcceptanceOk = recentAcceptance >= 0.65; // slightly lenient on latest window
+      const difficultyTrendStable = Math.abs(slope) <= slopeAbsMax;
+      const maxDropOk = maxDrop <= maxDropLimit;
+      const acceptanceOk = acceptancePercentile >= acceptanceThreshold && acceptanceCI[0] >= (acceptanceThreshold - 0.05); // require point est >= threshold and lower CI not catastrophically low
+      const rollingStable = windowMaxDrop <= windowMaxDropLimit;
+      const recentAcceptanceOk = recentAcceptance >= recentAcceptanceThreshold;
       // Rate-limit dispersion sanity (if rl evidence present)
       let rateLimitOk = true;
       let rateLimitSaturationOk = true;
@@ -942,7 +968,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           const min = Math.min(...caps); const max = Math.max(...caps); const ratio = max/min;
           // Flag as suspicious if dispersion extreme (>100x) unless explicitly justified
           bucketAcceptanceDispersion = ratio;
-          if (ratio > 100) { rateLimitOk = false; bucketDispersionHigh = true; }
+          if (ratio > rateDispersionMax) { rateLimitOk = false; bucketDispersionHigh = true; }
           // 95th percentile capacity
           const sorted = caps.slice().sort((a: number, b: number)=>a-b);
           const idx = Math.min(sorted.length-1, Math.floor(0.95*sorted.length));
@@ -953,7 +979,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           const sat = rl.bucketSaturationPct.filter((v:number)=> Number.isFinite(v));
           if (sat.length) {
             const maxSat = Math.max(...sat);
-            if (maxSat > 98) { rateLimitSaturationOk = false; bucketSaturationExcess = true; }
+      if (maxSat > rateSaturationMaxPct) { rateLimitSaturationOk = false; bucketSaturationExcess = true; }
           }
         }
       }
@@ -961,7 +987,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       const evidenceType: 'heuristic' | 'artifact' = (pow && rl) ? 'artifact' : 'heuristic';
       let details: string;
       if (passed) {
-        details = `✅ PoW stable slope=${slope.toFixed(3)} maxDrop=${maxDrop} windowMaxDrop=${windowMaxDrop} accept=${(acceptancePercentile*100).toFixed(0)}% recentWinAccept=${(recentAcceptance*100).toFixed(0)}% bucketsDispersion=${bucketAcceptanceDispersion.toFixed(2)}${capacityP95?` p95Cap=${capacityP95}`:''}`;
+    details = `✅ PoW stable slope=${slope.toFixed(3)} maxDrop=${maxDrop}/${maxDropLimit} windowMaxDrop=${windowMaxDrop}/${windowMaxDropLimit} tol±${tolBits} accept=${(acceptancePercentile*100).toFixed(0)}% CI95=[${(acceptanceCI[0]*100).toFixed(0)},${(acceptanceCI[1]*100).toFixed(0)}]% recentWinAccept=${(recentAcceptance*100).toFixed(0)}% bucketsDispersion=${bucketAcceptanceDispersion.toFixed(2)}/${rateDispersionMax}${capacityP95?` p95Cap=${capacityP95}`:''}`;
       } else {
         const codes: string[] = [];
         if (!difficultyTrendStable) codes.push('POW_SLOPE_INSTABILITY');
@@ -972,7 +998,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         if (!rateLimitOk && bucketDispersionHigh) codes.push('BUCKET_DISPERSION_HIGH');
         if (!rateLimitSaturationOk && bucketSaturationExcess) codes.push('BUCKET_SATURATION_EXCESS');
         if (!codes.length) codes.push('POW_TREND_DIVERGENCE'); // fallback generic
-        details = `❌ ${codes.join('|')}`;
+    details = `❌ ${codes.join('|')} slope=${slope.toFixed(3)} accept=${(acceptancePercentile*100).toFixed(0)}% CI95=[${(acceptanceCI[0]*100).toFixed(0)},${(acceptanceCI[1]*100).toFixed(0)}]% maxDrop=${maxDrop}/${maxDropLimit} windowMaxDrop=${windowMaxDrop}/${windowMaxDropLimit} tol±${tolBits} recentWinAccept=${(recentAcceptance*100).toFixed(0)}% disp=${bucketAcceptanceDispersion.toFixed(2)}/${rateDispersionMax}`;
       }
       return { id: 36, name: 'Adaptive PoW & Rate-Limit Statistics', description: 'Analyzes PoW difficulty convergence (slope, acceptance percentile, rolling stability) & multi-bucket rate-limit saturation/dispersion', passed, details, severity: 'major', evidenceType };
     }

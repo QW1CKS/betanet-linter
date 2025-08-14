@@ -65,6 +65,39 @@ CLI flags:
 --strict (default true)
 --allow-heuristic   # opt-in to count heuristic passes
 ```
+#### Adaptive PoW & Rate-Limit Configuration (Task 5 Caveat Resolution)
+The adaptive PoW convergence & multi-bucket rate-limit statistics check (ID 36) now exposes tunable policy parameters. Defaults preserve historical behavior; adjust to tighten or relax acceptance in CI without code changes.
+
+Flags:
+```
+--pow-window-size <n>                # Rolling window size (default 5)
+--pow-tolerance-bits <n>             # ±bits tolerance band around target (default 2)
+--pow-acceptance-threshold <f>       # Overall acceptance proportion (default 0.7)
+--pow-recent-acceptance-threshold <f># Recent window acceptance (default 0.65)
+--pow-slope-abs-max <f>              # |slope| maximum for stability (default 0.2)
+--pow-max-drop <n>                   # Max single drop across full series (default 4)
+--pow-window-max-drop <n>            # Max drop within any rolling window (default 3)
+--rate-dispersion-max <n>            # Capacity dispersion ratio limit (default 100)
+--rate-saturation-max <n>            # Max observed bucket saturation percent (default 98)
+```
+
+Statistical confidence: The checker computes a Wilson 95% confidence interval (CI95) for the acceptance proportion and requires the point estimate ≥ threshold AND the lower bound not catastrophically below (≥ threshold - 0.05). Output embeds `CI95=[L,U]` plus configured limits for transparent policy drift tracking.
+
+Example:
+```powershell
+betanet-lint check ./binary --pow-acceptance-threshold 0.8 --pow-slope-abs-max 0.15 --rate-dispersion-max 50 --pow-window-size 7
+```
+
+Result detail snippet when passing:
+```
+✅ PoW stable slope=0.012 maxDrop=2/4 windowMaxDrop=1/3 tol±2 accept=82% CI95=[74,87]% recentWinAccept=80% bucketsDispersion=32.00/50
+```
+
+If failing due to acceptance divergence with CI:
+```
+❌ POW_ACCEPTANCE_DIVERGENCE slope=0.005 accept=66% CI95=[58,73]% maxDrop=5/4 windowMaxDrop=4/3 tol±2 ...
+```
+
 Exit codes:
 ```
 0 = All required (non-heuristic or allowed heuristic) checks passed
