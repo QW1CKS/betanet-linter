@@ -17,6 +17,10 @@
 > betanet-lint check ./your-binary --sbom --format cyclonedx-json --output json > compliance.json
 > ```
 > Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
+> IMPORTANT! IF YOU DELETE THE FOLDER, THEN RE-INSTALL IT AGAIN, MAKE SURE TO DELETE THE OLD CACHE FILES IN ORDER TO AVOID CRASHING:
+>```
+> sudo rm -rf /usr/local/bin/betanet-lint
+>```
 
 > **Quick Test (Dummy Fully-Compliant Fixture):**
 > A heuristic trigger binary is provided at `examples/dummy-betanet-compliant.c` so you can instantly observe a (near) full‑pass result.
