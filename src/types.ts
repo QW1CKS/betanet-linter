@@ -532,6 +532,32 @@ export interface IngestedEvidence {
     forbiddenPresent?: string[]; // list of forbidden tokens discovered
   };
   // Future: quicInitial, statisticalJitter, signedEvidence, governanceHistoricalDiversity
+  // Extended QUIC Initial parsing (Task 18)
+  quicInitialBaseline?: { calibrationHash?: string; capturedAt?: string };
+  quicInitial?: {
+    host?: string;
+    port?: number;
+    udpSent?: boolean;
+    error?: string;
+    rawInitialB64?: string;
+    responseRawB64?: string;
+    responseBytes?: number;
+    responseWithinMs?: number;
+    parsed?: {
+      version?: string; // e.g. 0x00000001
+      dcil?: number; scil?: number;
+      dcidHex?: string; scidHex?: string; // extracted IDs
+      tokenLength?: number; tokenHex?: string;
+      lengthField?: number;
+      versionNegotiation?: boolean;
+      retry?: boolean;
+      versionsOffered?: string[];
+      odcil?: number; // original DCID len (mirror)
+    };
+    calibrationHash?: string; // sha256 over stable subset of parsed fields
+    calibrationMismatch?: boolean; // set when differs from baseline
+    failureCodes?: string[]; // populated by Check 40 if failing
+  };
   [k: string]: any; // allow forward-compatible keys
 }
 

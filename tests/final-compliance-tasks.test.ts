@@ -568,6 +568,40 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
+  describe('Task 18: Extended QUIC Initial Parsing & Calibration Hash', () => {
+    function analyzerWithQuic(qi: any, baseline?: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        evidence: baseline ? { quicInitial: qi, quicInitialBaseline: baseline } : { quicInitial: qi }
+      } as any;
+    }
+    it('passes with complete parsed fields and stable calibration hash', async () => {
+      const parsed = { version: '0x00000001', dcil: 4, scil: 4, dcidHex: '01020304', scidHex: 'aabbccdd', tokenLength: 0, lengthField: 0 };
+      const calibrationHash = require('crypto').createHash('sha256').update(JSON.stringify({ version: parsed.version, dcid: parsed.dcidHex, scid: parsed.scidHex, tokenLength: parsed.tokenLength, lengthField: parsed.lengthField })).digest('hex');
+      const qi = { parsed, calibrationHash };
+      const baseline = { calibrationHash };
+      const result = await runWithAnalyzer(analyzerWithQuic(qi, baseline));
+      const check40 = result.checks.find(c => c.id === 40)!;
+      expect(check40.passed).toBe(true);
+    });
+    it('fails when calibration hash mismatches baseline', async () => {
+      const parsed = { version: '0x00000001', dcil: 4, scil: 4, dcidHex: '01020304', scidHex: 'aabbccdd', tokenLength: 0, lengthField: 0 };
+      const calibrationHash = require('crypto').createHash('sha256').update('different').digest('hex');
+      const qi = { parsed, calibrationHash, calibrationMismatch: true };
+      const baseline = { calibrationHash: 'abc' }; // different
+      const result = await runWithAnalyzer(analyzerWithQuic(qi, baseline));
+      const check40 = result.checks.find(c => c.id === 40)!;
+      expect(check40.passed).toBe(false);
+      expect(check40.details).toMatch(/QUIC_CALIBRATION_MISMATCH/);
+    });
+    it('fails when evidence missing', async () => {
+      const result = await runWithAnalyzer({ analyze: () => Promise.resolve({ strings: [], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }), evidence: {} } as any);
+      const check40 = result.checks.find(c => c.id === 40)!;
+      expect(check40.passed).toBe(false);
+      expect(check40.details).toMatch(/QUIC_EVIDENCE_MISSING/);
+    });
+  });
+
   // Task 7: Governance ACK Span & Partition Safety Dataset
   describe('Task 7: Governance Historical Diversity & Partition Safety (Check 15 extension)', () => {
     function analyzerForGov(hist: any, gov: any = {}) {

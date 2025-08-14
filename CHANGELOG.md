@@ -53,6 +53,14 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 
 ## Unreleased
 
+### Task 18: Extended QUIC Initial Parsing & Calibration Hash
+- Added harness extended QUIC Initial parsing: version, DCID/SCID lengths & hex values, token length, length field varint, negotiation & retry heuristics.
+- Introduced calibrationHash (sha256 over stable subset) with baseline `quicInitialBaseline`; mismatch flagged via `calibrationMismatch` and failure code QUIC_CALIBRATION_MISMATCH.
+- New Check 40 (Extended QUIC Initial Parsing & Calibration) validating evidence presence, parse completeness, version expectation (0x00000001), calibration stability; surfaces negotiation/retry as informational codes (QUIC_VERSION_NEGOTIATION, QUIC_RETRY).
+- Updated `types.ts` with extended `quicInitial` and baseline schema additions.
+- Added tests covering pass, calibration mismatch, and missing evidence scenarios.
+- Roadmap Task 18 marked complete; Task 24 will later expand to full transport parameter parsing & additional mismatch codes.
+
 ### Task 11 Completion: Provenance & Evidence Authenticity Hardening
 ### Task 12 Completion: Algorithm Agility Registry Enforcement
 ### Task 13 Completion: Statistical Jitter Randomness Multi-Metric Enforcement

@@ -660,7 +660,7 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     const start = Date.now();
   const socket = dgram.createSocket('udp4');
     let settled = false;
-    const initial: any = { host, port, udpSent: false };
+  const initial: any = { host, port, udpSent: false };
     // Craft a more realistic QUIC v1 Initial header scaffold (not a valid packet but structurally richer for parsing):
     // Long header: first byte 0xC3 (fixed bits + Initial type), Version 0x00000001, DCID len=4, DCID=0x01020304, SCID len=4, SCID=0xaabbccdd, Token length varint=0, Length varint=0 (placeholders)
     // Note: True QUIC Initial contains payload length & crypto frames; omitted here.
@@ -728,18 +728,25 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
         if (raw.length >= 14) {
           const version = '0x' + raw.slice(1,5).toString('hex');
           const dcil = raw[5];
+          const dcid = raw.slice(6, 6 + dcil);
           const scilIndex = 6 + dcil; // after DCID len + DCID
           const scil = raw[scilIndex];
+          const scid = raw.slice(scilIndex + 1, scilIndex + 1 + scil);
           const tokenLenIndex = scilIndex + 1 + scil; // after SCID len + SCID
           const tokenLength = raw[tokenLenIndex];
           let cursor = tokenLenIndex + 1;
+          let tokenHex: string | undefined;
+          if (tokenLength && tokenLength > 0 && cursor + tokenLength <= raw.length) {
+            tokenHex = raw.slice(cursor, cursor + tokenLength).toString('hex');
+            cursor += tokenLength;
+          }
           let lengthField: number | undefined; // stays let: assigned conditionally
           const lenDecoded = decodeVarInt(raw, cursor);
           if (lenDecoded) {
             lengthField = lenDecoded.value;
             cursor += lenDecoded.bytes;
           }
-          initial.parsed = { version, dcil, scil, tokenLength, lengthField, odcil: dcil };
+          initial.parsed = { version, dcil, scil, dcidHex: dcid.toString('hex'), scidHex: scid.toString('hex'), tokenLength, tokenHex, lengthField, odcil: dcil };
         } else {
           initial.parsed = { version: '0x00000001' };
         }
@@ -778,6 +785,18 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
           }
         } catch { /* ignore response parse */ }
       }
+    }
+    // Compute calibration hash over stable parsed subset
+    if (initial.parsed) {
+      try {
+        const stable = { version: initial.parsed.version, dcid: initial.parsed.dcidHex, scid: initial.parsed.scidHex, tokenLength: initial.parsed.tokenLength, lengthField: initial.parsed.lengthField };
+        initial.calibrationHash = crypto.createHash('sha256').update(JSON.stringify(stable)).digest('hex');
+        if (!(evidence as any).quicInitialBaseline) {
+          (evidence as any).quicInitialBaseline = { calibrationHash: initial.calibrationHash, capturedAt: new Date().toISOString() };
+        } else if ((evidence as any).quicInitialBaseline?.calibrationHash && (evidence as any).quicInitialBaseline.calibrationHash !== initial.calibrationHash) {
+          initial.calibrationMismatch = true;
+        }
+      } catch { /* ignore */ }
     }
     (evidence as any).quicInitial = initial;
   }

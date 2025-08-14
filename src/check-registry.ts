@@ -24,6 +24,51 @@ export interface CheckDefinitionMeta {
 
 export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
   {
+    id: 40,
+    key: 'quic-initial-extended',
+    name: 'Extended QUIC Initial Parsing & Calibration',
+    description: 'Parses QUIC Initial structural fields & enforces calibration hash stability',
+    severity: 'major',
+    introducedIn: '1.1',
+    mandatoryIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence || {};
+      const qi = ev.quicInitial;
+      const baseline = ev.quicInitialBaseline;
+      const failureCodes: string[] = [];
+      let evidenceType: 'heuristic' | 'dynamic-protocol' = 'heuristic';
+      if (qi && qi.parsed) evidenceType = 'dynamic-protocol';
+      if (!qi) {
+        failureCodes.push('QUIC_EVIDENCE_MISSING');
+        return { id: 40, name: 'Extended QUIC Initial Parsing & Calibration', description: 'Parses QUIC Initial structural fields & enforces calibration hash stability', passed: false, details: '❌ QUIC_EVIDENCE_MISSING', severity: 'major', evidenceType };
+      }
+      const p = qi.parsed || {};
+      // Basic completeness checks
+      if (!(p.version && typeof p.dcil === 'number' && typeof p.scil === 'number')) {
+        failureCodes.push('QUIC_PARSE_INCOMPLETE');
+      }
+      if (p.version && p.version !== '0x00000001' && !p.versionNegotiation) {
+        failureCodes.push('QUIC_VERSION_UNEXPECTED');
+      }
+      if (qi.calibrationMismatch) {
+        failureCodes.push('QUIC_CALIBRATION_MISMATCH');
+      }
+      if (p.versionNegotiation) failureCodes.push('QUIC_VERSION_NEGOTIATION');
+      if (p.retry) failureCodes.push('QUIC_RETRY');
+      // Determine pass criteria: no hard failure codes except negotiation/retry (treated informational if alone)
+      const hardFailures = failureCodes.filter(c => !['QUIC_VERSION_NEGOTIATION','QUIC_RETRY'].includes(c));
+      const passed = hardFailures.length === 0;
+      let details: string;
+      if (passed) {
+        details = `✅ QUIC Initial parsed v=${p.version} dcil=${p.dcil} scil=${p.scil}${qi.calibrationMismatch?' (mismatch)': ''}`;
+      } else {
+        details = '❌ ' + failureCodes.join(',');
+      }
+      if (qi) qi.failureCodes = failureCodes;
+      return { id: 40, name: 'Extended QUIC Initial Parsing & Calibration', description: 'Parses QUIC Initial structural fields & enforces calibration hash stability', passed, details, severity: 'major', evidenceType };
+    }
+  },
+  {
     id: 1,
     key: 'htx-transports-tls-ech',
     name: 'HTX over TCP-443 & QUIC-443',
