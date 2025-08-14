@@ -324,6 +324,21 @@ export interface IngestedEvidence {
   diversityIndex?: number; // dispersion metric (0-1)
   nodeEntropyBits?: number; // Phase 7 extension: Shannon entropy of node occurrence distribution
   pathLengthStdDev?: number; // Phase 7 extension: stddev of path length distribution
+  // Task 6 (Mixnode Selection Entropy & Diversity Enforcement) extended fields
+  beaconSources?: {
+    drand?: { round?: number; randomness?: string };
+    nist?: { entropyHex?: string };
+    eth?: { blockNumber?: number; blockHash?: string };
+  }; // aggregated randomness sources powering selection
+  aggregatedBeaconEntropyBits?: number; // combined entropy assessment across sources
+  vrfProofs?: { hopSetIndex: number; proof?: string; valid?: boolean }[]; // simulated VRF proofs validating selection randomness
+  nodeASNs?: Record<string,string>; // node -> ASN mapping for AS diversity
+  nodeOrgs?: Record<string,string>; // node -> Org mapping for org diversity
+  asDiversityIndex?: number; // unique AS count / total nodes (computed if absent)
+  orgDiversityIndex?: number; // unique Org count / total nodes (computed if absent)
+  firstReuseIndex?: number; // index where first hop set reuse occurred (computed by checker if absent)
+  requiredUniqueBeforeReuse?: number; // configured threshold (default 8)
+  vrfSelectionSimulated?: boolean; // flag indicating VRF selection simulation performed
   }; // Phase 7 mix diversity sampling evidence
   h2Adaptive?: { settings?: Record<string, number>; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; paddingJitterStdDevMs?: number; sampleCount?: number; withinTolerance?: boolean; randomnessOk?: boolean };
   h3Adaptive?: { qpackTableSize?: number; paddingJitterMeanMs?: number; paddingJitterP95Ms?: number; paddingJitterStdDevMs?: number; sampleCount?: number; withinTolerance?: boolean; randomnessOk?: boolean };

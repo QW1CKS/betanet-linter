@@ -82,12 +82,12 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive, Full), 28 (H3 adaptive, Full) | dynamic-protocol | Full | Dynamic evidence (mean, p95, stddev, randomnessOk) with strict tolerances enforced |
 | 5 SCION bridging + control stream failover (no legacy header) | 4, 23, 33 | static-structural + dynamic-protocol | Full | Bridging & negative assertion + dynamic control stream: ≥3 offers & unique paths, no legacy header, latency ≤300ms, probe interval 50–5000ms, backoff ok, timestamp skew ok, signature/schema indicators |
 | 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | artifact | Full | ≥2 rotation epochs & entropy sources; no legacy deterministic seed |
-| 7 Mix node selection diversity & hops | 11, 17, 27 | dynamic-protocol | Full | Uniqueness ≥80%, diversityIndex ≥0.4, entropy ≥4 bits, path length stddev > 0 |
+| 7 Mix node selection diversity & hops | 11, 17, 27 | dynamic-protocol | Full | Uniqueness ≥80%, diversityIndex ≥0.4, entropy ≥4 bits, no reuse <8 hop sets, AS/Org diversity ≥15%, path length stddev > 0, VRF/beacon entropy ≥8 bits |
 | 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Quorum certificates validated + emergency advance gating |
 | 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31, 36 | artifact + static-structural + dynamic-protocol | Full | Voucher struct + aggregated sig + FROST n≥5 t=3 + advanced PoW convergence (slope/rolling/stability) & multi-bucket stats |
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Advanced historical diversity (volatility, window share, delta share, avgTop3) thresholds enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Stricter numeric bounds (retry<=25ms, udpTimeout 100–600ms, std<=450ms, cv<=1.2, model>=0.7, coverConn>=2, anomalies constrained) enforced |
-|12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index enforced |
+|12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index + entropy/no-early-reuse safeguards |
 |13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity |
 | – Algorithm agility registry | 34 | artifact | Full | Allowed vs used sets; unregisteredUsed empty |
 | – Statistical jitter randomness | 26, 37 | dynamic-protocol | Full | Jitter variance + randomness pValue > 0.01, adequate samples |
@@ -115,6 +115,27 @@ JSON results include `multiSignal` summarizing counts per evidence category and 
 
 ### Evidence Schema Versioning
 Schema v2 fields: `binaryMeta`, `clientHelloTemplate`, `noisePatternDetail`, `negative`, plus prior `mix`, `noiseExtended`, `h2Adaptive`, `provenance`, `governance`, `ledger`. Phase 7 adds fallback distribution statistics and dynamicClientHelloCapture JA3/ja3Hash + raw capture placeholders ahead of schema v3 bump. See `docs/evidence-schema.md`.
+
+### Mixnode Selection Entropy & Diversity (Task 6 Completion)
+Check 17 now enforces a comprehensive set of diversity and randomness properties beyond basic uniqueness:
+- Hop set uniqueness: adaptive threshold (≥80% for n≥10; scales down for smaller samples).
+- Early reuse prevention: first hop set reuse must occur only after at least 8 unique hop sets (configurable via `mix.requiredUniqueBeforeReuse`).
+- Entropy: Shannon entropy of node occurrence distribution ≥4 bits.
+- AS / Org diversity: At least 15% of total node appearances must correspond to unique ASNs and organizations (derived when `mix.nodeASNs` / `mix.nodeOrgs` provided).
+- VRF proofs: Optional `mix.vrfProofs[]` entries must all be present & marked valid to attest unbiased selection; currently simulated (cryptographic verification future).
+- Aggregated beacon entropy: `mix.aggregatedBeaconEntropyBits` ≥8 when beacon sources aggregated (drand, NIST, ETH block hash) via `mix.beaconSources`.
+- Reuse index & automatic computation: `mix.firstReuseIndex` auto-computed when absent to detect premature reuse; entropy & diversity ratios computed if fields omitted.
+
+Evidence fields added (all optional unless enforcing their related rule):
+```
+mix.beaconSources.{drand|nist|eth}
+mix.aggregatedBeaconEntropyBits
+mix.vrfProofs[]
+mix.nodeASNs, mix.nodeOrgs
+mix.asDiversityIndex, mix.orgDiversityIndex
+mix.firstReuseIndex, mix.requiredUniqueBeforeReuse
+```
+Non-blocking future work: Real beacon retrieval & cryptographic VRF verification, richer ASN/org classification accuracy, configurable statistical confidence intervals for diversity/entropy thresholds.
 
 ## License
 

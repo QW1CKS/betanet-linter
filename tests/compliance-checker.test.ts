@@ -1174,6 +1174,60 @@ describe('BetanetComplianceChecker', () => {
       expect(mixCheck?.passed).toBe(true);
       await fs.remove(evidencePath); await fs.remove(tmp);
     });
+    it('fails when reuse occurs too early and entropy low', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-existing-bin6b');
+      await fs.writeFile(tmp, Buffer.from('binary data mix diversity test fail1'));
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['mix reuse early'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      const hopSets = [ ['A','B','C'], ['A','B','C'], ['A','D','E'], ['A','D','E'], ['B','C','D'] ]; // early reuse at index 1
+      const evidence = { mix: { samples: hopSets.length, uniqueHopSets: 3, hopSets, minHopsBalanced: 2, minHopsStrict: 3, pathLengths: hopSets.map(h=>h.length), uniquenessRatio: 3/hopSets.length, diversityIndex: 0.3, requiredUniqueBeforeReuse: 4, nodeASNs: {A:'AS1',B:'AS1',C:'AS1',D:'AS1',E:'AS1'}, nodeOrgs: {A:'O1',B:'O1',C:'O1',D:'O1',E:'O1'} } };
+      const evidencePath = path.join(__dirname, 'temp-evidence-mix-fail.json');
+      await fs.writeFile(evidencePath, JSON.stringify(evidence));
+      const result = await checkerLocal.checkCompliance(tmp, { evidenceFile: evidencePath, allowHeuristic: true });
+      const mixCheck = result.checks.find(c => c.id === 17);
+      expect(mixCheck).toBeDefined();
+      expect(mixCheck?.passed).toBe(false);
+      await fs.remove(evidencePath); await fs.remove(tmp);
+    });
+    it('passes with VRF proofs and beacon entropy + AS/Org diversity', async () => {
+      const checkerLocal = new BetanetComplianceChecker();
+      const tmp = path.join(__dirname, 'temp-existing-bin6c');
+      await fs.writeFile(tmp, Buffer.from('binary data mix diversity test pass2'));
+      (checkerLocal as any)._analyzer = {
+        checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
+        analyze: () => Promise.resolve({ strings: ['mix vrf beacon diversity'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        checkCryptographicCapabilities: () => Promise.resolve({ hasChaCha20: true }),
+        checkSCIONSupport: () => Promise.resolve({ hasSCION: true, pathManagement: true, hasIPTransition: false, pathDiversityCount: 2 }),
+        checkDHTSupport: () => Promise.resolve({ hasDHT: true, deterministicBootstrap: true, seedManagement: true }),
+        checkLedgerSupport: () => Promise.resolve({ hasAliasLedger: true, hasConsensus: true, chainSupport: true }),
+        checkPaymentSupport: () => Promise.resolve({ hasCashu: true, hasLightning: true, hasFederation: true }),
+        checkBuildProvenance: () => Promise.resolve({ hasSLSA: true, reproducible: true, provenance: true })
+      };
+      const hopSets = [ ['A','B','C'], ['D','E','F'], ['G','H','I'], ['J','K','L'], ['M','N','O'], ['P','Q','R'], ['S','T','U'], ['V','W','X'] ];
+      const flat = hopSets.flat();
+      const uniqueNodes = new Set(flat).size;
+      const diversityIndex = uniqueNodes / flat.length;
+      const nodeASNs: Record<string,string> = {}; const nodeOrgs: Record<string,string> = {};
+      flat.forEach((n,i)=> { nodeASNs[n] = 'AS'+i; nodeOrgs[n] = 'ORG'+(i%5); });
+      const vrfProofs = hopSets.map((_,i)=> ({ hopSetIndex: i, proof: 'proof'+i, valid: true }));
+      const evidence = { mix: { samples: hopSets.length, uniqueHopSets: hopSets.length, hopSets, minHopsBalanced: 2, minHopsStrict: 3, pathLengths: hopSets.map(h=>h.length), uniquenessRatio: 1.0, diversityIndex, requiredUniqueBeforeReuse: 8, nodeASNs, nodeOrgs, vrfProofs, aggregatedBeaconEntropyBits: 16 } };
+      const evidencePath = path.join(__dirname, 'temp-evidence-mix-pass2.json');
+      await fs.writeFile(evidencePath, JSON.stringify(evidence));
+      const result = await checkerLocal.checkCompliance(tmp, { evidenceFile: evidencePath, allowHeuristic: true });
+      const mixCheck = result.checks.find(c => c.id === 17);
+      expect(mixCheck).toBeDefined();
+      expect(mixCheck?.passed).toBe(true);
+      await fs.remove(evidencePath); await fs.remove(tmp);
+    });
   });
 
   describe('multi-signal anti-evasion (check 18)', () => {

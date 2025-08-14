@@ -1119,7 +1119,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     id: 17,
     key: 'mix-diversity-sampling',
     name: 'Mix Diversity Sampling',
-    description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth policy',
+    description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth, entropy & AS/Org diversity & VRF/beacon integrity',
     severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer) => {
@@ -1141,11 +1141,68 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         const uniquenessOk = ratio >= required;
         const diversityIndex = mix.diversityIndex || 0; // require some baseline dispersion
         const diversityOk = diversityIndex >= 0.4; // crude threshold
-        passed = samples >= 5 && depthOk && uniquenessOk && diversityOk;
-        details = passed ? `✅ unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}%` :
-          `❌ Mix diversity insufficient unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}%`;
+        // Task 6 extended metrics
+        const requiredUniqueBeforeReuse = mix.requiredUniqueBeforeReuse || 8;
+        // Determine first reuse index if hopSets present
+        let firstReuseIndex = mix.firstReuseIndex;
+        if (Array.isArray(mix.hopSets) && firstReuseIndex === undefined) {
+          const seen = new Set<string>();
+          for (let i=0;i<mix.hopSets.length;i++) {
+            const hs = JSON.stringify(mix.hopSets[i]);
+            if (seen.has(hs)) { firstReuseIndex = i; break; }
+            seen.add(hs);
+          }
+        }
+        const reuseOk = (firstReuseIndex === undefined) || firstReuseIndex >= requiredUniqueBeforeReuse;
+        // Entropy (node occurrence distribution). If not supplied compute basic Shannon bits.
+        let entropyBits = mix.nodeEntropyBits;
+        if (entropyBits === undefined && Array.isArray(mix.hopSets)) {
+          const counts: Record<string, number> = {};
+            for (const hs of mix.hopSets) for (const n of hs) counts[n]=(counts[n]||0)+1;
+          const total = Object.values(counts).reduce((a,b)=>a+b,0);
+          let H = 0;
+          for (const c of Object.values(counts)) { const p = c/total; H -= p * Math.log2(p); }
+          entropyBits = H;
+        }
+        const entropyOk = (entropyBits||0) >= 4; // baseline threshold
+        // ASN / Org diversity (derived if mappings and hopSets provided)
+        let asDiv = mix.asDiversityIndex;
+        let orgDiv = mix.orgDiversityIndex;
+        if ((asDiv === undefined || orgDiv === undefined) && Array.isArray(mix.hopSets) && mix.nodeASNs && mix.nodeOrgs) {
+          const asSet = new Set<string>();
+          const orgSet = new Set<string>();
+          let nodeCount = 0;
+          for (const hs of mix.hopSets) {
+            for (const n of hs) { nodeCount++; if (mix.nodeASNs[n]) asSet.add(mix.nodeASNs[n]); if (mix.nodeOrgs[n]) orgSet.add(mix.nodeOrgs[n]); }
+          }
+          if (asDiv === undefined) asDiv = asSet.size / Math.max(1,nodeCount);
+          if (orgDiv === undefined) orgDiv = orgSet.size / Math.max(1,nodeCount);
+        }
+        const asDivOk = asDiv === undefined || asDiv >= 0.15; // at least 15% of nodes from unique AS (heuristic)
+        const orgDivOk = orgDiv === undefined || orgDiv >= 0.15; // same baseline
+        // VRF proofs validation: all provided proofs must be marked valid
+        const vrfProofs = Array.isArray(mix.vrfProofs) ? mix.vrfProofs : [];
+  const vrfOk = vrfProofs.length === 0 || vrfProofs.every((p: any) => p.valid !== false && typeof p.proof === 'string');
+        // Beacon sources aggregated entropy (if provided)
+        const beaconEntropy = mix.aggregatedBeaconEntropyBits;
+        const beaconOk = beaconEntropy === undefined || beaconEntropy >= 8; // aggregated randomness threshold
+        // Overall pass
+        passed = samples >= 5 && depthOk && uniquenessOk && diversityOk && reuseOk && entropyOk && asDivOk && orgDivOk && vrfOk && beaconOk;
+        const failReasons: string[] = [];
+        if (samples < 5) failReasons.push('insufficient samples');
+        if (!depthOk) failReasons.push('min hop depth');
+        if (!uniquenessOk) failReasons.push(`uniqueness ${(ratio*100).toFixed(1)}% < ${(required*100)}%`);
+        if (!diversityOk) failReasons.push('diversityIdx low');
+        if (!reuseOk) failReasons.push(`reuse before ${requiredUniqueBeforeReuse}`);
+        if (!entropyOk) failReasons.push(`entropy ${(entropyBits||0).toFixed(2)}<4`);
+        if (!asDivOk) failReasons.push('AS diversity low');
+        if (!orgDivOk) failReasons.push('Org diversity low');
+        if (!vrfOk) failReasons.push('VRF proofs invalid');
+        if (!beaconOk) failReasons.push('beacon entropy low');
+        details = passed ? `✅ unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}% entropy=${(entropyBits||0).toFixed(2)} bits reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'}bits` :
+          `❌ Mix diversity issues: ${failReasons.join('; ')} unique=${unique}/${samples} minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}% entropy=${(entropyBits||0).toFixed(2)} reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'}`;
       }
-      return { id: 17, name: 'Mix Diversity Sampling', description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth policy', passed, details, severity: 'major', evidenceType: mix ? 'dynamic-protocol' : 'heuristic' };
+      return { id: 17, name: 'Mix Diversity Sampling', description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth, entropy & AS/Org diversity & VRF/beacon integrity', passed, details, severity: 'major', evidenceType: mix ? 'dynamic-protocol' : 'heuristic' };
     }
   }
   ,

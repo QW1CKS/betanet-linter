@@ -129,13 +129,23 @@
 	},
 	"mix": {
 		"samples": 10,
-		"uniqueHopSets": 9,
+		"uniqueHopSets": 10,
 		"pathLengths": [3,3,3,3,3,3,3,3,3,3],
+		"hopSets": [["A","B","C"],["D","E","F"],["G","H","I"],["J","K","L"],["M","N","O"],["P","Q","R"],["S","T","U"],["V","W","X"],["Y","Z","AA"],["AB","AC","AD"]],
 		"minHopsBalanced": 2,
 		"minHopsStrict": 3,
 		"mode": "strict",
 		"diversityIndex": 0.8,
-		"uniquenessRatio": 0.9
+		"uniquenessRatio": 1.0,
+		"requiredUniqueBeforeReuse": 8,
+		"nodeASNs": {"A":"AS1","B":"AS2","C":"AS3","D":"AS4","E":"AS5","F":"AS6","G":"AS7","H":"AS8","I":"AS9","J":"AS10","K":"AS11","L":"AS12","M":"AS13","N":"AS14","O":"AS15"},
+		"nodeOrgs": {"A":"O1","B":"O2","C":"O3","D":"O4","E":"O5","F":"O1","G":"O2","H":"O3","I":"O4","J":"O5","K":"O6","L":"O7","M":"O8","N":"O9","O":"O10"},
+		"vrfProofs": [
+			{"hopSetIndex":0,"proof":"p0","valid":true},
+			{"hopSetIndex":1,"proof":"p1","valid":true},
+			{"hopSetIndex":2,"proof":"p2","valid":true}
+		],
+		"aggregatedBeaconEntropyBits": 16
 	},
 	"h3Adaptive": {
 		"meanMs": 60,
