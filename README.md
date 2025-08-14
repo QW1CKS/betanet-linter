@@ -16,6 +16,22 @@
 > ```
 > Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
 
+> **Quick Test (Dummy Fully-Compliant Fixture):**
+> A heuristic trigger binary is provided at `examples/dummy-betanet-compliant.c` so you can instantly observe a (near) full‑pass result.
+>
+> WSL / Linux build & test:
+> ```bash
+> gcc -O2 -s -o dummy-betanet-compliant examples/dummy-betanet-compliant.c
+> ./dummy-betanet-compliant --version
+> betanet-lint check ./dummy-betanet-compliant --sbom --format cyclonedx-json --output json | tee dummy-compliance.json
+> ```
+> MinGW (Windows) build (from a shell with MinGW toolchain in PATH):
+> ```powershell
+> x86_64-w64-mingw32-gcc -O2 -s -o dummy-betanet-compliant.exe .\examples\dummy-betanet-compliant.c
+> betanet-lint check .\dummy-betanet-compliant.exe --sbom --format cyclonedx-json --output json | Tee-Object dummy-compliance.json
+> ```
+> Explanation: the C file embeds all keyword tokens used by the heuristic/static checks (transport endpoints, TLS 1.3, QUIC, ECH, access ticket rotation, ChaCha20/Poly1305, SCION/path, deterministic DHT seed, alias ledger + 2of3 consensus, Cashu + Lightning, reproducible build/provenance markers, X25519/Kyber). This allows validating the linter itself without a real Betanet implementation. Use `--allow-heuristic` if you want heuristic-only passes counted where applicable.
+
 A CLI tool enumerating Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) with a blend of heuristic, static‑structural, dynamic (captured / simulated), and artifact evidence. The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
 
 > **Flag Naming:**
