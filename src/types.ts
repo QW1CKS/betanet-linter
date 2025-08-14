@@ -208,6 +208,15 @@ export interface CheckOptions {
   dsseThreshold?: number; // required verified signer threshold
   evidenceBundleFile?: string; // Phase 7: multi-signer evidence bundle JSON path
   strictAuthMode?: boolean; // Task 11: require signed evidence authenticity for artifact elevation
+  // Task 28: Reproducibility & Supply Chain Provenance Hardening inputs
+  provenanceAttestationSignatureFile?: string; // detached signature over raw provenance / evidence file
+  provenanceAttestationPublicKeyFile?: string; // public key for provenance attestation
+  sbomAttestationSignatureFile?: string; // detached signature over SBOM file
+  sbomAttestationPublicKeyFile?: string; // public key for SBOM attestation
+  checksumManifestFile?: string; // path to checksum manifest (e.g., sha256sum style)
+  checksumManifestSignatureFile?: string; // detached signature over checksum manifest
+  checksumManifestPublicKeyFile?: string; // public key for checksum manifest signature
+  environmentLockFile?: string; // lock file capturing build environment/toolchain versions
 }
 
 export interface SBOMOptions {
@@ -249,6 +258,14 @@ export interface IngestedEvidence {
   dssePolicyReasons?: string[]; // Aggregate failure reasons if policy not met
   pqHybridVerified?: boolean; // Task 22: PQ hybrid handshake transcript proof verified
   pqHybridError?: string; // Task 22: error reason if PQ hybrid verification failed
+  // Task 28 provenance & SBOM attestation extensions
+  provenanceAttestationSignatureVerified?: boolean; // detached signature over provenance/evidence file
+  provenanceAttestationSignatureError?: string; // verification error
+  sbomAttestationSignatureVerified?: boolean; // detached signature over SBOM artifact
+  sbomAttestationSignatureError?: string;
+  checksumManifestDigest?: string; // sha256 hex over raw manifest content
+  checksumManifestSignatureVerified?: boolean;
+  checksumManifestSignatureError?: string;
   };
   // Phase 7: multi-signer evidence bundle (canonical hash chain) placeholder
   signedEvidenceBundle?: {
@@ -609,6 +626,10 @@ export interface IngestedEvidence {
   };
   [k: string]: any; // allow forward-compatible keys
 }
+
+// Task 28: checksum manifest & environment lock auxiliary shapes
+export interface ChecksumManifestEntry { file: string; sha256?: string; raw?: string }
+export interface EnvironmentLock { components?: { name: string; version: string }[]; diffCount?: number; verified?: boolean }
 
 // Augmented harness meta (Phase 2 completion hashing)
 export interface EvidenceMeta {

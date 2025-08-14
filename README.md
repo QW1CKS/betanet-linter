@@ -88,7 +88,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Diversity volatility/window/delta/top3 + 7d degradation, gap ratio, spike detection enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Bounds: udpTimeout 100–600ms, retry<=25ms, coverConn≥2, teardownStd<=450ms, CV≤1.2, |skew|≤1.2, outliers≤20%, modelScore≥0.7, median 200–1200ms, p95≤1800ms, startDelay≤500ms, IQR≤900ms, outlierPct≤25%, ≥2 provenance categories |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index + entropy/no-early-reuse safeguards |
-|13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity (codes: SIG_DETACHED_INVALID, BUNDLE_THRESHOLD_UNMET, BUNDLE_SIGNATURE_INVALID, BUNDLE_HASH_CHAIN_INVALID, MISSING_AUTH_SIGNALS) |
+|13 Reproducible builds & SLSA provenance + attestations | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached/bundle/attestation authenticity (codes: SIG_DETACHED_INVALID, BUNDLE_THRESHOLD_UNMET, BUNDLE_SIGNATURE_INVALID, BUNDLE_HASH_CHAIN_INVALID, PROVENANCE_SIGNATURE_INVALID, PROVENANCE_ATTESTATION_MISSING, SBOM_SIGNATURE_INVALID, SBOM_ATTESTATION_MISSING, MISSING_AUTH_SIGNALS) |
 | – Algorithm agility registry | 34 | artifact | Full | Allowed vs used sets; unregisteredUsed empty |
 | – Statistical jitter randomness | 26, 37 | dynamic-protocol | Full | Jitter variance + randomness pValue > 0.01, adequate samples |
 | – SCION control stream path failover metrics | 33 | dynamic-protocol | Full | Path switch latency & probe/backoff/timestamp skew + signature/schema flags |
@@ -108,17 +108,29 @@ An early CI workflow (`.github/workflows/provenance-repro.yml`) now attempts:
 4. Clean rebuild diff to assert reproducibility.
 5. Evidence ingestion via `--evidence-file` (DSSE envelope, raw SLSA JSON, or simple reference with provenance object) to upgrade Build Provenance (check 9) to `artifact` status when predicateType + builderId + binary/subject SHA256 digest are validated against the analyzed binary (or accepted if analyzer hashing unavailable in degraded environments).
 
-Implementation: detached signature verification, optional DSSE envelope verification, signer threshold & required key policy, materials completeness & mismatch detection, reproducible rebuild digest comparison, toolchain diff gating, authenticity gate (Check 35) in strict auth mode.
+Implementation: detached signature verification, optional DSSE envelope verification, signer threshold & required key policy, materials completeness & mismatch detection, reproducible rebuild digest comparison, toolchain diff gating, authenticity gate (Check 35) in strict auth mode. Task 28 extends authenticity with independent attestation sources (provenance attestation, SBOM attestation, checksum manifest signature, environment lock ingestion placeholder) so any verified attestation elevates authenticity.
 
-Authenticity (Check 35) granular failure codes:
-- SIG_DETACHED_INVALID – detached signature path attempted but cryptographic verification failed.
-- BUNDLE_THRESHOLD_UNMET – multi-signer bundle present but required threshold not satisfied.
-- BUNDLE_SIGNATURE_INVALID – one or more bundle entry signatures structurally/cryptographically invalid.
-- BUNDLE_HASH_CHAIN_INVALID – recomputed hash chain over entry canonicalSha256 values does not match provided bundleSha256.
-- MISSING_AUTH_SIGNALS – neither detached signature nor bundle evidence provided under strict auth.
-- EVIDENCE_UNSIGNED – (non-strict mode) authenticity not enforced but surfaced for visibility.
+Authenticity & Attestations (Check 35) failure codes (Task 28):
+- SIG_DETACHED_INVALID – detached signature attempted but cryptographic verification failed.
+- BUNDLE_THRESHOLD_UNMET – bundle present but required threshold not satisfied.
+- BUNDLE_SIGNATURE_INVALID – one or more bundle entry signatures invalid.
+- BUNDLE_HASH_CHAIN_INVALID – recomputed hash chain mismatch.
+- PROVENANCE_SIGNATURE_INVALID – provenance attestation signature invalid.
+- PROVENANCE_ATTESTATION_MISSING – provenance attestation absent in strict-auth mode.
+- SBOM_SIGNATURE_INVALID – SBOM attestation signature invalid.
+- SBOM_ATTESTATION_MISSING – SBOM attestation absent in strict-auth mode.
+- MISSING_AUTH_SIGNALS – no acceptable authenticity/attestation signals (detached/bundle/attestations/manifest) in strict-auth mode.
+- EVIDENCE_UNSIGNED – (non-strict mode) authenticity not enforced (informational).
 
-Pass conditions: either a verified detached signature OR a bundle with `multiSignerThresholdMet=true` and (if provided) a valid hash chain (bundleSha256 matches recomputed). Evidence type is elevated to `artifact` only when authenticity satisfied; otherwise remains heuristic in reports. Future enhancements (non-blocking) include canonical JSON normalization before hash/sign, real public key allow/deny lists, multi-format (minisign/cosign) verification, signature caching, and Merkle-style tamper paths.
+Authenticity pass conditions (any one): detached evidence signature, multi-signer bundle threshold met (+ optional hash chain), provenance attestation signature, SBOM attestation signature, or signed checksum manifest.
+
+CLI flags (Task 28 additions):
+--provenance-attestation-signature / --provenance-attestation-public-key
+--sbom-attestation-signature / --sbom-attestation-public-key
+--checksum-manifest-file / --checksum-manifest-signature / --checksum-manifest-public-key
+--environment-lock-file
+
+Future enhancements (non-blocking): canonical JSON normalization before hash/sign, real public key allow/deny lists, multi-format (minisign/cosign) verification, signature caching, Merkle-style tamper paths, environment lock diff against secondary build.
 
 ### Multi-Signal Scoring & Anti-Evasion
 JSON results include `multiSignal` summarizing counts per evidence category and a weighted score (artifact=3, dynamic=2, static=1). Advanced keyword stuffing detection (Check 18) now evaluates:

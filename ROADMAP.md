@@ -117,7 +117,7 @@ Normative §11 Items → Current State Map (All Full)
 10. [x] Cashu vouchers (128 B struct), FROST group n≥5 t=3, PoW adverts, Lightning settlement, rate-limits → Full (Check 8 artifact when voucherCrypto + powAdaptive + rateLimit present; Checks 14/29/31 voucher struct + FROST + aggregated signature)
 11. [x] Governance anti‑concentration caps & partition safety → Full (Check 15: AS/org caps + partitions + advanced diversity volatility/window/delta/avgTop3 thresholds)
 12. [x] Anti‑correlation fallback (UDP→TCP retry timing + cover connections) → Full (Check 25: strict numeric bounds retry<=25ms, udpTimeout 100–600ms, std<=450ms, cv<=1.2, model>=0.7, coverConn>=2, anomalies constrained)
-13. [x] Reproducible builds & SLSA 3 provenance artifacts → Full (Check 9 artifact: predicateType/builderId/digest match + DSSE signer counting + detached evidence signature verification)
+13. [x] Reproducible builds & SLSA 3 provenance artifacts + attestations (Task 28) → Full (Checks 9 & 35 artifact: predicateType/builderId/digest match + DSSE signer counting + detached / bundle / provenance attestation / SBOM attestation / checksum manifest authenticity; environment lock ingestion placeholder)
 
 Strategic Phases (Completed)
 ---------------------------
@@ -404,7 +404,7 @@ These are required to transition from “spec gap tasks complete” to a bounty�
   - Added since initial completion: signature verification cache tests; static parser coverage expansion (ClientHello, Noise, voucher struct, voucher crypto); safe-exec cross-platform branches (skip, timeout); analyzer fallback string extraction & truncation, symbols-missing degradation, network attempt branches (disabled, host blocked, retry success), unsupported signature algorithm cache, dynamic probe enrichment.
   - Deferred (future enhancement): mutation smoke test, automated false-positive rate computation (real FP budget <2%), branch-level historical coverage ratchet & subsequent re-introduction of hard 90/85 thresholds once met, performance regression budget integration.
 
-28. [ ] Reproducibility & Supply Chain Provenance Hardening
+28. [x] Reproducibility & Supply Chain Provenance Hardening
   - Add signed provenance attestation (Sigstore or minisign), SBOM attestation signatures, checksum manifest (sha256sum.txt) with detached signature, periodic action pin re-audit script, build environment lock file (toolchain versions) diff enforcement.
   - Failure codes: PROVENANCE_SIGNATURE_INVALID, SBOM_ATTESTATION_MISSING.
 

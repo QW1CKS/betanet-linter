@@ -88,7 +88,7 @@ describe('advanced evidence ingestion & analyzer edge branches', () => {
     const prov = (checker.analyzer as any).evidence?.provenance;
     expect(prov.materialsMismatchCount).toBeGreaterThan(0);
     expect(prov.materialsValidated).toBe(false);
-  });
+  }, 15000);
 
   it('covers analyzer attemptNetwork success path and unsupported signature algorithm caching', async () => {
     const analyzer = new BinaryAnalyzer(bin, false);

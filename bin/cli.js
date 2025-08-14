@@ -60,6 +60,15 @@ program
   .option('--evidence-bundle <path>', 'Multi-signer evidence bundle JSON (array of {evidence,signature,publicKey,signer})')
   .option('--fail-on-sig-invalid', 'Exit non-zero if evidence signature invalid')
   .option('--strict-auth', 'Require evidence authenticity (detached signature or bundle) for artifact elevation (Task 11)', false)
+  // Task 28 supply chain hardening / attestation & manifest flags
+  .option('--provenance-attestation-signature <path>', 'Detached signature over raw provenance evidence file (Task 28)')
+  .option('--provenance-attestation-public-key <path>', 'Public key for provenance attestation (base64 raw 32B ed25519 or PEM)')
+  .option('--sbom-attestation-signature <path>', 'Detached signature over SBOM file (Task 28)')
+  .option('--sbom-attestation-public-key <path>', 'Public key for SBOM attestation (base64 raw 32B ed25519 or PEM)')
+  .option('--checksum-manifest-file <path>', 'Checksum manifest file (sha256sum style)')
+  .option('--checksum-manifest-signature <path>', 'Detached signature over checksum manifest')
+  .option('--checksum-manifest-public-key <path>', 'Public key for checksum manifest signature (base64 raw 32B ed25519 or PEM)')
+  .option('--environment-lock-file <path>', 'Environment/toolchain lock file (JSON) to record build inputs (Task 28)')
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -103,6 +112,14 @@ program
   evidenceBundleFile: options.evidenceBundle,
   failOnSignatureInvalid: options.failOnSigInvalid
   , strictAuthMode: options.strictAuth
+  , provenanceAttestationSignatureFile: options.provenanceAttestationSignature,
+  provenanceAttestationPublicKeyFile: options.provenanceAttestationPublicKey,
+  sbomAttestationSignatureFile: options.sbomAttestationSignature,
+  sbomAttestationPublicKeyFile: options.sbomAttestationPublicKey,
+  checksumManifestFile: options.checksumManifestFile,
+  checksumManifestSignatureFile: options.checksumManifestSignature,
+  checksumManifestPublicKeyFile: options.checksumManifestPublicKey,
+  environmentLockFile: options.environmentLockFile
       });
       
       if (options.sbom) {

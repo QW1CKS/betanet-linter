@@ -16,7 +16,8 @@
     "lint:strict": "eslint \"src/**/*.ts\" --max-warnings=0",
     "quality:gates": "node scripts/quality-gates.js",
     "prepare": "npm run build",
-    "repro:verify": "node bin/repro-verify.js"
+  "reaudit:actions": "node scripts/reaudit-actions.js",
+  "repro:verify": "node bin/repro-verify.js"
   },
   "keywords": [
     "betanet",

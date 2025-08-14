@@ -2039,13 +2039,13 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
     id: 35,
     key: 'evidence-authenticity',
     name: 'Evidence Authenticity',
-    description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode',
+  description: 'Validates signed evidence authenticity (detached signature, multi-signer bundle, provenance & SBOM attestations) in strictAuth mode',
     severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer: any) => {
       const ev = analyzer.evidence || {};
       const diag = (analyzer.getDiagnostics && analyzer.getDiagnostics()) || {};
-      const provenance = ev.provenance || {};
+  const provenance = ev.provenance || {};
       const bundle = ev.signedEvidenceBundle;
       const strictAuth = (analyzer as any).options?.strictAuthMode === true;
       const detachedAttempted = provenance.signatureVerified === true || provenance.signatureVerified === false || diag.evidenceSignatureValid !== undefined;
@@ -2071,7 +2071,11 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
         bundle.multiSignerThresholdMet = uniqueSigners.size >= (bundle.thresholdRequired || 2);
       }
       const bundleThresholdMet = bundle?.multiSignerThresholdMet === true;
-      const anyAuth = detachedValid || bundleThresholdMet;
+  // Task 28: provenance & SBOM attestation signals (count toward authenticity if verified)
+  const provAttOk = provenance.provenanceAttestationSignatureVerified === true;
+  const sbomAttOk = provenance.sbomAttestationSignatureVerified === true;
+  const manifestOk = provenance.checksumManifestSignatureVerified === true;
+  const anyAuth = detachedValid || bundleThresholdMet || provAttOk || sbomAttOk || manifestOk;
       const failureCodes: string[] = [];
       // Task 26: detect canonical JSON mismatch (recompute canonical digest and compare)
       if (provenance.canonicalDigest && (analyzer as any).canonicalize) {
@@ -2096,6 +2100,13 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
           failureCodes.push('EVIDENCE_UNSIGNED');
         }
       }
+      // Task 28: explicit provenance / SBOM attestation related failure codes
+      if (strictAuth) {
+        if (provenance.provenanceAttestationSignatureVerified === false) failureCodes.push('PROVENANCE_SIGNATURE_INVALID');
+        if (provenance.provenanceAttestationSignatureVerified === undefined) failureCodes.push('PROVENANCE_ATTESTATION_MISSING');
+        if (provenance.sbomAttestationSignatureVerified === false) failureCodes.push('SBOM_SIGNATURE_INVALID');
+        if (provenance.sbomAttestationSignatureVerified === undefined) failureCodes.push('SBOM_ATTESTATION_MISSING');
+      }
       // Unsupported format if signatureAlgorithm present & not recognized
       if (provenance.signatureAlgorithm && !['ed25519'].includes(provenance.signatureAlgorithm)) {
         failureCodes.push('SIGNATURE_FORMAT_UNSUPPORTED');
@@ -2103,9 +2114,14 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const evidenceType: 'heuristic' | 'artifact' = anyAuth ? 'artifact' : 'heuristic';
       let details: string;
       if (anyAuth) {
-        const mode = detachedValid ? 'detached-signature' : 'bundle';
+        const mode = detachedValid ? 'detached-signature'
+          : bundleThresholdMet ? 'bundle'
+          : provAttOk ? 'provenance-attestation'
+          : sbomAttOk ? 'sbom-attestation'
+          : manifestOk ? 'checksum-manifest' : 'unknown';
         const chainInfo = bundlePresent ? ` hashChain=${bundle?.hashChainValid === false ? 'invalid' : 'ok'}` : '';
-        details = `✅ authenticity ${mode} verified${chainInfo}`;
+        const attInfo = [provAttOk && 'provAtt', sbomAttOk && 'sbomAtt', manifestOk && 'manifest'].filter(Boolean).join('+');
+        details = `✅ authenticity ${mode} verified${chainInfo}${attInfo? ' att=['+attInfo+']':''}`;
       } else {
         const codeStr = failureCodes.length ? ` codes=[${failureCodes.join(',')}]` : '';
         if (strictAuth) {
