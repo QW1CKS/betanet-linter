@@ -558,6 +558,20 @@ export interface IngestedEvidence {
     calibrationMismatch?: boolean; // set when differs from baseline
     failureCodes?: string[]; // populated by Check 40 if failing
   };
+  // Task 19: HTTP/2 & HTTP/3 Jitter Statistical Tests extended evidence
+  jitterMetrics?: {
+    pingIntervalsMs?: number[]; // inter-PING frame intervals
+    paddingSizes?: number[]; // observed padding frame sizes
+    priorityFrameGaps?: number[]; // gaps between PRIORITY frames
+    chiSquareP?: number; // chi-square goodness-of-fit p-value
+    runsP?: number; // runs test p-value
+    ksP?: number; // Kolmogorov-Smirnov p-value (approximate)
+    entropyBitsPerSample?: number; // estimated entropy per sample (normalized 0..1)
+    sampleCount?: number; // total combined samples across distributions
+    stdDevPing?: number; // derived stddev for ping intervals
+    stdDevPadding?: number; // derived stddev for padding sizes
+    stdDevPriorityGap?: number; // derived stddev for priority frame gaps
+  };
   [k: string]: any; // allow forward-compatible keys
 }
 

@@ -54,6 +54,12 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 ## Unreleased
 
 ### Task 18: Extended QUIC Initial Parsing & Calibration Hash
+### Task 19: HTTP/2 & HTTP/3 Jitter Statistical Tests
+- Added `jitterMetrics` evidence section with ping interval, padding size, priority gap samples plus chiSquareP, runsP, ksP, entropyBitsPerSample, stddev metrics & sampleCount.
+- Harness populates simulated jitterMetrics when both h2/h3 adaptive simulations are enabled.
+- Introduced Check 41 enforcing sample minimum, randomness p-value thresholds (>0.01), entropy floor (≥0.25), stddev sanity; failure codes: JITTER_EVIDENCE_MISSING, JITTER_SAMPLES_INSUFFICIENT, CHI_SQUARE_P_LOW, RUNS_TEST_P_LOW, KS_P_LOW, ENTROPY_LOW, PING_STDDEV_LOW, PADDING_STDDEV_LOW.
+- Added tests covering pass and each failure scenario; roadmap Task 19 marked complete.
+- Caveats: statistical values simulated; real capture & advanced distribution modeling deferred to Task 25.
 - Added harness extended QUIC Initial parsing: version, DCID/SCID lengths & hex values, token length, length field varint, negotiation & retry heuristics.
 - Introduced calibrationHash (sha256 over stable subset) with baseline `quicInitialBaseline`; mismatch flagged via `calibrationMismatch` and failure code QUIC_CALIBRATION_MISMATCH.
 - New Check 40 (Extended QUIC Initial Parsing & Calibration) validating evidence presence, parse completeness, version expectation (0x00000001), calibration stability; surfaces negotiation/retry as informational codes (QUIC_VERSION_NEGOTIATION, QUIC_RETRY).

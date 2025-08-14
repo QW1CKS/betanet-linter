@@ -602,6 +602,48 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
+  describe('Task 19: HTTP/2 & HTTP/3 Jitter Statistical Tests (Check 41)', () => {
+    function analyzerForJitter(jm?: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: ['h2','h3','jitter'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        evidence: jm ? { jitterMetrics: jm } : {}
+      } as any;
+    }
+    it('passes with sufficient samples and acceptable p-values & entropy', async () => {
+      const jm = { pingIntervalsMs: [40,41,42,43,44], paddingSizes: [500,550,600,650,700], priorityFrameGaps: [20,22,21,23,24], chiSquareP: 0.2, runsP: 0.3, ksP: 0.25, entropyBitsPerSample: 0.4, sampleCount: 40, stdDevPing: 2, stdDevPadding: 60 };
+      const result = await runWithAnalyzer(analyzerForJitter(jm));
+      const check41 = result.checks.find(c => c.id === 41)!;
+      expect(check41.passed).toBe(true);
+    });
+    it('fails with insufficient samples', async () => {
+      const jm = { pingIntervalsMs: [40,41], paddingSizes: [600], priorityFrameGaps: [20], chiSquareP: 0.2, runsP: 0.2, ksP: 0.2, entropyBitsPerSample: 0.5, sampleCount: 5, stdDevPing: 1, stdDevPadding: 10 };
+      const result = await runWithAnalyzer(analyzerForJitter(jm));
+      const check41 = result.checks.find(c => c.id === 41)!;
+      expect(check41.passed).toBe(false);
+      expect(check41.details).toMatch(/JITTER_SAMPLES_INSUFFICIENT/);
+    });
+    it('fails with low chi-square p-value', async () => {
+      const jm = { pingIntervalsMs: [40,41,42,43,44], paddingSizes: [500,550,600,650,700], priorityFrameGaps: [20,22,21,23,24], chiSquareP: 0.0001, runsP: 0.3, ksP: 0.25, entropyBitsPerSample: 0.4, sampleCount: 40, stdDevPing: 2, stdDevPadding: 60 };
+      const result = await runWithAnalyzer(analyzerForJitter(jm));
+      const check41 = result.checks.find(c => c.id === 41)!;
+      expect(check41.passed).toBe(false);
+      expect(check41.details).toMatch(/CHI_SQUARE_P_LOW/);
+    });
+    it('fails with low entropy', async () => {
+      const jm = { pingIntervalsMs: [40,41,42,43,44], paddingSizes: [500,550,600,650,700], priorityFrameGaps: [20,22,21,23,24], chiSquareP: 0.2, runsP: 0.3, ksP: 0.25, entropyBitsPerSample: 0.1, sampleCount: 40, stdDevPing: 2, stdDevPadding: 60 };
+      const result = await runWithAnalyzer(analyzerForJitter(jm));
+      const check41 = result.checks.find(c => c.id === 41)!;
+      expect(check41.passed).toBe(false);
+      expect(check41.details).toMatch(/ENTROPY_LOW/);
+    });
+    it('fails when evidence missing', async () => {
+      const result = await runWithAnalyzer(analyzerForJitter());
+      const check41 = result.checks.find(c => c.id === 41)!;
+      expect(check41.passed).toBe(false);
+      expect(check41.details).toMatch(/JITTER_EVIDENCE_MISSING/);
+    });
+  });
+
   // Task 7: Governance ACK Span & Partition Safety Dataset
   describe('Task 7: Governance Historical Diversity & Partition Safety (Check 15 extension)', () => {
     function analyzerForGov(hist: any, gov: any = {}) {

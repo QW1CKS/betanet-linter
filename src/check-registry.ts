@@ -69,6 +69,40 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     }
   },
   {
+    id: 41,
+    key: 'http-jitter-statistics',
+    name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests',
+    description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy',
+    severity: 'major',
+    introducedIn: '1.1',
+    mandatoryIn: '1.1',
+    evaluate: async (analyzer) => {
+      const ev: any = (analyzer as any).evidence || {};
+      const jm = ev.jitterMetrics;
+      if (!jm) {
+        return { id: 41, name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests', description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy', passed: false, details: '❌ JITTER_EVIDENCE_MISSING', severity: 'major', evidenceType: 'heuristic' };
+      }
+      const failureCodes: string[] = [];
+      const minSamples = 30; // combined threshold
+      const totalSamples = jm.sampleCount || 0;
+      if (totalSamples < minSamples) failureCodes.push('JITTER_SAMPLES_INSUFFICIENT');
+      const pThreshold = 0.01;
+      if (jm.chiSquareP !== undefined && jm.chiSquareP <= pThreshold) failureCodes.push('CHI_SQUARE_P_LOW');
+      if (jm.runsP !== undefined && jm.runsP <= pThreshold) failureCodes.push('RUNS_TEST_P_LOW');
+      if (jm.ksP !== undefined && jm.ksP <= pThreshold) failureCodes.push('KS_P_LOW');
+      if (jm.entropyBitsPerSample !== undefined && jm.entropyBitsPerSample < 0.25) failureCodes.push('ENTROPY_LOW');
+      // Basic stddev sanity (avoid degenerate distributions)
+      if (jm.stdDevPing !== undefined && jm.stdDevPing < 0.1) failureCodes.push('PING_STDDEV_LOW');
+      if (jm.stdDevPadding !== undefined && jm.stdDevPadding < 0.1) failureCodes.push('PADDING_STDDEV_LOW');
+      const passed = failureCodes.length === 0;
+      const evidenceType: 'heuristic' | 'artifact' = passed ? 'artifact' : 'heuristic';
+      const details = passed
+        ? `✅ jitter stats ok pingN=${jm.pingIntervalsMs?.length||0} padN=${jm.paddingSizes?.length||0} priN=${jm.priorityFrameGaps?.length||0} chiP=${jm.chiSquareP?.toExponential(2)} runsP=${jm.runsP?.toExponential(2)} ksP=${jm.ksP?.toExponential(2)} entropy=${jm.entropyBitsPerSample?.toFixed(3)}`
+        : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] chiP=${jm.chiSquareP} runsP=${jm.runsP} ksP=${jm.ksP} entropy=${jm.entropyBitsPerSample} n=${totalSamples}`;
+      return { id: 41, name: 'HTTP/2 & HTTP/3 Jitter Statistical Tests', description: 'Evaluates jitter distributions (PING intervals, padding sizes, priority gaps) with randomness p-values & entropy', passed, details, severity: 'major', evidenceType };
+    }
+  },
+  {
     id: 1,
     key: 'htx-transports-tls-ech',
     name: 'HTX over TCP-443 & QUIC-443',
