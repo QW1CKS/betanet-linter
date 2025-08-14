@@ -429,7 +429,8 @@ export class BetanetComplianceChecker {
         checks.push({ id: def.id, name: def.name, description: def.description, passed: false, details: e && e.message === 'CHECK_TIMEOUT' ? '❌ Check timed out' : `❌ Check error: ${e?.message || e}`, severity: def.severity, durationMs: duration });
       }
     };
-    while (queue.length || running.length) {
+  // Loop until both queues empty (explicit >0 comparisons to satisfy no-constant-condition)
+  while (queue.length > 0 || running.length > 0) {
       while (queue.length && running.length < maxParallel) {
         const def = queue.shift()!;
         const p = runOne(def).finally(() => { const idx = running.indexOf(p); if (idx >= 0) running.splice(idx, 1); });

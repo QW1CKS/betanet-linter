@@ -354,6 +354,53 @@ All 16 tasks pass; README updated; Compliance Matrix reflects Strict Normative F
 
 16. [x] Multi-Signal Corroboration: Each normative pass cites ≥2 independent evidence categories (enforced by Check 18 + authenticity when enabled).
 
+Outstanding Spec Gap Tasks (Unimplemented / Incomplete)
+------------------------------------------------------
+The following additional items were identified as still incomplete for a strictly normative Betanet 1.1 bounty submission. They are tracked here with empty boxes. When each is fully implemented (code + evidence + tests + docs) its box should be checked. These coexist with the historical Final Compliance list above, which may have been over‑reported as complete.
+
+1. [ ] Full TLS Calibration Canonicalization
+  - Implement true JA3 & JA4 canonical strings, extension ordering hashing, ALPN set/order exact match, HTTP/2 SETTINGS ±15% tolerance math, POP co‑location verification, granular mismatch codes (ALPN_SET_DIFF, EXT_COUNT_DIFF, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH).
+2. [ ] Definitive ECH Behavioral Verification
+  - Dual handshake (outer SNI vs encrypted) confirming certificate / transcript differential beyond extension token presence; produce echVerified flag & failure codes.
+3. [ ] Real Noise XK Transcript & Rekey Enforcement
+  - Capture live message sequence, validate pattern & HKDF labels, enforce rekey triggers (≥8 GiB OR ≥2^16 frames OR ≥1 h), detect nonce overuse; emit NO_REKEY / NONCE_OVERUSE / MSG_PATTERN_MISMATCH codes.
+4. [ ] SCION Control Stream & Path Failover Metrics
+  - Parse CBOR control stream, ensure ≥3 offers, unique paths, no legacy header; measure path switch latency (≤300 ms) & probe rate backoff limits.
+5. [ ] Bootstrap PoW & Multi-Bucket Rate-Limit Statistics
+  - Verify PoW bit difficulty (≥22) & adaptive convergence; analyze acceptance percentile, multi-bucket (/24, /56, AS) dispersion & trend; POW_TREND_DIVERGENCE failures.
+6. [ ] Mixnode Selection Entropy & Diversity Enforcement
+  - Validate per-stream entropy (streamNonce), ≥8 unique hop sets before reuse, AS/ISD diversity constraints, avoidance of identical hop set repetition.
+7. [ ] Alias Ledger 2-of-3 Finality & Emergency Advance Validation
+  - Parse per-chain finality depths, quorum certificate weights & signatures, 14‑day liveness prerequisite, epoch monotonicity; FINALITY_DEPTH_SHORT / EMERGENCY_LIVENESS_SHORT / QUORUM_WEIGHT_MISMATCH codes.
+8. [ ] Voucher Aggregated Signature (FROST) Cryptographic Verification
+  - Implement Ed25519 aggregated / FROST threshold (n≥5, t=3) signature validation over 128‑B voucher payload; AGG_SIG_INVALID / FROST_PARAMS_INVALID.
+9. [ ] Governance Partition Safety 7‑Day Dataset
+  - Ingest historical ACK/path diversity series (≥7*24 points) detecting >20% degradation; PARTITION_DEGRADATION code generation.
+10. [ ] Anti-Correlation Fallback Timing Enforcement
+  - Measure UDP→TCP retry delay windows, cover connection counts (≥2), teardown timing (3–15 s) distributions (IQR, CV) & anomaly detection; COVER_DELAY_OUT_OF_RANGE / TEARDOWN_VARIANCE_EXCESS.
+11. [ ] Provenance DSSE Signature & Rebuild Diff Hardening
+  - Verify DSSE signatures with trusted keys, enforce materials completeness & toolchain pinning, compare rebuild digest; SIG_INVALID / MATERIAL_GAP / REBUILD_MISMATCH.
+12. [ ] Algorithm Agility Registry Enforcement
+  - Parse registry artifact (allowed cipher/hash/KEM sets); verify used sets ⊆ allowed; unregisteredUsed empty; failure on unknown combos.
+13. [ ] Post-Quantum Mandatory Date Gate (2027‑01‑01)
+  - Enforce failure if hybrid X25519-Kyber768 absent after date (PQ_PAST_DUE) or present prematurely without override (PQ_EARLY_WITHOUT_OVERRIDE).
+14. [ ] Evidence Authenticity (Detached Signature / Bundle)
+  - Implement signature / bundle verification (minisign, cosign, DSSE) promoting artifact evidence only when authenticity passes; EVIDENCE_UNSIGNED failure in strict auth mode.
+15. [ ] Keyword Stuffing Advanced Heuristic Refinement
+  - Strengthen density measurement with category entropy & false-positive regression tests; flag & downgrade stuffing evasions.
+16. [ ] Governance & Ledger Cryptographic Quorum Signature Validation
+  - Perform real Ed25519 signature checks for quorum certificates & maintain weight duplicates detection.
+17. [ ] Extended QUIC Initial Parsing & Calibration Hash
+  - Extract version, DCID/SCID, token length/value, transport params subset; generate calibration hash & mismatch diagnostics.
+18. [ ] HTTP/2 & HTTP/3 Jitter Statistical Tests
+  - Collect real distribution samples (PING cadence, idle padding, PRIORITY frames), run chi-square / KS tests, enforce variance bounds; JITTER_RANDOMNESS_WEAK.
+19. [ ] Mix Diversity Variance & Entropy Metrics
+  - Compute hop set entropy, path length stddev, confidence intervals; fail when below thresholds.
+20. [ ] Lint & Type Hygiene Hardening
+  - Eliminate remaining ESLint error(s) & systematically reduce any/no-non-null & no-explicit-any warnings for core modules or justify via documented exclusions.
+
+Note: Completing each gap requires: implementation, evidence schema extension (with version bump if fields are normative), tests (positive & negative), README matrix update, and change log entry.
+
 Testing & Validation Additions
 ------------------------------
 Categories:
