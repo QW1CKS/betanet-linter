@@ -683,17 +683,20 @@ exports.CHECK_REGISTRY = [
             const overrideApproved = !!(ev.pqOverride?.approved === true || ev.provenance?.pqOverrideApproved === true);
             const afterDate = currentEpoch >= mandatoryEpoch;
             let passed = true;
-            let failCode = null;
-            if (afterDate && !pqPresent) {
-                passed = false;
-                failCode = 'PQ_PAST_DUE';
-            }
-            if (!afterDate && pqPresent && !overrideApproved) {
-                passed = false;
-                failCode = 'PQ_EARLY_WITHOUT_OVERRIDE';
-            }
-            const evidenceType = pqPresent ? 'artifact' : 'heuristic';
-            const details = passed ? `✅ PQ boundary ok (${afterDate ? 'post' : 'pre'}-date${pqPresent ? ' pq-present' : ' pq-absent'}${overrideApproved ? ' override-approved' : ''})` : `❌ ${failCode}`;
+            const failureCodes = [];
+            // Core failure conditions (retain original codes for backward compatibility)
+            if (afterDate && !pqPresent)
+                failureCodes.push('PQ_PAST_DUE');
+            if (!afterDate && pqPresent && !overrideApproved)
+                failureCodes.push('PQ_EARLY_WITHOUT_OVERRIDE');
+            passed = failureCodes.length === 0;
+            // Elevate to artifact only when cryptographic capability (pqPresent) or explicit override object supplied
+            const evidenceType = (pqPresent || ev.pqOverride) ? 'artifact' : 'heuristic';
+            const boundaryISO = new Date(mandatoryEpoch).toISOString().slice(0, 10);
+            const meta = `ctx={now=${new Date(currentEpoch).toISOString()}, mandatory=${boundaryISO}, afterDate=${afterDate}, pqPresent=${pqPresent}, overrideApproved=${overrideApproved}}`;
+            const details = passed
+                ? `✅ PQ boundary ok (${afterDate ? 'post' : 'pre'}-date${pqPresent ? ' pq-present' : ' pq-absent'}${overrideApproved ? ' override-approved' : ''}) ${meta}`
+                : `❌ PQ_BOUNDARY codes=[${failureCodes.join(',')}] ${meta}`;
             return { id: 38, name: 'Post-Quantum Date Boundary', description: 'Enforces PQ suite presence after mandatory date; forbids premature PQ without approved override', passed, details, severity: 'major', evidenceType };
         }
     },
@@ -702,34 +705,59 @@ exports.CHECK_REGISTRY = [
         id: 37,
         key: 'jitter-randomness',
         name: 'Statistical Jitter Randomness',
-        description: 'Validates adaptive jitter & teardown distributions via p-value threshold',
+        description: 'Validates adaptive jitter & teardown distributions via multi-metric randomness thresholds',
         severity: 'major',
         introducedIn: '1.1',
         evaluate: async (analyzer) => {
             const ev = analyzer.evidence || {};
-            const rt = ev.randomnessTest; // expected shape { pValue:number, sampleCount:number, method?:string }
-            // Fallback: derive trivial pValue heuristic from statisticalJitter stddev vs mean if randomnessTest absent
+            const rt = ev.randomnessTest; // shape { pValue, sampleCount, method, entropyBitsPerSample?, chiSquareP?, runsP? }
+            // Primary metrics
             let pValue = rt?.pValue;
             let sampleCount = rt?.sampleCount;
+            const entropyBps = rt?.entropyBitsPerSample; // expected Shannon bits per sample (normalized to 0..log2(k))
+            const chiSquareP = rt?.chiSquareP;
+            const runsP = rt?.runsP;
+            // Derive heuristic fallback if no explicit pValue but have statisticalJitter
             if (pValue === undefined && ev.statisticalJitter) {
                 const sj = ev.statisticalJitter;
                 if (typeof sj.stdDevMs === 'number' && typeof sj.meanMs === 'number' && sj.meanMs > 0) {
-                    const cv = sj.stdDevMs / sj.meanMs; // coefficient of variation
-                    // Map CV heuristically to pseudo p-value (purely placeholder): higher dispersion -> higher pseudo p
+                    const cv = sj.stdDevMs / sj.meanMs;
                     pValue = Math.max(0, Math.min(1, cv / 2));
                     sampleCount = sj.samples || sj.sampleCount;
                 }
             }
-            const threshold = 0.01; // AC threshold
+            const thresholds = { primaryP: 0.01, chiSquareP: 0.005, runsP: 0.01, entropyMin: 0.2 }; // heuristic minimums
             const minSamples = 20;
-            if (pValue === undefined || !Number.isFinite(pValue)) {
-                return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed: false, details: '❌ JITTER_RANDOMNESS_WEAK: missing pValue', severity: 'major', evidenceType: 'heuristic' };
-            }
+            const failureCodes = [];
+            if (pValue === undefined || !Number.isFinite(pValue))
+                failureCodes.push('MISSING_PVALUE');
             const enoughSamples = (sampleCount || 0) >= minSamples;
-            const passed = pValue > threshold && enoughSamples;
-            const evidenceType = (rt && enoughSamples) ? 'artifact' : 'heuristic';
-            const details = passed ? `✅ randomness pValue=${pValue.toExponential(2)} samples=${sampleCount}` : `❌ JITTER_RANDOMNESS_WEAK: pValue=${pValue.toExponential(2)} samples=${sampleCount || 0}${!enoughSamples ? ' insufficient-samples' : ''}`;
-            return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed, details, severity: 'major', evidenceType };
+            if (!enoughSamples)
+                failureCodes.push('INSUFFICIENT_SAMPLES');
+            if (pValue !== undefined && pValue <= thresholds.primaryP)
+                failureCodes.push('PRIMARY_P_LOW');
+            if (chiSquareP !== undefined && chiSquareP <= thresholds.chiSquareP)
+                failureCodes.push('CHI_SQUARE_P_LOW');
+            if (runsP !== undefined && runsP <= thresholds.runsP)
+                failureCodes.push('RUNS_TEST_P_LOW');
+            if (entropyBps !== undefined && entropyBps < thresholds.entropyMin)
+                failureCodes.push('ENTROPY_LOW');
+            const passed = failureCodes.length === 0;
+            const evidenceType = (rt && enoughSamples && passed) ? 'artifact' : 'heuristic';
+            const metrics = [];
+            if (pValue !== undefined)
+                metrics.push(`p=${pValue.toExponential(2)}`);
+            if (chiSquareP !== undefined)
+                metrics.push(`chiP=${chiSquareP.toExponential(2)}`);
+            if (runsP !== undefined)
+                metrics.push(`runsP=${runsP.toExponential(2)}`);
+            if (entropyBps !== undefined)
+                metrics.push(`entropy=${entropyBps.toFixed(3)}`);
+            metrics.push(`n=${sampleCount || 0}`);
+            const details = passed
+                ? `✅ randomness ${metrics.join(' ')}`
+                : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] ${metrics.join(' ')}`;
+            return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via multi-metric randomness thresholds', passed, details, severity: 'major', evidenceType };
         }
     },
     // Task 12: Adaptive PoW & Rate-Limit Statistical Validation (Check 36)
@@ -1147,9 +1175,46 @@ exports.CHECK_REGISTRY = [
                     const windowOk = hist.maxWindowShare === undefined || hist.maxWindowShare <= 0.2;
                     const deltaOk = hist.maxDeltaShare === undefined || hist.maxDeltaShare <= 0.05;
                     const avgTop3Ok = hist.avgTop3 === undefined || hist.avgTop3 <= 0.24; // 20% cap * 1.2 = 0.24
-                    const pointsOk = !hist.series || hist.series.length >= (7 * 24); // require ≥7*24 points if series provided
-                    const degradationOk = hist.degradationPct === undefined || hist.degradationPct <= 0.20; // Task 7 threshold
-                    diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok && pointsOk && degradationOk;
+                    // Expect hourly points over 7 days => 7*24. Allow up to 5% gaps.
+                    let pointsOk = true;
+                    let gapRatioOk = true;
+                    if (Array.isArray(hist.series)) {
+                        const expected = 7 * 24;
+                        const have = hist.series.length;
+                        const gapRatio = have / expected;
+                        hist.seriesGapRatio = gapRatio;
+                        pointsOk = have >= expected * 0.95; // allow small gaps
+                        gapRatioOk = gapRatio >= 0.95;
+                    }
+                    // Compute degradation if not provided: compare top1 average first 24h vs last 24h
+                    if (hist.degradationPct === undefined && Array.isArray(hist.series) && hist.series.length >= 48) {
+                        const firstDay = hist.series.slice(0, 24);
+                        const lastDay = hist.series.slice(-24);
+                        function top1Avg(arr) { return arr.reduce((acc, p) => { const vals = Object.values(p.asShares); const max = Math.max(...vals); return acc + max; }, 0) / arr.length; }
+                        const firstAvg = top1Avg(firstDay);
+                        const lastAvg = top1Avg(lastDay);
+                        const degradation = (lastAvg - firstAvg); // absolute increase
+                        hist.degradationComputedPct = degradation;
+                        if (hist.degradationPct === undefined)
+                            hist.degradationPct = degradation; // reuse existing logic threshold 0.2
+                    }
+                    const degradationOk = hist.degradationPct === undefined || hist.degradationPct <= 0.20; // Task 9 threshold
+                    // Detect partitions: sudden large drop (>15% absolute) of dominant AS share or spike (> +15%) within 6h window
+                    let partitionSafetyOk = true;
+                    if (Array.isArray(hist.series) && hist.series.length > 6) {
+                        for (let i = 1; i < hist.series.length; i++) {
+                            const prevVals = Object.values(hist.series[i - 1].asShares);
+                            const curVals = Object.values(hist.series[i].asShares);
+                            const prevMax = Math.max(...prevVals);
+                            const curMax = Math.max(...curVals);
+                            const delta = curMax - prevMax;
+                            if (delta > 0.15 || delta < -0.15) {
+                                partitionSafetyOk = false;
+                                break;
+                            }
+                        }
+                    }
+                    diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok && pointsOk && degradationOk && gapRatioOk && partitionSafetyOk;
                     if (!stableBasic)
                         diversityReasons.push('historical basic instability');
                     if (!adv)
@@ -1168,6 +1233,10 @@ exports.CHECK_REGISTRY = [
                         diversityReasons.push('insufficient-points');
                     if (!degradationOk)
                         diversityReasons.push('PARTITION_DEGRADATION');
+                    if (!gapRatioOk)
+                        diversityReasons.push('SERIES_GAP_EXCESS');
+                    if (!partitionSafetyOk)
+                        diversityReasons.push('PARTITION_VOLATILITY_SPIKE');
                 }
                 passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && diversityOk);
                 details = passed ? `✅ Caps enforced (AS=${(maxASShare ?? 0).toFixed(3)} org=${(maxOrgShare ?? 0).toFixed(3)}) partitions=none diversity=stable` : `❌ Governance issues: ${(0, format_1.missingList)([
@@ -1831,32 +1900,66 @@ exports.PHASE_7_CONT_CHECKS = [
             return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter, stddev, and randomness with strict tolerances (Full compliance)', passed, details, severity: 'major', evidenceType: 'dynamic-protocol' };
         }
     },
-    // Task 9: Algorithm Agility Registry Validation
+    // Task 12: Algorithm Agility Registry Enforcement (upgraded)
     {
         id: 34,
         key: 'algorithm-agility-registry',
         name: 'Algorithm Agility Registry',
-        description: 'Validates cryptographic algorithm set usage against registered allowed sets',
+        description: 'Validates cryptographic algorithm set usage against registered allowed sets (schema, mapping, diffs)',
         severity: 'major',
         introducedIn: '1.1',
         evaluate: async (analyzer) => {
             const ev = analyzer.evidence || {};
             const aa = ev.algorithmAgility;
             if (!aa)
-                return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed: false, details: '❌ No algorithmAgility evidence', severity: 'major', evidenceType: 'heuristic' };
+                return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets (schema, mapping, diffs)', passed: false, details: '❌ No algorithmAgility evidence', severity: 'major', evidenceType: 'heuristic' };
+            const failureCodes = [];
             const allowed = Array.isArray(aa.allowedSets) ? aa.allowedSets : [];
             const used = Array.isArray(aa.usedSets) ? aa.usedSets : [];
-            const unregistered = (aa.unregisteredUsed && Array.isArray(aa.unregisteredUsed)) ? aa.unregisteredUsed : used.filter((s) => !allowed.includes(s));
-            const digestOk = typeof aa.registryDigest === 'string' && aa.registryDigest.length >= 32;
-            const usedOk = used.length > 0;
-            const passed = digestOk && usedOk && unregistered.length === 0;
-            const failReasons = !passed ? [
-                !digestOk && 'registry digest missing/invalid',
-                !usedOk && 'no usedSets',
-                unregistered.length > 0 && `unregisteredUsed=${unregistered.join(',')}`
-            ].filter(Boolean) : [];
-            const details = passed ? `✅ registryDigest=${aa.registryDigest?.slice(0, 12)} sets=${used.length}` : `❌ Algorithm agility issues: ${(0, format_1.missingList)(failReasons)}`;
-            return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed, details, severity: 'major', evidenceType: 'artifact' };
+            const digestOk = typeof aa.registryDigest === 'string' && /^[a-f0-9]{32,64}$/i.test(aa.registryDigest || '');
+            if (!digestOk)
+                failureCodes.push('REGISTRY_DIGEST_INVALID');
+            const schemaOk = aa.schemaValid !== false; // default true unless explicitly false
+            if (!schemaOk)
+                failureCodes.push('REGISTRY_SCHEMA_INVALID');
+            const hasUsed = used.length > 0;
+            if (!hasUsed)
+                failureCodes.push('NO_USED_SETS');
+            // Compute unregistered sets if not provided
+            const unregistered = Array.isArray(aa.unregisteredUsed) ? aa.unregisteredUsed : used.filter((s) => !allowed.includes(s));
+            if (unregistered.length > 0)
+                failureCodes.push('UNREGISTERED_SET_PRESENT');
+            // Mapping diagnostics
+            const mapping = Array.isArray(aa.suiteMapping) ? aa.suiteMapping : [];
+            const unknownCombos = Array.isArray(aa.unknownCombos) ? aa.unknownCombos : [];
+            if (unknownCombos.length > 0)
+                failureCodes.push('UNKNOWN_COMBO');
+            const invalidMappings = mapping.filter((m) => m.valid === false);
+            if (invalidMappings.length > 0)
+                failureCodes.push('MAPPING_INVALID');
+            // Mismatch diff (expected vs actual) indicates usage drift
+            const mismatches = Array.isArray(aa.mismatches) ? aa.mismatches : [];
+            if (mismatches.length > 0)
+                failureCodes.push('ALGORITHM_MISMATCH');
+            const passed = failureCodes.length === 0;
+            const detailParts = [];
+            if (passed) {
+                detailParts.push(`registryDigest=${aa.registryDigest?.slice(0, 12)}`);
+                detailParts.push(`used=${used.length}`);
+                if (mapping.length)
+                    detailParts.push(`mapped=${mapping.length}`);
+            }
+            else {
+                detailParts.push(`failCodes=[${failureCodes.join(',')}]`);
+                if (unregistered.length)
+                    detailParts.push(`unregistered=[${unregistered.join(',')}]`);
+                if (unknownCombos.length)
+                    detailParts.push(`unknownCombos=${unknownCombos.length}`);
+                if (mismatches.length)
+                    detailParts.push(`mismatches=${mismatches.length}`);
+            }
+            const details = (passed ? '✅ ' : '❌ ') + 'Algorithm agility ' + (passed ? 'ok ' : 'issues ') + detailParts.join(' ');
+            return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets (schema, mapping, diffs)', passed, details, severity: 'major', evidenceType: passed ? 'artifact' : 'heuristic' };
         }
     },
     // Task 11: Evidence Authenticity & Bundle Trust (Check 35)
@@ -1872,15 +1975,49 @@ exports.PHASE_7_CONT_CHECKS = [
             const diag = (analyzer.getDiagnostics && analyzer.getDiagnostics()) || {};
             const provenance = ev.provenance || {};
             const bundle = ev.signedEvidenceBundle;
-            const strictAuth = analyzer.options?.strictAuthMode === true; // options attached in ensureAnalyzer
-            // Determine authenticity signals
+            const strictAuth = analyzer.options?.strictAuthMode === true;
+            const detachedAttempted = provenance.signatureVerified === true || provenance.signatureVerified === false || diag.evidenceSignatureValid !== undefined;
             const detachedValid = provenance.signatureVerified === true || diag.evidenceSignatureValid === true;
-            const bundleValid = bundle?.multiSignerThresholdMet === true;
-            const anyAuth = (detachedValid === true) || (bundleValid === true);
-            // Pass policy: if strictAuth mode enabled, require anyAuth true. If not strict, informational pass if authenticity present.
-            const passed = anyAuth; // bool
+            const bundlePresent = !!bundle;
+            const bundleThresholdMet = bundle?.multiSignerThresholdMet === true;
+            const anyAuth = detachedValid || bundleThresholdMet;
+            const failureCodes = [];
+            if (!anyAuth) {
+                if (strictAuth) {
+                    if (bundlePresent) {
+                        if (!bundleThresholdMet)
+                            failureCodes.push('BUNDLE_THRESHOLD_UNMET');
+                        const invalidEntries = (bundle.entries || []).filter((e) => e && e.signatureValid === false).length;
+                        if (invalidEntries > 0)
+                            failureCodes.push('BUNDLE_SIGNATURE_INVALID');
+                    }
+                    else if (detachedAttempted) {
+                        if (!detachedValid)
+                            failureCodes.push('SIG_DETACHED_INVALID');
+                    }
+                    else {
+                        failureCodes.push('MISSING_AUTH_SIGNALS');
+                    }
+                }
+                else {
+                    failureCodes.push('EVIDENCE_UNSIGNED');
+                }
+            }
             const evidenceType = anyAuth ? 'artifact' : 'heuristic';
-            const details = anyAuth ? `✅ authenticity ${detachedValid ? 'detached-signature' : 'bundle'} verified` : (strictAuth ? '❌ EVIDENCE_UNSIGNED' : '❌ EVIDENCE_UNSIGNED (not enforced)');
+            let details;
+            if (anyAuth) {
+                details = `✅ authenticity ${(detachedValid ? 'detached-signature' : 'bundle')} verified`;
+            }
+            else {
+                const codeStr = failureCodes.length ? ` codes=[${failureCodes.join(',')}]` : '';
+                if (strictAuth) {
+                    details = `❌ ${codeStr || 'EVIDENCE_UNSIGNED'}`;
+                }
+                else {
+                    details = `❌ EVIDENCE_UNSIGNED (not enforced)${codeStr}`;
+                }
+            }
+            const passed = anyAuth;
             return { id: 35, name: 'Evidence Authenticity', description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode', passed, details, severity: 'major', evidenceType };
         }
     },

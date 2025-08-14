@@ -281,6 +281,25 @@ export interface IngestedEvidence {
         bundleSha256?: string;
         multiSignerThresholdMet?: boolean;
     };
+    algorithmAgility?: {
+        allowedSets?: string[];
+        usedSets?: string[];
+        unregisteredUsed?: string[];
+        registryDigest?: string;
+        observedSuites?: string[];
+        suiteMapping?: {
+            observed: string;
+            mapped?: string;
+            valid: boolean;
+            reason?: string;
+        }[];
+        unknownCombos?: string[];
+        mismatches?: {
+            expected: string;
+            actual: string;
+        }[];
+        schemaValid?: boolean;
+    };
     fallbackTiming?: {
         udpTimeoutMs?: number;
         tcpConnectMs?: number;
@@ -293,6 +312,14 @@ export interface IngestedEvidence {
         teardownIqrMs?: number;
         outlierPct?: number;
         provenanceCategories?: string[];
+        coverTeardownMedianMs?: number;
+        coverTeardownP95Ms?: number;
+        coverTeardownCv?: number;
+        coverTeardownSkewness?: number;
+        coverTeardownOutlierCount?: number;
+        coverTeardownAnomalyCodes?: string[];
+        behaviorModelScore?: number;
+        behaviorWithinPolicy?: boolean;
     };
     statisticalVariance?: {
         jitterStdDevMs?: number;
@@ -379,6 +406,8 @@ export interface IngestedEvidence {
         maxDeltaShare?: number;
         avgTop3?: number;
         degradationPct?: number;
+        degradationComputedPct?: number;
+        seriesGapRatio?: number;
         advancedStable?: boolean;
     };
     mix?: {
@@ -563,12 +592,6 @@ export interface IngestedEvidence {
         capacityP95?: number;
         capacityStdDev?: number;
         refillVarianceTrend?: number;
-    };
-    algorithmAgility?: {
-        registryDigest?: string;
-        allowedSets?: string[];
-        usedSets?: string[];
-        unregisteredUsed?: string[];
     };
     scionControl?: {
         offers?: {

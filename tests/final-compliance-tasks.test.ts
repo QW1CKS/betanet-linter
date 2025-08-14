@@ -1020,6 +1020,28 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       const check38 = result.checks.find(c => c.id === 38)!;
       expect(check38.passed).toBe(true);
     });
+    it('passes exactly at boundary when PQ present', async () => {
+      const ev = { pqTestNowEpoch: mandatoryEpoch };
+      const cryptoCaps = { hasKyber768: true };
+      const result = await runWithAnalyzer(analyzerForPQ(ev, cryptoCaps));
+      const check38 = result.checks.find(c => c.id === 38)!;
+      expect(check38.passed).toBe(true);
+    });
+    it('fails exactly at boundary when PQ absent', async () => {
+      const ev = { pqTestNowEpoch: mandatoryEpoch };
+      const cryptoCaps = { hasKyber768: false };
+      const result = await runWithAnalyzer(analyzerForPQ(ev, cryptoCaps));
+      const check38 = result.checks.find(c => c.id === 38)!;
+      expect(check38.passed).toBe(false);
+      expect(check38.details).toMatch(/PQ_PAST_DUE/);
+    });
+    it('includes contextual metadata in pass details', async () => {
+      const ev = { pqTestNowEpoch: mandatoryEpoch + 1, }; // after date with PQ present
+      const cryptoCaps = { hasKyber768: true };
+      const result = await runWithAnalyzer(analyzerForPQ(ev, cryptoCaps));
+      const check38 = result.checks.find(c => c.id === 38)!;
+      expect(check38.details).toMatch(/ctx=\{/);
+    });
   });
 
   // Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes

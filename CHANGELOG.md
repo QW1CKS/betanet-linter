@@ -69,6 +69,13 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 - Extended tests (Task 11 section) covering pass (detached + bundle) and each new negative scenario
 - ROADMAP updated to mark Task 11 complete with caveats retained for future real cryptographic bundle verification & key policy enhancements
 
+### Task 14 Completion: Post-Quantum Date Boundary Reliability
+- Enhanced Check 38 with contextual metadata (ctx={now,mandatory,afterDate,pqPresent,overrideApproved}) for audit traceability
+- Preserved failure codes PQ_PAST_DUE & PQ_EARLY_WITHOUT_OVERRIDE (aggregated under PQ_BOUNDARY token in failure details) ensuring backward compatibility for existing parsers
+- EvidenceType now elevates to artifact when either PQ capability detected or override object present
+- Added edge-case tests: exact boundary epoch pass/fail, override pre-date pass, metadata presence assertion
+- README updated to reflect PQ boundary codes and contextual metadata emission
+
 Post‑1.1 optional enhancements and polish items (see deferred list above). No breaking changes scheduled; future work will aim for additive schema expansions and optional flags.
 
 ### Added (since 1.0 baseline, historical aggregation)

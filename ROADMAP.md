@@ -61,8 +61,8 @@ The following tasks constitute the definitive completion list. Implementing all 
    - AC: randomnessTest.pValue > 0.01 on pass; failure code JITTER_RANDOMNESS_WEAK otherwise. Deterministic fixture triggers fail test.
 
 [x] 14. Post-Quantum Date Boundary Reliability
-   - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
-   - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE. Tests with mocked date contexts.
+  - Objective: UTC parsing with override audit; fail if PQ suite absent after date or present before without override.
+  - AC: pqDateEnforced=true; failure codes: PQ_PAST_DUE, PQ_EARLY_WITHOUT_OVERRIDE (grouped under PQ_BOUNDARY in failure details); contextual metadata emitted (ctx={now,mandatory,afterDate,pqPresent,overrideApproved}); artifact elevation when PQ present or override supplied. Tests cover: post-date absent (past due), pre-date present without override (early), pre-date with approved override, exact boundary pass/fail, metadata presence.
 
 [x] 15. Negative Assertion Expansion & Forbidden Artifact Hashes
    - Objective: Maintain deny-list (legacy header pattern, deterministic seed, deprecated cipher constants) hashed & compared.
@@ -333,28 +333,28 @@ The following additional items were identified as still incomplete for a strictl
   - Implemented: Check 37 upgraded from single p-value heuristic to multi-metric evaluation (primary pValue, chi-square p, runs test p, entropy bits/sample, sample count). New failure codes: MISSING_PVALUE, INSUFFICIENT_SAMPLES, PRIMARY_P_LOW, CHI_SQUARE_P_LOW, RUNS_TEST_P_LOW, ENTROPY_LOW. Evidence elevated to artifact when explicit `randomnessTest` metrics present and all thresholds satisfied.
   - Tests: Added pass scenario plus negative cases for each new failure code category in `final-compliance-tasks.test.ts`.
   - Caveats (non-blocking): Real statistical test implementations (current metrics assumed provided), dynamic adaptive thresholding based on distribution family, confidence interval reporting, sequential test correction (multiple comparisons), entropy normalization relative to symbol alphabet size.
-14. [ ] Post-Quantum Mandatory Date Gate (2027‑01‑01)
-  - Enforce failure if hybrid X25519-Kyber768 absent after date (PQ_PAST_DUE) or present prematurely without override (PQ_EARLY_WITHOUT_OVERRIDE).
-  - Caveats: reliable UTC date sourcing, override mechanism (env/config) audit logging, test matrix around boundary (±1 day) with simulated clock.
-14. [ ] Evidence Authenticity (Detached Signature / Bundle)
+14. [x] Post-Quantum Mandatory Date Gate (2027‑01‑01)
+  - Implemented: Check 38 enforces failure if hybrid X25519-Kyber768 absent after date (PQ_PAST_DUE) or present prematurely without override (PQ_EARLY_WITHOUT_OVERRIDE); emits contextual metadata ctx={now,mandatory,afterDate,pqPresent,overrideApproved}; artifact elevation when PQ present or override supplied; boundary ±1 day tests plus exact epoch pass/fail and override pre-date pass.
+  - Caveats (future optional): external trusted time source, override provenance (signed config), multi-suite PQ readiness (additional KEMs), explicit deprecation window warnings pre-cutover.
+15. [ ] Evidence Authenticity (Detached Signature / Bundle)
   - Implement signature / bundle verification (minisign, cosign, DSSE) promoting artifact evidence only when authenticity passes; EVIDENCE_UNSIGNED failure in strict auth mode.
   - Caveats: canonical JSON normalization, ed25519 & optional cosign key formats, multi-bundle threshold, tamper hash chain verification, signature cache & negative tests.
-15. [ ] Keyword Stuffing Advanced Heuristic Refinement
+16. [ ] Keyword Stuffing Advanced Heuristic Refinement
   - Strengthen density measurement with category entropy & false-positive regression tests; flag & downgrade stuffing evasions.
   - Caveats: entropy over evidence category presence, curated benign corpus for FP rate, adaptive thresholding, evasion pattern detection (e.g., random insertion), regression suite.
-16. [ ] Governance & Ledger Cryptographic Quorum Signature Validation
+17. [ ] Governance & Ledger Cryptographic Quorum Signature Validation
   - Perform real Ed25519 signature checks for quorum certificates & maintain weight duplicates detection.
   - Caveats: per-signer weight aggregation, duplicate signer / org detection, weight cap enforcement, signature batch verification optimization, invalid reason codes.
-17. [ ] Extended QUIC Initial Parsing & Calibration Hash
+18. [ ] Extended QUIC Initial Parsing & Calibration Hash
   - Extract version, DCID/SCID, token length/value, transport params subset; generate calibration hash & mismatch diagnostics.
   - Caveats: real QUIC Initial packet capture, varint parsing correctness tests, transport parameter extraction, hash stability spec, mismatch code taxonomy.
-18. [ ] HTTP/2 & HTTP/3 Jitter Statistical Tests
+19. [ ] HTTP/2 & HTTP/3 Jitter Statistical Tests
   - Collect real distribution samples (PING cadence, idle padding, PRIORITY frames), run chi-square / KS tests, enforce variance bounds; JITTER_RANDOMNESS_WEAK.
   - Caveats: sample collection hooks, statistical test implementation (chi-square / KS) with p‑value threshold (e.g. >0.01), randomness failure codes, insufficient sample handling.
-19. [ ] Mix Diversity Variance & Entropy Metrics
+20. [ ] Mix Diversity Variance & Entropy Metrics
   - Compute hop set entropy, path length stddev, confidence intervals; fail when below thresholds.
   - Caveats: entropy calculation (Shannon bits), path length variance thresholds, confidence interval estimation, dataset size guardrails, reproducibility of sampling.
-20. [ ] Lint & Type Hygiene Hardening
+21. [ ] Lint & Type Hygiene Hardening
   - Eliminate remaining ESLint error(s) & systematically reduce any/no-non-null & no-explicit-any warnings for core modules or justify via documented exclusions.
   - Caveats: introduce strict TypeScript config (noImplicitAny, strictNullChecks) compliance, documented whitelist for unavoidable anys, CI gate enforcing 0 errors, target warning budget.
 

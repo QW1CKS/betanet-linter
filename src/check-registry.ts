@@ -626,11 +626,18 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
       const overrideApproved = !!(ev.pqOverride?.approved === true || ev.provenance?.pqOverrideApproved === true);
       const afterDate = currentEpoch >= mandatoryEpoch;
       let passed = true;
-      let failCode: string | null = null;
-      if (afterDate && !pqPresent) { passed = false; failCode = 'PQ_PAST_DUE'; }
-      if (!afterDate && pqPresent && !overrideApproved) { passed = false; failCode = 'PQ_EARLY_WITHOUT_OVERRIDE'; }
-      const evidenceType: 'heuristic' | 'artifact' = pqPresent ? 'artifact' : 'heuristic';
-      const details = passed ? `✅ PQ boundary ok (${afterDate ? 'post' : 'pre'}-date${pqPresent ? ' pq-present' : ' pq-absent'}${overrideApproved ? ' override-approved' : ''})` : `❌ ${failCode}`;
+      const failureCodes: string[] = [];
+      // Core failure conditions (retain original codes for backward compatibility)
+      if (afterDate && !pqPresent) failureCodes.push('PQ_PAST_DUE');
+      if (!afterDate && pqPresent && !overrideApproved) failureCodes.push('PQ_EARLY_WITHOUT_OVERRIDE');
+      passed = failureCodes.length === 0;
+      // Elevate to artifact only when cryptographic capability (pqPresent) or explicit override object supplied
+      const evidenceType: 'heuristic' | 'artifact' = (pqPresent || ev.pqOverride) ? 'artifact' : 'heuristic';
+      const boundaryISO = new Date(mandatoryEpoch).toISOString().slice(0,10);
+      const meta = `ctx={now=${new Date(currentEpoch).toISOString()}, mandatory=${boundaryISO}, afterDate=${afterDate}, pqPresent=${pqPresent}, overrideApproved=${overrideApproved}}`;
+      const details = passed
+        ? `✅ PQ boundary ok (${afterDate ? 'post' : 'pre'}-date${pqPresent ? ' pq-present' : ' pq-absent'}${overrideApproved ? ' override-approved' : ''}) ${meta}`
+        : `❌ PQ_BOUNDARY codes=[${failureCodes.join(',')}] ${meta}`;
       return { id: 38, name: 'Post-Quantum Date Boundary', description: 'Enforces PQ suite presence after mandatory date; forbids premature PQ without approved override', passed, details, severity: 'major', evidenceType };
     }
   }
