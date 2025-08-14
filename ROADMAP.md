@@ -329,7 +329,11 @@ The following additional items were identified as still incomplete for a strictl
   - Implemented: Check 34 upgraded to enforce registry digest format (hex ≥32 chars), schema validity, used set non-empty, used ⊆ allowed, mapping diagnostics (suiteMapping), detection of unregistered sets, unknown combos, invalid mapping entries, and expected vs actual mismatches. New failure codes: REGISTRY_DIGEST_INVALID, REGISTRY_SCHEMA_INVALID, NO_USED_SETS, UNREGISTERED_SET_PRESENT, UNKNOWN_COMBO, MAPPING_INVALID, ALGORITHM_MISMATCH.
   - Tests: Added positive pass plus negative cases for each failure category in `final-compliance-tasks.test.ts` (legacy tests updated to expect new codes).
   - Caveats (non-blocking): Canonical registry artifact hashing (currently superficial), deeper schema JSON Schema validation, cryptographic suite canonicalization (mapping multiple observed forms to one logical set), diff pretty-print of mismatches, dynamic extraction of suites from real binaries vs synthetic evidence, future allowlist version pin & provenance of registry source.
-13. [ ] Post-Quantum Mandatory Date Gate (2027‑01‑01)
+13. [x] Statistical Jitter Randomness Multi-Metric Enforcement
+  - Implemented: Check 37 upgraded from single p-value heuristic to multi-metric evaluation (primary pValue, chi-square p, runs test p, entropy bits/sample, sample count). New failure codes: MISSING_PVALUE, INSUFFICIENT_SAMPLES, PRIMARY_P_LOW, CHI_SQUARE_P_LOW, RUNS_TEST_P_LOW, ENTROPY_LOW. Evidence elevated to artifact when explicit `randomnessTest` metrics present and all thresholds satisfied.
+  - Tests: Added pass scenario plus negative cases for each new failure code category in `final-compliance-tasks.test.ts`.
+  - Caveats (non-blocking): Real statistical test implementations (current metrics assumed provided), dynamic adaptive thresholding based on distribution family, confidence interval reporting, sequential test correction (multiple comparisons), entropy normalization relative to symbol alphabet size.
+14. [ ] Post-Quantum Mandatory Date Gate (2027‑01‑01)
   - Enforce failure if hybrid X25519-Kyber768 absent after date (PQ_PAST_DUE) or present prematurely without override (PQ_EARLY_WITHOUT_OVERRIDE).
   - Caveats: reliable UTC date sourcing, override mechanism (env/config) audit logging, test matrix around boundary (±1 day) with simulated clock.
 14. [ ] Evidence Authenticity (Detached Signature / Bundle)

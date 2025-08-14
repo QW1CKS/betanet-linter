@@ -279,7 +279,7 @@ betanet-lint check /path/to/binary --verbose
 
 ## Compliance Checks
 
-Registry (39 checks): foundation (1–23), rate‑limit & fallback/jitter (24–26), mix variance & HTTP/3 (27–28), algorithm agility & payment/voucher deepening (29–34) with enhanced algorithm agility failure codes (REGISTRY_DIGEST_INVALID, REGISTRY_SCHEMA_INVALID, NO_USED_SETS, UNREGISTERED_SET_PRESENT, UNKNOWN_COMBO, MAPPING_INVALID, ALGORITHM_MISMATCH), authenticity & advanced statistical / PQ boundary / forbidden hashes (35–39).
+Registry (39 checks): foundation (1–23), rate‑limit & fallback/jitter (24–26), mix variance & HTTP/3 (27–28), algorithm agility & payment/voucher deepening (29–34) with enhanced algorithm agility failure codes (REGISTRY_DIGEST_INVALID, REGISTRY_SCHEMA_INVALID, NO_USED_SETS, UNREGISTERED_SET_PRESENT, UNKNOWN_COMBO, MAPPING_INVALID, ALGORITHM_MISMATCH), authenticity & advanced statistical / PQ boundary / forbidden hashes (35–39) including multi-metric jitter randomness (MISSING_PVALUE, INSUFFICIENT_SAMPLES, PRIMARY_P_LOW, CHI_SQUARE_P_LOW, RUNS_TEST_P_LOW, ENTROPY_LOW).
 
 Architecture note: All checks are declared in `check-registry.ts` (IDs 1–23 after Step 10). New checks require only one object append. Structural augmentation & evidence schema population occur in `analyzer.ts` (static patterns + binary introspection) and specialized modules (`static-parsers.ts`, `binary-introspect.ts`). Dynamic ClientHello calibration now emits a heuristic JA3 string plus `ja3Hash` (MD5 over the canonical tuple) when OpenSSL capture succeeds (`captureQuality: parsed-openssl`). This is a precursor to full raw packet JA3/JA4 capture.
 

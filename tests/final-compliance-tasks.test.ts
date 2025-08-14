@@ -935,20 +935,47 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       const result = await runWithAnalyzer(analyzerForRandom(ev));
       const check37 = result.checks.find(c => c.id === 37)!;
       expect(check37.passed).toBe(false);
-      expect(check37.details).toMatch(/JITTER_RANDOMNESS_WEAK/);
+  expect(check37.details).toMatch(/PRIMARY_P_LOW/);
     });
     it('fails when insufficient samples even if pValue high', async () => {
       const ev = { randomnessTest: { pValue: 0.2, sampleCount: 5, method: 'chi-square' } };
       const result = await runWithAnalyzer(analyzerForRandom(ev));
       const check37 = result.checks.find(c => c.id === 37)!;
       expect(check37.passed).toBe(false);
-      expect(check37.details).toMatch(/insufficient-samples/);
+  expect(check37.details).toMatch(/INSUFFICIENT_SAMPLES/);
     });
     it('fails when pValue missing (derives heuristic) leading to weak randomness', async () => {
       const ev = { statisticalJitter: { meanMs: 100, stdDevMs: 1, samples: 10 } }; // cv low => small pseudo pValue may be < threshold
       const result = await runWithAnalyzer(analyzerForRandom(ev));
       const check37 = result.checks.find(c => c.id === 37)!;
       expect(check37.passed).toBe(false);
+    });
+    it('fails with CHI_SQUARE_P_LOW when chi-square p below threshold', async () => {
+      const ev = { randomnessTest: { pValue: 0.2, chiSquareP: 0.0001, runsP: 0.5, sampleCount: 50 } };
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(false);
+      expect(check37.details).toMatch(/CHI_SQUARE_P_LOW/);
+    });
+    it('fails with RUNS_TEST_P_LOW when runs test p below threshold', async () => {
+      const ev = { randomnessTest: { pValue: 0.2, runsP: 0.001, sampleCount: 50 } };
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(false);
+      expect(check37.details).toMatch(/RUNS_TEST_P_LOW/);
+    });
+    it('fails with ENTROPY_LOW when entropy bits per sample under minimum', async () => {
+      const ev = { randomnessTest: { pValue: 0.2, entropyBitsPerSample: 0.05, sampleCount: 50 } };
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(false);
+      expect(check37.details).toMatch(/ENTROPY_LOW/);
+    });
+    it('passes when all secondary metrics present and above thresholds', async () => {
+      const ev = { randomnessTest: { pValue: 0.2, chiSquareP: 0.2, runsP: 0.3, entropyBitsPerSample: 0.5, sampleCount: 60 } };
+      const result = await runWithAnalyzer(analyzerForRandom(ev));
+      const check37 = result.checks.find(c => c.id === 37)!;
+      expect(check37.passed).toBe(true);
     });
   });
 

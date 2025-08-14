@@ -55,6 +55,11 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 
 ### Task 11 Completion: Provenance & Evidence Authenticity Hardening
 ### Task 12 Completion: Algorithm Agility Registry Enforcement
+### Task 13 Completion: Statistical Jitter Randomness Multi-Metric Enforcement
+- Upgraded Check 37 to evaluate multiple randomness metrics (primary pValue, chiSquareP, runsP, entropyBitsPerSample, sampleCount)
+- Added granular failure codes: MISSING_PVALUE, INSUFFICIENT_SAMPLES, PRIMARY_P_LOW, CHI_SQUARE_P_LOW, RUNS_TEST_P_LOW, ENTROPY_LOW
+- Extended tests with pass + each negative scenario; evidence elevated to artifact only when explicit metrics provided and thresholds satisfied
+- ROADMAP updated to mark Task 13 complete and outline future statistical refinement caveats
 - Expanded Check 34 with schema/digest validation and granular failure codes: REGISTRY_DIGEST_INVALID, REGISTRY_SCHEMA_INVALID, NO_USED_SETS, UNREGISTERED_SET_PRESENT, UNKNOWN_COMBO, MAPPING_INVALID, ALGORITHM_MISMATCH
 - Added extended evidence fields (suiteMapping, mismatches, unknownCombos, observedSuites) and upgraded types
 - Added comprehensive positive + negative tests in final-compliance-tasks suite

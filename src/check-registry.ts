@@ -640,34 +640,49 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     id: 37,
     key: 'jitter-randomness',
     name: 'Statistical Jitter Randomness',
-    description: 'Validates adaptive jitter & teardown distributions via p-value threshold',
+    description: 'Validates adaptive jitter & teardown distributions via multi-metric randomness thresholds',
     severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer: any) => {
       const ev = analyzer.evidence || {};
-      const rt = ev.randomnessTest; // expected shape { pValue:number, sampleCount:number, method?:string }
-      // Fallback: derive trivial pValue heuristic from statisticalJitter stddev vs mean if randomnessTest absent
+      const rt = ev.randomnessTest; // shape { pValue, sampleCount, method, entropyBitsPerSample?, chiSquareP?, runsP? }
+      // Primary metrics
       let pValue: number | undefined = rt?.pValue;
       let sampleCount: number | undefined = rt?.sampleCount;
+      const entropyBps: number | undefined = rt?.entropyBitsPerSample; // expected Shannon bits per sample (normalized to 0..log2(k))
+      const chiSquareP: number | undefined = rt?.chiSquareP;
+      const runsP: number | undefined = rt?.runsP;
+      // Derive heuristic fallback if no explicit pValue but have statisticalJitter
       if (pValue === undefined && ev.statisticalJitter) {
         const sj = ev.statisticalJitter;
         if (typeof sj.stdDevMs === 'number' && typeof sj.meanMs === 'number' && sj.meanMs > 0) {
-          const cv = sj.stdDevMs / sj.meanMs; // coefficient of variation
-          // Map CV heuristically to pseudo p-value (purely placeholder): higher dispersion -> higher pseudo p
-            pValue = Math.max(0, Math.min(1, cv / 2));
-            sampleCount = sj.samples || sj.sampleCount;
+          const cv = sj.stdDevMs / sj.meanMs;
+          pValue = Math.max(0, Math.min(1, cv / 2));
+          sampleCount = sj.samples || sj.sampleCount;
         }
       }
-      const threshold = 0.01; // AC threshold
+      const thresholds = { primaryP: 0.01, chiSquareP: 0.005, runsP: 0.01, entropyMin: 0.2 }; // heuristic minimums
       const minSamples = 20;
-      if (pValue === undefined || !Number.isFinite(pValue)) {
-        return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed: false, details: '❌ JITTER_RANDOMNESS_WEAK: missing pValue', severity: 'major', evidenceType: 'heuristic' };
-      }
-      const enoughSamples = (sampleCount||0) >= minSamples;
-      const passed = pValue > threshold && enoughSamples;
-      const evidenceType: 'heuristic' | 'artifact' = (rt && enoughSamples) ? 'artifact' : 'heuristic';
-      const details = passed ? `✅ randomness pValue=${pValue.toExponential(2)} samples=${sampleCount}` : `❌ JITTER_RANDOMNESS_WEAK: pValue=${pValue.toExponential(2)} samples=${sampleCount||0}${!enoughSamples? ' insufficient-samples':''}`;
-      return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed, details, severity: 'major', evidenceType };
+      const failureCodes: string[] = [];
+      if (pValue === undefined || !Number.isFinite(pValue)) failureCodes.push('MISSING_PVALUE');
+      const enoughSamples = (sampleCount || 0) >= minSamples;
+      if (!enoughSamples) failureCodes.push('INSUFFICIENT_SAMPLES');
+      if (pValue !== undefined && pValue <= thresholds.primaryP) failureCodes.push('PRIMARY_P_LOW');
+      if (chiSquareP !== undefined && chiSquareP <= thresholds.chiSquareP) failureCodes.push('CHI_SQUARE_P_LOW');
+      if (runsP !== undefined && runsP <= thresholds.runsP) failureCodes.push('RUNS_TEST_P_LOW');
+      if (entropyBps !== undefined && entropyBps < thresholds.entropyMin) failureCodes.push('ENTROPY_LOW');
+      const passed = failureCodes.length === 0;
+      const evidenceType: 'heuristic' | 'artifact' = (rt && enoughSamples && passed) ? 'artifact' : 'heuristic';
+      const metrics: string[] = [];
+      if (pValue !== undefined) metrics.push(`p=${pValue.toExponential(2)}`);
+      if (chiSquareP !== undefined) metrics.push(`chiP=${chiSquareP.toExponential(2)}`);
+      if (runsP !== undefined) metrics.push(`runsP=${runsP.toExponential(2)}`);
+      if (entropyBps !== undefined) metrics.push(`entropy=${entropyBps.toFixed(3)}`);
+      metrics.push(`n=${sampleCount||0}`);
+      const details = passed
+        ? `✅ randomness ${metrics.join(' ')}`
+        : `❌ JITTER_RANDOMNESS_WEAK codes=[${failureCodes.join(',')}] ${metrics.join(' ')}`;
+      return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via multi-metric randomness thresholds', passed, details, severity: 'major', evidenceType };
     }
   }
   ,
