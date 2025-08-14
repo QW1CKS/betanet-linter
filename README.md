@@ -22,7 +22,31 @@
 > sudo rm -rf /usr/local/bin/betanet-lint
 >```
 
-A CLI tool enumerating Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) with a blend of heuristic, static‑structural, dynamic (captured / simulated), and artifact evidence. The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
+A CLI tool that enforces the Betanet specification §11 requirements (1.0 baseline + 1.1 deltas) by decomposing the **13 high‑level normative items** into a finer‑grained **39 check registry**. Each registry entry isolates a distinct evidence surface (static‑structural, dynamic‑protocol, artifact, heuristic) or a defensive / integrity dimension (negative assertions, anti‑evasion, provenance authenticity, algorithm agility, PQ boundary, forbidden hashes). This decomposition makes failures more actionable (granular root cause) and prevents “one big checkbox” passes based on a single weak signal.
+
+The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
+
+### §11 → 39 Check Decomposition (Orientation)
+High‑level §11 item groups and their principal check IDs (non‑exhaustive; some groups have auxiliary defensive checks not listed for brevity):
+
+| §11 Item (summary) | Core Checks (principal) | Auxiliary / Defensive |
+|--------------------|-------------------------|-----------------------|
+| 1 Transport + TLS calibration + ECH | 1, 12, 22, 32 | 18 (multi‑signal), 21 (meta) |
+| 2 Access tickets (replay‑bound, rotation) | 2, 30 | 18, 24 (buckets) |
+| 3 Noise XK + rekey + PQ date | 13, 19, 10, 38 | 18 |
+| 4 HTTP/2/3 adaptive & jitter | 20, 28, 26, 37 | 18 |
+| 5 SCION bridging / absence legacy header | 4, 33, 23 | 18 |
+| 6 Rendezvous bootstrap rotation & PoW trend | 6, 36 | 24 |
+| 7 Privacy hops & mix diversity | 11, 17, 27 | 18 |
+| 8 Alias ledger finality & emergency advance | 7, 16 | 18 |
+| 9 Payments (vouchers, FROST, PoW) | 8, 14, 29, 31, 36 | 24, 18 |
+| 10 Governance anti‑concentration & partition | 15 | 18 |
+| 11 Anti‑correlation fallback timing & cover | 25, (timing) 18 (gate) | 26 (padding, indirect) |
+| 12 Privacy hop enforcement (balanced/strict) | 11, 17 | 27 (variance), 18 |
+| 13 Reproducible builds & provenance authenticity | 9, 35 | 18, 21 |
+| Cross‑cutting registries (algorithm agility, forbidden hashes) | 34, 39 | 23 (negative assertions) |
+
+Scoring: Strict mode counts only non‑heuristic evidence (static / dynamic / artifact). Heuristic passes are reported but excluded unless `--allow-heuristic` is provided. Multi‑signal gate (check 18) prevents superficial keyword stuffing from yielding a compliant score without diversity of evidence categories.
 
 > **Flag Naming:**
 > `--format` is now the canonical flag for SBOM format selection. The older `--sbom-format` still works but is deprecated and will emit a warning; it will be removed in a future minor release. All CLI and GitHub Action usage should migrate to `--format`.
