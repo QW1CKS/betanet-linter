@@ -14,6 +14,7 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 - Governance & ledger: diversity volatility thresholds, quorum certificate parsing scaffolds, emergency advance gating (7, 15, 16).
 - Reproducible build & SLSA provenance elevation (9) with authenticity gate (35) and failing/strict auth modes.
 #### Added (Task 5 Completion)
+- SCION Control Stream deep metrics (enhanced): Added rolling duplicate window detection, signature material fields (signatureB64, publicKeyB64, controlStreamHash) and token bucket level sanity with new failure codes: DUPLICATE_OFFER_WINDOW, SIGNATURE_UNVERIFIED, CONTROL_HASH_MISSING, TOKEN_BUCKET_LEVEL_EXCESS, TOKEN_BUCKET_LEVEL_NEGATIVE. Updated tests for each code.
 - Bootstrap PoW & Multi-Bucket Rate-Limit Statistics (Check 36) upgraded: advanced PoW convergence (slope, maxDrop, rolling window stability, acceptance percentile & recent window acceptance) and multi-bucket saturation/dispersion analytics. New failure codes: POW_SLOPE_INSTABILITY, POW_MAX_DROP_EXCEEDED, POW_ACCEPTANCE_DIVERGENCE, POW_ROLLING_WINDOW_UNSTABLE, POW_RECENT_WINDOW_LOW, BUCKET_DISPERSION_HIGH, BUCKET_SATURATION_EXCESS, POW_EVIDENCE_MISSING (generic fallback retained POW_TREND_DIVERGENCE). Evidence schema extended (powAdaptive.acceptancePercentile, regressionSlope, windowSize, windowMaxDrop, rollingAcceptance, recentMeanBits; rateLimit.bucketSaturationPct, dispersionRatio, capacityP95, capacityStdDev, refillVarianceTrend). Tests expanded covering pass + each failure code.
 
 ### Upgrade Notes

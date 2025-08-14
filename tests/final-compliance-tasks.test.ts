@@ -269,11 +269,46 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     }
 
     it('passes with full advanced metrics present', async () => {
-      const sc = { offers: [ { path: '1-ff00:0:110', latencyMs: 10, ts: 1000 }, { path: '1-ff00:0:111', latencyMs: 12, ts: 1100 }, { path: '1-ff00:0:112', latencyMs: 14, ts: 1200 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [120,140], probeIntervalsMs: [500,520,510], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
+      const sc = { offers: [ { path: '1-ff00:0:110', latencyMs: 10, ts: 1000 }, { path: '1-ff00:0:111', latencyMs: 12, ts: 1105 }, { path: '1-ff00:0:112', latencyMs: 14, ts: 1210 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [120,140], probeIntervalsMs: [500,520,510], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true, rawCborB64: 'YmFzZTY0', controlStreamHash: 'abc123', tokenBucketLevels: [10,20,15], expectedBucketCapacity: 100 };
       const result = await runWithAnalyzer(analyzerForScion(sc));
       const check33 = result.checks.find(c => c.id === 33)!;
       expect(check33.passed).toBe(true);
       expect(check33.details).toMatch(/maxLatency=/);
+    });
+    it('fails with DUPLICATE_OFFER_WINDOW when duplicate within window appears', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', ts: 1000 }, { path: '1-ff00:0:111', ts: 1010 }, { path: '1-ff00:0:110', ts: 1020 } ], duplicateWindowSec: 30, uniquePaths: 2, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/DUPLICATE_OFFER_WINDOW/);
+    });
+    it('fails with SIGNATURE_UNVERIFIED when signature material present but not validated', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', ts: 1 }, { path: '1-ff00:0:111', ts: 2 }, { path: '1-ff00:0:112', ts: 3 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureB64: 'c2ln', publicKeyB64: 'a2V5', signatureValid: false, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/SIGNATURE_UNVERIFIED/);
+    });
+    it('fails with CONTROL_HASH_MISSING when raw CBOR present but no hash', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', ts: 1 }, { path: '1-ff00:0:111', ts: 2 }, { path: '1-ff00:0:112', ts: 3 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, rawCborB64: 'YmFzZTY0', schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/CONTROL_HASH_MISSING/);
+    });
+    it('fails with TOKEN_BUCKET_LEVEL_EXCESS when sampled level exceeds capacity', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', ts: 1 }, { path: '1-ff00:0:111', ts: 2 }, { path: '1-ff00:0:112', ts: 3 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, tokenBucketLevels: [10,200], expectedBucketCapacity: 150, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/TOKEN_BUCKET_LEVEL_EXCESS/);
+    });
+    it('fails with TOKEN_BUCKET_LEVEL_NEGATIVE when a sample is negative', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', ts: 1 }, { path: '1-ff00:0:111', ts: 2 }, { path: '1-ff00:0:112', ts: 3 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, tokenBucketLevels: [10,-1], expectedBucketCapacity: 100, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/TOKEN_BUCKET_LEVEL_NEGATIVE/);
     });
 
     it('fails with PATH_SWITCH_LATENCY_HIGH when max latency >300ms', async () => {

@@ -1736,13 +1736,13 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
     id: 33,
     key: 'scion-control-stream',
     name: 'SCION Control Stream',
-    description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature)',
+    description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature, token bucket levels)',
     severity: 'minor',
     introducedIn: '1.1',
     evaluate: async (analyzer: any) => {
       const ev = analyzer.evidence || {};
       const sc = ev.scionControl;
-      if (!sc) return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature)', passed: false, details: '❌ No scionControl evidence', severity: 'minor', evidenceType: 'heuristic' };
+      if (!sc) return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature, token bucket levels)', passed: false, details: '❌ No scionControl evidence', severity: 'minor', evidenceType: 'heuristic' };
       const failureCodes: string[] = [];
       const offers = Array.isArray(sc.offers) ? sc.offers : [];
       if (offers.length < 3) failureCodes.push('INSUFFICIENT_OFFERS');
@@ -1751,6 +1751,20 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       if (sc.noLegacyHeader === false) failureCodes.push('LEGACY_HEADER_PRESENT');
       if (sc.duplicateOfferDetected) failureCodes.push('DUPLICATE_OFFER');
       if (sc.parseError) failureCodes.push('CBOR_PARSE_ERROR');
+      // Duplicate path detection within window if raw timestamps present
+      if (typeof sc.duplicateWindowSec === 'number' && sc.duplicateWindowSec > 0 && offers.length) {
+        const windowMs = sc.duplicateWindowSec * 1000;
+        const seen: Record<string, number[]> = {};
+        for (const o of offers) {
+          if (!o.path || typeof o.ts !== 'number') continue;
+          seen[o.path] = seen[o.path] || [];
+          // prune older
+          const nowTs = o.ts;
+          seen[o.path] = seen[o.path].filter(t => nowTs - t <= windowMs);
+          if (seen[o.path].length) failureCodes.push('DUPLICATE_OFFER_WINDOW');
+          seen[o.path].push(nowTs);
+        }
+      }
       // Advanced metrics validations (Task 4 full completion)
       // Path switch latency: all pathSwitchLatenciesMs must be defined and max <=300ms
       if (Array.isArray(sc.pathSwitchLatenciesMs) && sc.pathSwitchLatenciesMs.length) {
@@ -1784,6 +1798,19 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       // Signature
       if (sc.signatureValid === false) failureCodes.push('SIGNATURE_INVALID');
       if (sc.signatureValid == null) failureCodes.push('SIGNATURE_MISSING');
+      // If we have signature material but not validated
+      if ((sc.signatureB64 || sc.publicKeyB64) && sc.signatureValid !== true) failureCodes.push('SIGNATURE_UNVERIFIED');
+      // Control stream hash presence if raw control stream present
+      if (sc.rawCborB64 && !sc.controlStreamHash) failureCodes.push('CONTROL_HASH_MISSING');
+      // Token bucket sampled levels sanity
+      if (Array.isArray(sc.tokenBucketLevels) && sc.tokenBucketLevels.length) {
+        if (typeof sc.expectedBucketCapacity === 'number') {
+          const over = sc.tokenBucketLevels.filter((v:number)=> v > sc.expectedBucketCapacity!);
+          if (over.length) failureCodes.push('TOKEN_BUCKET_LEVEL_EXCESS');
+        }
+        const negatives = sc.tokenBucketLevels.filter((v:number)=> v < 0);
+        if (negatives.length) failureCodes.push('TOKEN_BUCKET_LEVEL_NEGATIVE');
+      }
       // Schema validation
       if (sc.schemaValid === false) failureCodes.push('SCHEMA_INVALID');
       if (sc.schemaValid == null) failureCodes.push('SCHEMA_UNKNOWN');
@@ -1791,7 +1818,7 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       const details = passed
         ? `✅ offers=${offers.length} uniquePaths=${unique.size} maxLatency=${sc.maxPathSwitchLatencyMs}ms avgProbe=${sc.avgProbeIntervalMs?.toFixed?.(1)}ms`
         : `❌ SCION control issues: ${failureCodes.join(',')}`;
-      return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
+      return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature, token bucket levels)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
     }
   }
 ];

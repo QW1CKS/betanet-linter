@@ -468,6 +468,15 @@ export interface IngestedEvidence {
     rateBackoffOk?: boolean; // indicates acceptable backoff / token bucket behavior
     signatureValid?: boolean; // signature over control stream (future real verification)
     timestampSkewOk?: boolean; // all offer ts within acceptable skew window
+  // Advanced (Spec Gap Task 5 completion depth)
+  rawCborB64?: string; // raw CBOR payload base64
+  signatureB64?: string; // detached Ed25519 signature over canonical offers JSON
+  publicKeyB64?: string; // Ed25519 public key
+  signatureAlgorithm?: string; // e.g. 'ed25519'
+  controlStreamHash?: string; // sha256 hex of canonical offers JSON
+  duplicateWindowSec?: number; // rolling window for duplicate detection
+  tokenBucketLevels?: number[]; // sampled token bucket fill levels (0..capacity)
+  expectedBucketCapacity?: number; // expected capacity to sanity check levels
   };
   negative?: {
     forbiddenPresent?: string[]; // list of forbidden tokens discovered
