@@ -3,6 +3,8 @@
 Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a hardened 39‑check registry covering every §11 high‑level requirement plus auxiliary integrity / anti‑evasion surfaces. All tests (148) pass; provenance & SBOM generators upgraded; documentation de‑transitionalized. This version supersedes 1.0.0 which only partially surfaced 1.1 heuristics.
 
 ### Highlights
+#### Added (Task 4 Completion)
+- SCION Control Stream & Path Failover Metrics (Check 33) fully implemented: advanced evidence fields (latency, probe intervals, backoff flag, timestamp skew, signature indicator, schema validation). New failure codes: PATH_SWITCH_LATENCY_HIGH, NO_LATENCY_METRICS, PROBE_INTERVAL_OUT_OF_RANGE, NO_PROBE_INTERVALS, BACKOFF_VIOLATION, BACKOFF_UNKNOWN, TS_SKEW, TS_SKEW_UNKNOWN, SIGNATURE_INVALID, SIGNATURE_MISSING, SCHEMA_INVALID, SCHEMA_UNKNOWN (alongside existing INSUFFICIENT_OFFERS, INSUFFICIENT_UNIQUE_PATHS, LEGACY_HEADER_PRESENT, DUPLICATE_OFFER, CBOR_PARSE_ERROR). Tests expanded (final-compliance-tasks) adding pass + targeted negative cases.
 - Full decomposition of 13 §11 normative items into 39 granular checks (static, dynamic, artifact, heuristic, defensive) with explicit mapping in README.
 - Evidence schema v2+ (binaryMeta, clientHelloTemplate, noisePatternDetail, negative, mix variance, fallback timing, jitter randomness, powAdaptive, voucherCrypto, algorithmAgility, governance/ledger, provenance authenticity).
 - Dynamic harness extensions: Noise rekey policy, HTTP/2 & HTTP/3 adaptive emulation, fallback timing distribution, mix diversity & variance, adaptive PoW trend, statistical jitter randomness.

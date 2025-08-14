@@ -1689,13 +1689,13 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
     id: 33,
     key: 'scion-control-stream',
     name: 'SCION Control Stream',
-    description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)',
+    description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature)',
     severity: 'minor',
     introducedIn: '1.1',
     evaluate: async (analyzer: any) => {
       const ev = analyzer.evidence || {};
       const sc = ev.scionControl;
-      if (!sc) return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)', passed: false, details: '❌ No scionControl evidence', severity: 'minor', evidenceType: 'heuristic' };
+      if (!sc) return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature)', passed: false, details: '❌ No scionControl evidence', severity: 'minor', evidenceType: 'heuristic' };
       const failureCodes: string[] = [];
       const offers = Array.isArray(sc.offers) ? sc.offers : [];
       if (offers.length < 3) failureCodes.push('INSUFFICIENT_OFFERS');
@@ -1704,11 +1704,47 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       if (sc.noLegacyHeader === false) failureCodes.push('LEGACY_HEADER_PRESENT');
       if (sc.duplicateOfferDetected) failureCodes.push('DUPLICATE_OFFER');
       if (sc.parseError) failureCodes.push('CBOR_PARSE_ERROR');
+      // Advanced metrics validations (Task 4 full completion)
+      // Path switch latency: all pathSwitchLatenciesMs must be defined and max <=300ms
+      if (Array.isArray(sc.pathSwitchLatenciesMs) && sc.pathSwitchLatenciesMs.length) {
+        const maxLatency = Math.max(...sc.pathSwitchLatenciesMs);
+        if (typeof sc.maxPathSwitchLatencyMs === 'number' && sc.maxPathSwitchLatencyMs !== maxLatency) {
+          // normalize for downstream reporting
+          sc.maxPathSwitchLatencyMs = maxLatency;
+        } else if (sc.maxPathSwitchLatencyMs == null) {
+          sc.maxPathSwitchLatencyMs = maxLatency;
+        }
+        if (maxLatency > 300) failureCodes.push('PATH_SWITCH_LATENCY_HIGH');
+      } else {
+        failureCodes.push('NO_LATENCY_METRICS');
+      }
+      // Probe interval / backoff: ensure avgProbeIntervalMs defined and rateBackoffOk true
+      if (Array.isArray(sc.probeIntervalsMs) && sc.probeIntervalsMs.length >= 2) {
+        const intervals = sc.probeIntervalsMs.filter((n: any)=> typeof n === 'number' && n >= 0);
+        if (!intervals.length) failureCodes.push('PROBE_INTERVAL_INVALID');
+        const avg = intervals.reduce((a:number,b:number)=>a+b,0)/intervals.length;
+        if (sc.avgProbeIntervalMs == null) sc.avgProbeIntervalMs = avg;
+        // Basic sanity: average interval should be between 50ms and 5000ms
+        if (avg < 50 || avg > 5000) failureCodes.push('PROBE_INTERVAL_OUT_OF_RANGE');
+      } else {
+        failureCodes.push('NO_PROBE_INTERVALS');
+      }
+      if (sc.rateBackoffOk === false) failureCodes.push('BACKOFF_VIOLATION');
+      if (sc.rateBackoffOk == null) failureCodes.push('BACKOFF_UNKNOWN');
+      // Timestamp skew: require timestampSkewOk true
+      if (sc.timestampSkewOk === false) failureCodes.push('TS_SKEW');
+      if (sc.timestampSkewOk == null) failureCodes.push('TS_SKEW_UNKNOWN');
+      // Signature
+      if (sc.signatureValid === false) failureCodes.push('SIGNATURE_INVALID');
+      if (sc.signatureValid == null) failureCodes.push('SIGNATURE_MISSING');
+      // Schema validation
+      if (sc.schemaValid === false) failureCodes.push('SCHEMA_INVALID');
+      if (sc.schemaValid == null) failureCodes.push('SCHEMA_UNKNOWN');
       const passed = failureCodes.length === 0;
       const details = passed
-        ? `✅ offers=${offers.length} uniquePaths=${unique.size} noLegacyHeader=${sc.noLegacyHeader !== false}`
+        ? `✅ offers=${offers.length} uniquePaths=${unique.size} maxLatency=${sc.maxPathSwitchLatencyMs}ms avgProbe=${sc.avgProbeIntervalMs?.toFixed?.(1)}ms`
         : `❌ SCION control issues: ${failureCodes.join(',')}`;
-      return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
+      return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (offers, unique paths, no legacy header, duplicates, latency, probe/backoff, timestamp skew, signature)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
     }
   }
 ];

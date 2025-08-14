@@ -61,13 +61,21 @@ export interface Evidence {
     pqDateOk?: boolean;
   };
   scionControl?: {
-    offers?: { path: string; latencyMs?: number; expiresAt?: string }[];
-    rawCborB64?: string; // original CBOR for auditing
-    uniquePaths?: number;
-    noLegacyHeader?: boolean;
-    duplicateOfferDetected?: boolean;
-    duplicateWindowSec?: number;
-    parseError?: string;
+  offers?: { path: string; latencyMs?: number; expiresAt?: string; ts?: number; flowId?: string }[]; // parsed offers
+  rawCborB64?: string; // original CBOR for auditing
+  uniquePaths?: number; // unique path count
+  noLegacyHeader?: boolean; // legacy transition header absent
+  duplicateOfferDetected?: boolean; // duplicate path+flow within window
+  duplicateWindowSec?: number; // time window evaluated for duplicates
+  parseError?: string; // CBOR parse error string
+  schemaValid?: boolean; // full CBOR schema validation result
+  pathSwitchLatenciesMs?: number[]; // measured latencies for path switch events
+  maxPathSwitchLatencyMs?: number; // convenience maximum (should be <=300ms)
+  probeIntervalsMs?: number[]; // intervals between control probes
+  avgProbeIntervalMs?: number; // average probe interval (ms)
+  rateBackoffOk?: boolean; // token bucket / backoff policy adherence
+  signatureValid?: boolean; // control stream signature verification
+  timestampSkewOk?: boolean; // all timestamps within ±300s skew
   };
 }
 export interface ComplianceCheck {

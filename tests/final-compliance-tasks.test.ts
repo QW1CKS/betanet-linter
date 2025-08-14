@@ -252,8 +252,8 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
   });
 
-  // Task 5: SCION Gateway Control-Stream & CBOR Validation
-  describe('Task 5: SCION Gateway Control-Stream & CBOR Validation (Check 33)', () => {
+  // Task 5: SCION Gateway Control-Stream & CBOR Validation (enhanced Task 4 full completion)
+  describe('Task 5: SCION Gateway Control-Stream & CBOR Validation (Check 33 enhanced)', () => {
     function analyzerForScion(sc: any) {
       return {
         checkNetworkCapabilities: () => Promise.resolve({ hasTLS: true, hasQUIC: true, hasHTX: true, hasECH: true, port443: true }),
@@ -268,15 +268,64 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       } as any;
     }
 
-    it('passes with ≥3 offers & unique paths and no legacy header', async () => {
-      const sc = { offers: [ { path: '1-ff00:0:110', latencyMs: 10 }, { path: '1-ff00:0:111', latencyMs: 12 }, { path: '1-ff00:0:112', latencyMs: 14 } ], uniquePaths: 3, noLegacyHeader: true };
+    it('passes with full advanced metrics present', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', latencyMs: 10, ts: 1000 }, { path: '1-ff00:0:111', latencyMs: 12, ts: 1100 }, { path: '1-ff00:0:112', latencyMs: 14, ts: 1200 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [120,140], probeIntervalsMs: [500,520,510], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
       const result = await runWithAnalyzer(analyzerForScion(sc));
       const check33 = result.checks.find(c => c.id === 33)!;
       expect(check33.passed).toBe(true);
+      expect(check33.details).toMatch(/maxLatency=/);
+    });
+
+    it('fails with PATH_SWITCH_LATENCY_HIGH when max latency >300ms', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', ts: 1 }, { path: '1-ff00:0:111', ts: 2 }, { path: '1-ff00:0:112', ts: 3 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [120, 450], probeIntervalsMs: [500,550], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/PATH_SWITCH_LATENCY_HIGH/);
+    });
+
+    it('fails with PROBE_INTERVAL_OUT_OF_RANGE when average interval <50ms', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110', ts: 1 }, { path: '1-ff00:0:111', ts: 2 }, { path: '1-ff00:0:112', ts: 3 } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [10,15,20], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/PROBE_INTERVAL_OUT_OF_RANGE/);
+    });
+
+    it('fails with BACKOFF_VIOLATION when rateBackoffOk false', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' }, { path: '1-ff00:0:112' } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: false, timestampSkewOk: true, signatureValid: true, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/BACKOFF_VIOLATION/);
+    });
+
+    it('fails with TS_SKEW when timestampSkewOk false', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' }, { path: '1-ff00:0:112' } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: false, signatureValid: true, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/TS_SKEW/);
+    });
+
+    it('fails with SIGNATURE_INVALID when signatureValid false', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' }, { path: '1-ff00:0:112' } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: false, schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/SIGNATURE_INVALID/);
+    });
+
+    it('fails with SCHEMA_INVALID when schemaValid false', async () => {
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' }, { path: '1-ff00:0:112' } ], uniquePaths: 3, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: false };
+      const result = await runWithAnalyzer(analyzerForScion(sc));
+      const check33 = result.checks.find(c => c.id === 33)!;
+      expect(check33.passed).toBe(false);
+      expect(check33.details).toMatch(/SCHEMA_INVALID/);
     });
 
     it('fails with insufficient offers', async () => {
-      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' } ], uniquePaths: 2, noLegacyHeader: true };
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' } ], uniquePaths: 2, noLegacyHeader: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
       const result = await runWithAnalyzer(analyzerForScion(sc));
       const check33 = result.checks.find(c => c.id === 33)!;
       expect(check33.passed).toBe(false);
@@ -284,7 +333,7 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
 
     it('fails with duplicate offer paths', async () => {
-      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' } ], uniquePaths: 2, noLegacyHeader: true, duplicateOfferDetected: true };
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' } ], uniquePaths: 2, noLegacyHeader: true, duplicateOfferDetected: true, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
       const result = await runWithAnalyzer(analyzerForScion(sc));
       const check33 = result.checks.find(c => c.id === 33)!;
       expect(check33.passed).toBe(false);
@@ -292,7 +341,7 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
     });
 
     it('fails when legacy header present', async () => {
-      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' }, { path: '1-ff00:0:112' } ], uniquePaths: 3, noLegacyHeader: false };
+      const sc = { offers: [ { path: '1-ff00:0:110' }, { path: '1-ff00:0:111' }, { path: '1-ff00:0:112' } ], uniquePaths: 3, noLegacyHeader: false, pathSwitchLatenciesMs: [100], probeIntervalsMs: [500,600], rateBackoffOk: true, timestampSkewOk: true, signatureValid: true, schemaValid: true };
       const result = await runWithAnalyzer(analyzerForScion(sc));
       const check33 = result.checks.find(c => c.id === 33)!;
       expect(check33.passed).toBe(false);

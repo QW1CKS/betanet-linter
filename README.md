@@ -18,7 +18,7 @@
 > ```
 > Result: `compliance.json` (structured report) plus a CycloneDX JSON SBOM next to your binary.
 > 
-> IMPORTANT! IF YOU DELETE THE FOLDER, THEN RE-INSTALL IT AGAIN, MAKE SURE TO DELETE THE LINKING FILES IN ORDER TO AVOID CRASHING:
+> IMPORTANT! IF YOU DELETE THE FOLDER, THEN RE-INSTALL IT AGAIN, MAKE SURE TO DELETE THE OLD BINARIES IN ORDER TO AVOID CRASHING & PERMISSION ISSUES:
 >```
 > sudo rm -rf /usr/local/bin/betanet-lint
 >```
@@ -80,7 +80,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 | 2 Access tickets (replay-bound, padding, rate) | 2 (presence), 30 (struct+dynamic policy) | static-structural + dynamic-protocol | Full | Structural core fields + rotation + padding variety + rate-limit tokens + dynamic sampling (rotation ≤10m, replay window ≤2m) |
 | 3 Noise XK tunnel / key sep / rekey / PQ date | 13 (pattern), 19 (rekey policy) | static-structural + dynamic-protocol | Full | Static pattern + dynamic transcript, rekey triggers, PQ date enforced |
 | 4 HTTP/2/3 adaptive emulation & jitter | 20 (H2 adaptive, Full), 28 (H3 adaptive, Full) | dynamic-protocol | Full | Dynamic evidence (mean, p95, stddev, randomnessOk) with strict tolerances enforced |
-| 5 SCION bridging + absence of legacy header | 4, 23 (negative assertions) | static-structural | Full | Negative assertion ensures legacy header absence |
+| 5 SCION bridging + control stream failover (no legacy header) | 4, 23, 33 | static-structural + dynamic-protocol | Full | Bridging & negative assertion + dynamic control stream: ≥3 offers & unique paths, no legacy header, latency ≤300ms, probe interval 50–5000ms, backoff ok, timestamp skew ok, signature/schema indicators |
 | 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | artifact | Full | ≥2 rotation epochs & entropy sources; no legacy deterministic seed |
 | 7 Mix node selection diversity & hops | 11, 17, 27 | dynamic-protocol | Full | Uniqueness ≥80%, diversityIndex ≥0.4, entropy ≥4 bits, path length stddev > 0 |
 | 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Quorum certificates validated + emergency advance gating |
@@ -91,6 +91,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity |
 | – Algorithm agility registry | 34 | artifact | Full | Allowed vs used sets; unregisteredUsed empty |
 | – Statistical jitter randomness | 26, 37 | dynamic-protocol | Full | Jitter variance + randomness pValue > 0.01, adequate samples |
+| – SCION control stream path failover metrics | 33 | dynamic-protocol | Full | Path switch latency & probe/backoff/timestamp skew + signature/schema flags |
 | – PQ boundary enforcement | 10, 38 | heuristic + artifact | Full | Mandatory date boundary & early/late enforcement with override audit |
 | – Forbidden artifact hashes / negative assertions | 23, 39 | static-structural + artifact | Full | Deny‑list + forbidden hash policy enforced |
 |– Binary structural meta (foundational) | 21 | static-structural | Baseline | Supports multi-signal diversity |
@@ -153,6 +154,8 @@ Install from source (recommended):
 ```bash
 git clone <repository-url>
 cd betanet-linter
+rm -rf node_modules package-lock.json
+npm cache verify
 npm install
 npm run build
 npm link
