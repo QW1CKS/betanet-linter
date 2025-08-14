@@ -297,6 +297,8 @@ export interface IngestedEvidence {
     alpn?: string[];
     extensions?: number[];
     extOrderSha256?: string;
+  extensionCount?: number; // added for EXT_COUNT_DIFF comparisons
+  popId?: string; // optional POP/location identifier for calibration co-location
   };
   // Dynamic TLS ClientHello capture (evidence schema v3 draft field – Step 11 slice)
   dynamicClientHelloCapture?: {
@@ -305,6 +307,7 @@ export interface IngestedEvidence {
     ja3?: string; // optional JA3/JA4 style fingerprint string (simulated until real capture integrated)
   ja3Hash?: string; // md5 hash of JA3 canonical string
   ja3Canonical?: string; // canonical form when full raw capture available
+  ja4?: string; // added explicit JA4 style classification string
     capturedAt?: string; // ISO timestamp of capture
     matchStaticTemplate?: boolean; // analyzer/harness comparison result against static template
   note?: string; // free-form note / simulation marker
@@ -316,6 +319,8 @@ export interface IngestedEvidence {
   rawClientHelloB64?: string; // existing pseudo/raw capture
   rawClientHelloCanonicalB64?: string; // improved canonical synthetic struct
   rawClientHelloCanonicalHash?: string; // sha256 hash of canonical raw ClientHello bytes (base64 decoded)
+  extensionCount?: number; // explicit count for EXT_COUNT_DIFF
+  popId?: string; // POP/location identifier observed during dynamic capture
   };
   // New static structural evidence: access ticket & voucher cryptographic struct
   accessTicket?: {

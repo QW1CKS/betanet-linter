@@ -1168,10 +1168,19 @@ export const STEP_10_CHECKS = [
         if (!ch) {
           mismatchCode = 'NO_STATIC_BASELINE';
         }
+        // ALPN comparison: prioritize set difference over ordering difference (so ALPN_SET_DIFF not masked)
         const alpnMatch = !!(ch && dyn.alpn.join(',') === ch.alpn.join(','));
+        const alpnSetMatch = !!(ch && [...new Set(dyn.alpn)].sort().join(',') === [...new Set(ch.alpn||[])].sort().join(','));
         const extMatch = !!(ch && dyn.extOrderSha256 === ch.extOrderSha256);
-        if (!alpnMatch) mismatchCode = mismatchCode || 'ALPN_ORDER_MISMATCH';
+        const extCountMatch = typeof (ch as any).extensionCount === 'number' && typeof (dyn as any).extensionCount === 'number'
+          ? (ch as any).extensionCount === (dyn as any).extensionCount : true; // default true if not available
+        if (!alpnSetMatch) {
+          mismatchCode = mismatchCode || 'ALPN_SET_DIFF';
+        } else if (!alpnMatch) {
+          mismatchCode = mismatchCode || 'ALPN_ORDER_MISMATCH';
+        }
         if (!extMatch) mismatchCode = mismatchCode || 'EXT_SEQUENCE_MISMATCH';
+        if (!extCountMatch) mismatchCode = mismatchCode || 'EXT_COUNT_DIFF';
         // JA3 canonical hash mismatch (if both present)
         if (dyn.ja3Canonical && dyn.ja3Hash && dyn.ja3 && cryptoLikeEqual(dyn.ja3Canonical, dyn.ja3) === false) {
           mismatchCode = mismatchCode || 'JA3_HASH_MISMATCH';
@@ -1186,12 +1195,19 @@ export const STEP_10_CHECKS = [
             }
           }
         }
-        // SETTINGS drift: if HTTP/2 SETTINGS present compare to ch expected ext order presence; simple tolerance placeholder (stddev/mean test if available)
+        // SETTINGS drift: enforce ±15% tolerance around canonical baseline values when present
         if (h2 && h2.settings && Object.keys(h2.settings).length) {
-          const iw = h2.settings.INITIAL_WINDOW_SIZE;
-          const frameSize = h2.settings.MAX_FRAME_SIZE;
-          if (typeof iw === 'number' && (iw < 1024*1024 || iw > 10*1024*1024)) mismatchCode = mismatchCode || 'SETTINGS_DRIFT';
-          if (typeof frameSize === 'number' && (frameSize < 16384 || frameSize > 1048576)) mismatchCode = mismatchCode || 'SETTINGS_DRIFT';
+          const baseline = { INITIAL_WINDOW_SIZE: 6291456, MAX_FRAME_SIZE: 16384 } as const; // normative baseline
+          const observedIW = h2.settings.INITIAL_WINDOW_SIZE;
+            const observedFrame = h2.settings.MAX_FRAME_SIZE;
+          const withinPct = (obs: number | undefined, base: number) => (typeof obs === 'number') ? Math.abs(obs - base) / base <= 0.15 : true;
+          const iwOk = withinPct(observedIW, baseline.INITIAL_WINDOW_SIZE);
+          const frameOk = withinPct(observedFrame, baseline.MAX_FRAME_SIZE);
+          if (!(iwOk && frameOk)) mismatchCode = mismatchCode || 'SETTINGS_DRIFT';
+        }
+        // POP co-location verification: if both static & dynamic POP IDs present ensure equality
+        if (ch && (ch as any).popId && (dyn as any).popId && (ch as any).popId !== (dyn as any).popId) {
+          mismatchCode = mismatchCode || 'POP_MISMATCH';
         }
         const matches = !mismatchCode;
         passed = passed && matches; // require static baseline pass + no mismatch
@@ -1201,7 +1217,7 @@ export const STEP_10_CHECKS = [
       }
   // Upgrade severity if full raw capture present (treat as stronger dynamic evidence)
           let severity: 'minor' | 'major' = 'minor';
-          if (dyn && dyn.rawClientHelloB64) severity = 'major';
+          if (dyn && (dyn.rawClientHelloB64 || dyn.rawClientHelloCanonicalB64)) severity = 'major';
           return { id: 22, name: 'TLS Static Template Calibration', description: 'Static ClientHello template + dynamic calibration (raw capture JA3/JA4 when available)', passed, details, severity, evidenceType };
     }
   },

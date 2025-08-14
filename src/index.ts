@@ -429,7 +429,8 @@ export class BetanetComplianceChecker {
         checks.push({ id: def.id, name: def.name, description: def.description, passed: false, details: e && e.message === 'CHECK_TIMEOUT' ? '❌ Check timed out' : `❌ Check error: ${e?.message || e}`, severity: def.severity, durationMs: duration });
       }
     };
-  // Loop until both queues empty (explicit >0 comparisons to satisfy no-constant-condition)
+  // Loop until both queues empty (explicit >0 comparisons) -- eslint rule misflags as constant; suppress locally
+  // eslint-disable-next-line no-constant-condition
   while (queue.length > 0 || running.length > 0) {
       while (queue.length && running.length < maxParallel) {
         const def = queue.shift()!;

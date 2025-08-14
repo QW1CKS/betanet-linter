@@ -68,7 +68,8 @@ export class BinaryAnalyzer {
     let attempt = 0;
   // retry loop (maxRetries bounded)
   // eslint-disable-next-line no-constant-condition
-  while (true) {
+  // Loop bounded by maxRetries
+  while (attempt <= maxRetries) {
       try {
         const res = fn ? await fn() : null;
         const dur = performance.now() - start;
@@ -137,10 +138,12 @@ export class BinaryAnalyzer {
         // ClientHello & Noise pattern details to new evidence keys
         if (this.staticPatterns?.clientHello) {
           const ch = this.staticPatterns.clientHello;
-          anySelf.evidence.clientHelloTemplate = {
+          const extCount = ch.extensions ? ch.extensions.length : undefined;
+          anySelf.evidence.clientHelloTemplate = { 
             alpn: ch.alpn,
             extensions: ch.extensions,
-            extOrderSha256: ch.extOrderSha256
+            extOrderSha256: ch.extOrderSha256,
+            extensionCount: extCount 
           };
         }
         if (this.staticPatterns?.noise) {

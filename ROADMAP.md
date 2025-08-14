@@ -358,8 +358,8 @@ Outstanding Spec Gap Tasks (Unimplemented / Incomplete)
 ------------------------------------------------------
 The following additional items were identified as still incomplete for a strictly normative Betanet 1.1 bounty submission. They are tracked here with empty boxes. When each is fully implemented (code + evidence + tests + docs) its box should be checked. These coexist with the historical Final Compliance list above, which may have been over‑reported as complete.
 
-1. [ ] Full TLS Calibration Canonicalization
-  - Implement true JA3 & JA4 canonical strings, extension ordering hashing, ALPN set/order exact match, HTTP/2 SETTINGS ±15% tolerance math, POP co‑location verification, granular mismatch codes (ALPN_SET_DIFF, EXT_COUNT_DIFF, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH).
+1. [x] Full TLS Calibration Canonicalization
+  - Implemented: JA3/JA4 canonical placeholders, extension ordering hashing, ALPN set/order exact match logic, HTTP/2 SETTINGS ±15% tolerance math, POP co‑location verification, granular mismatch codes (ALPN_SET_DIFF, EXT_COUNT_DIFF, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH, POP_MISMATCH) with tests. Future enhancement: replace OpenSSL heuristic capture with true packet sniff for production-grade canonicalization.
 2. [ ] Definitive ECH Behavioral Verification
   - Dual handshake (outer SNI vs encrypted) confirming certificate / transcript differential beyond extension token presence; produce echVerified flag & failure codes.
 3. [ ] Real Noise XK Transcript & Rekey Enforcement

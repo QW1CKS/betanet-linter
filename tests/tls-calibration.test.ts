@@ -74,4 +74,20 @@ describe('TLS Static Template Calibration (Check 22) mismatch codes', () => {
     expect(check.passed).toBe(false);
     expect(check.details).toMatch(/SETTINGS_DRIFT/);
   });
+
+  it('detects POP_MISMATCH', async () => {
+    const staticWithPop = { ...baseStatic, popId: 'pop-a' } as any;
+    const dyn = { ...baseDynamic, popId: 'pop-b' };
+    const check = await runCheck({ static: staticWithPop, dynamic: dyn });
+    expect(check.passed).toBe(false);
+    expect(check.details).toMatch(/POP_MISMATCH/);
+  });
+
+  it('accepts SETTINGS within ±15% tolerance', async () => {
+    const dyn = { ...baseDynamic };
+    // 10% increase still within tolerance window
+    const extra = { h2Adaptive: { settings: { INITIAL_WINDOW_SIZE: Math.round(6291456 * 1.10), MAX_FRAME_SIZE: Math.round(16384 * 0.90) } } };
+    const check = await runCheck({ static: baseStatic, dynamic: dyn, extra });
+    expect(check.passed).toBe(true);
+  });
 });

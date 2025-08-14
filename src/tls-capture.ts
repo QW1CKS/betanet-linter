@@ -37,6 +37,11 @@ export function buildCanonicalClientHello(struct: {
   const ja3Hash = crypto.createHash('md5').update(ja3).digest('hex');
   // Provide ja3Canonical separate to allow future divergence once real capture differs
   const ja3Canonical = ja3;
+  // Derive extension count and a coarse JA4-style placeholder hash for forward compatibility
+  // extensionCount & ALPN set hash reserved for future enhanced JA4 style classification (omitted to avoid unused var lint)
+  // JA4 simplified: version|cipherCount|extCount|alpnSetHash
+  // JA4 placeholder kept for potential future return (not yet wired through types to avoid unused var warnings)
+  // const ja4 = `${version}|${ciphers.length}|${extensionCount}|${alpnSetHash}`;
   // Synthetic raw canonical already produced in harness; we only compute textual here.
-  return { ja3, ja3Hash, ja3Canonical, rawSynthetic: undefined, rawCanonical: undefined, extensions, ciphers, curves, ecPointFormats };
+  return { ja3, ja3Hash, ja3Canonical, rawSynthetic: undefined, rawCanonical: undefined, extensions, ciphers, curves, ecPointFormats } as any;
 }

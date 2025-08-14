@@ -454,7 +454,8 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       const ja3Hash = crypto.createHash('md5').update(ja3).digest('hex');
   // Build canonical textual representation (future: real packet capture to replace extIds/ciphers ordering)
   const canonical = buildCanonicalClientHello({ extensions: extIds, ciphers, curves, alpn, host });
-      const matchStatic = !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256);
+  const matchStatic = !!(evidence.clientHello && alpn && evidence.clientHello.extOrderSha256 === extOrderSha256);
+  const extensionCount = extIds.length;
       let mismatchReason: string | undefined;
       if (!matchStatic && evidence.clientHello) {
         if (alpn && evidence.clientHello.alpn) {
@@ -566,7 +567,7 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       // JA4 placeholder classification: Construct coarse taxonomy string.
       // JA4 (true) has defined sections; here we approximate to flag future upgrade path.
       const ja4 = `TLSH-${(alpn||[]).length}a-${extIds.length}e-${ciphers.length}c-${curves.length}g`;
-      evidence.dynamicClientHelloCapture = {
+  evidence.dynamicClientHelloCapture = {
         alpn,
         extOrderSha256,
         ja3,
@@ -584,7 +585,9 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
         rawClientHelloB64: rawStruct ? rawStruct.toString('base64') : undefined
   , rawClientHelloCanonicalB64: canonicalRaw ? canonicalRaw.toString('base64') : undefined
   , rawClientHelloCanonicalHash: canonicalRaw ? crypto.createHash('sha256').update(canonicalRaw).digest('hex') : undefined
-      };
+  } as any;
+  (evidence.dynamicClientHelloCapture as any).extensionCount = extensionCount;
+  (evidence.dynamicClientHelloCapture as any).popId = process.env.BETANET_POP_ID || undefined;
       if (!evidence.calibrationBaseline && evidence.clientHello) {
         evidence.calibrationBaseline = { alpn: evidence.clientHello.alpn, extOrderSha256: evidence.clientHello.extOrderSha256, source: 'static-template', capturedAt: new Date().toISOString() };
       }
