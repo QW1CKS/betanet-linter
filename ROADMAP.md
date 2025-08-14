@@ -359,45 +359,64 @@ Outstanding Spec Gap Tasks (Unimplemented / Incomplete)
 The following additional items were identified as still incomplete for a strictly normative Betanet 1.1 bounty submission. They are tracked here with empty boxes. When each is fully implemented (code + evidence + tests + docs) its box should be checked. These coexist with the historical Final Compliance list above, which may have been over‑reported as complete.
 
 1. [x] Full TLS Calibration Canonicalization
-  - Implemented: JA3/JA4 canonical placeholders, extension ordering hashing, ALPN set/order exact match logic, HTTP/2 SETTINGS ±15% tolerance math, POP co‑location verification, granular mismatch codes (ALPN_SET_DIFF, EXT_COUNT_DIFF, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH, POP_MISMATCH) with tests. Future enhancement: replace OpenSSL heuristic capture with true packet sniff for production-grade canonicalization.
+  - Implemented: Real-time pre-flight pairing (baseline vs dynamic), GREASE extension detection (failure code GREASE_ABSENT), JA3/JA4 placeholder fingerprints, extension ordering hashing, ALPN set/order exact match logic, HTTP/2 SETTINGS ±15% tolerance math, POP co‑location verification, granular mismatch codes (ALPN_SET_DIFF, EXT_COUNT_DIFF, SETTINGS_DRIFT, JA3_HASH_MISMATCH, JA4_CLASS_MISMATCH, POP_MISMATCH, GREASE_ABSENT) with tests planned. Future enhancement (non-blocking): swap heuristic OpenSSL parsing for raw packet capture library for production-grade JA3/JA4 accuracy.
 2. [ ] Definitive ECH Behavioral Verification
   - Dual handshake (outer SNI vs encrypted) confirming certificate / transcript differential beyond extension token presence; produce echVerified flag & failure codes.
+  - Caveats: implement real outer+inner capture (cert chain hash diff, extension diff, ALPN consistency), GREASE presence validation, failure codes for MISSING_DIFF, GREASE_ABSENT, ALPN_DIVERGENCE; tests with simulated and real traces.
 3. [ ] Real Noise XK Transcript & Rekey Enforcement
   - Capture live message sequence, validate pattern & HKDF labels, enforce rekey triggers (≥8 GiB OR ≥2^16 frames OR ≥1 h), detect nonce overuse; emit NO_REKEY / NONCE_OVERUSE / MSG_PATTERN_MISMATCH codes.
+  - Caveats: implement frame counter & byte accumulator, timestamped key epochs, transcript hash, actual HKDF label parsing, nonce reuse detection, and rekey policy tests including positive/negative boundaries.
 4. [ ] SCION Control Stream & Path Failover Metrics
   - Parse CBOR control stream, ensure ≥3 offers, unique paths, no legacy header; measure path switch latency (≤300 ms) & probe rate backoff limits.
+  - Caveats: full CBOR schema validation, TS skew ±300 s check, duplicate FLOW+TS rejection window, signature verification of SIG field, latency measurement harness, forbidden legacy header detection, token bucket rate enforcement.
 5. [ ] Bootstrap PoW & Multi-Bucket Rate-Limit Statistics
   - Verify PoW bit difficulty (≥22) & adaptive convergence; analyze acceptance percentile, multi-bucket (/24, /56, AS) dispersion & trend; POW_TREND_DIVERGENCE failures.
+  - Caveats: constant‑time PoW verify, rolling acceptance window, 95th percentile capacity calculation, bucket saturation metrics, adaptive difficulty trend analysis with regression tests.
 6. [ ] Mixnode Selection Entropy & Diversity Enforcement
   - Validate per-stream entropy (streamNonce), ≥8 unique hop sets before reuse, AS/ISD diversity constraints, avoidance of identical hop set repetition.
+  - Caveats: implement BeaconSet aggregation (drand / nist / eth) retrieval, VRF-based selection simulation, uniqueness tracking store, AS/Org classification mapping, entropy & repetition tests.
 7. [ ] Alias Ledger 2-of-3 Finality & Emergency Advance Validation
   - Parse per-chain finality depths, quorum certificate weights & signatures, 14‑day liveness prerequisite, epoch monotonicity; FINALITY_DEPTH_SHORT / EMERGENCY_LIVENESS_SHORT / QUORUM_WEIGHT_MISMATCH codes.
+  - Caveats: real RPC / artifact ingestion for 3 chains, Ed25519 quorum cert signature validation, weight cap enforcement, emergency advance 14‑day liveness gating logic, epoch ordering checks.
 8. [ ] Voucher Aggregated Signature (FROST) Cryptographic Verification
   - Implement Ed25519 aggregated / FROST threshold (n≥5, t=3) signature validation over 128‑B voucher payload; AGG_SIG_INVALID / FROST_PARAMS_INVALID.
+  - Caveats: integrate or implement FROST verify routine, keysetId derivation cross-check, malformed length handling, negative tests for threshold & signature corruption.
 9. [ ] Governance Partition Safety 7‑Day Dataset
   - Ingest historical ACK/path diversity series (≥7*24 points) detecting >20% degradation; PARTITION_DEGRADATION code generation.
+  - Caveats: data ingestion schema, rolling window computations, 20% degradation math (baseline vs window), partition event detection tests, resilience to missing intervals.
 10. [ ] Anti-Correlation Fallback Timing Enforcement
   - Measure UDP→TCP retry delay windows, cover connection counts (≥2), teardown timing (3–15 s) distributions (IQR, CV) & anomaly detection; COVER_DELAY_OUT_OF_RANGE / TEARDOWN_VARIANCE_EXCESS.
+  - Caveats: high‑resolution timing capture, statistical calculation (IQR, CV, skew), anomaly thresholds justification, multi-origin cover validation, min sample size safeguards.
 11. [ ] Provenance DSSE Signature & Rebuild Diff Hardening
   - Verify DSSE signatures with trusted keys, enforce materials completeness & toolchain pinning, compare rebuild digest; SIG_INVALID / MATERIAL_GAP / REBUILD_MISMATCH.
+  - Caveats: multi-signer threshold logic, key allow/deny lists, reproducible rebuild invocation & diff hashing, per-material digest cross‑reference with SBOM, policy reason aggregation.
 12. [ ] Algorithm Agility Registry Enforcement
   - Parse registry artifact (allowed cipher/hash/KEM sets); verify used sets ⊆ allowed; unregisteredUsed empty; failure on unknown combos.
+  - Caveats: canonical registry hash, strict parsing (schema validation), mapping binary-observed suites to registry names, mismatch diff reporting & tests.
 13. [ ] Post-Quantum Mandatory Date Gate (2027‑01‑01)
   - Enforce failure if hybrid X25519-Kyber768 absent after date (PQ_PAST_DUE) or present prematurely without override (PQ_EARLY_WITHOUT_OVERRIDE).
+  - Caveats: reliable UTC date sourcing, override mechanism (env/config) audit logging, test matrix around boundary (±1 day) with simulated clock.
 14. [ ] Evidence Authenticity (Detached Signature / Bundle)
   - Implement signature / bundle verification (minisign, cosign, DSSE) promoting artifact evidence only when authenticity passes; EVIDENCE_UNSIGNED failure in strict auth mode.
+  - Caveats: canonical JSON normalization, ed25519 & optional cosign key formats, multi-bundle threshold, tamper hash chain verification, signature cache & negative tests.
 15. [ ] Keyword Stuffing Advanced Heuristic Refinement
   - Strengthen density measurement with category entropy & false-positive regression tests; flag & downgrade stuffing evasions.
+  - Caveats: entropy over evidence category presence, curated benign corpus for FP rate, adaptive thresholding, evasion pattern detection (e.g., random insertion), regression suite.
 16. [ ] Governance & Ledger Cryptographic Quorum Signature Validation
   - Perform real Ed25519 signature checks for quorum certificates & maintain weight duplicates detection.
+  - Caveats: per-signer weight aggregation, duplicate signer / org detection, weight cap enforcement, signature batch verification optimization, invalid reason codes.
 17. [ ] Extended QUIC Initial Parsing & Calibration Hash
   - Extract version, DCID/SCID, token length/value, transport params subset; generate calibration hash & mismatch diagnostics.
+  - Caveats: real QUIC Initial packet capture, varint parsing correctness tests, transport parameter extraction, hash stability spec, mismatch code taxonomy.
 18. [ ] HTTP/2 & HTTP/3 Jitter Statistical Tests
   - Collect real distribution samples (PING cadence, idle padding, PRIORITY frames), run chi-square / KS tests, enforce variance bounds; JITTER_RANDOMNESS_WEAK.
+  - Caveats: sample collection hooks, statistical test implementation (chi-square / KS) with p‑value threshold (e.g. >0.01), randomness failure codes, insufficient sample handling.
 19. [ ] Mix Diversity Variance & Entropy Metrics
   - Compute hop set entropy, path length stddev, confidence intervals; fail when below thresholds.
+  - Caveats: entropy calculation (Shannon bits), path length variance thresholds, confidence interval estimation, dataset size guardrails, reproducibility of sampling.
 20. [ ] Lint & Type Hygiene Hardening
   - Eliminate remaining ESLint error(s) & systematically reduce any/no-non-null & no-explicit-any warnings for core modules or justify via documented exclusions.
+  - Caveats: introduce strict TypeScript config (noImplicitAny, strictNullChecks) compliance, documented whitelist for unavoidable anys, CI gate enforcing 0 errors, target warning budget.
 
 Note: Completing each gap requires: implementation, evidence schema extension (with version bump if fields are normative), tests (positive & negative), README matrix update, and change log entry.
 

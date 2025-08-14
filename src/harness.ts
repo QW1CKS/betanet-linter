@@ -398,6 +398,8 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     const host = opts.clientHelloCapture.host;
     const port = opts.clientHelloCapture.port || 443;
     const openssl = opts.clientHelloCapture.opensslPath || 'openssl';
+  // Record pre-flight baseline timestamp for calibration pairing
+  const preflightAt = new Date().toISOString();
     try {
       const output = await new Promise<string>((resolve) => {
   // Use -msg for richer handshake dump when available; fall back to -tlsextdebug only
@@ -588,6 +590,17 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
   } as any;
   (evidence.dynamicClientHelloCapture as any).extensionCount = extensionCount;
   (evidence.dynamicClientHelloCapture as any).popId = process.env.BETANET_POP_ID || undefined;
+      // Pair calibration baseline with dynamic capture if absent
+      if (!(evidence as any).calibrationPreflightPair && evidence.clientHello) {
+        (evidence as any).calibrationPreflightPair = {
+          baselineCapturedAt: preflightAt,
+          dynamicCapturedAt: (evidence.dynamicClientHelloCapture as any).capturedAt,
+          baselineAlpn: evidence.clientHello.alpn,
+          dynamicAlpn: (evidence.dynamicClientHelloCapture as any).alpn,
+          baselineExtHash: evidence.clientHello.extOrderSha256,
+          dynamicExtHash: (evidence.dynamicClientHelloCapture as any).extOrderSha256
+        };
+      }
       if (!evidence.calibrationBaseline && evidence.clientHello) {
         evidence.calibrationBaseline = { alpn: evidence.clientHello.alpn, extOrderSha256: evidence.clientHello.extOrderSha256, source: 'static-template', capturedAt: new Date().toISOString() };
       }

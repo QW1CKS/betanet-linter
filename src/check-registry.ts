@@ -1168,6 +1168,10 @@ export const STEP_10_CHECKS = [
         if (!ch) {
           mismatchCode = 'NO_STATIC_BASELINE';
         }
+  // GREASE detection for static & dynamic extension sets
+  const GREASE_VALUES = new Set([0x0a0a,0x1a1a,0x2a2a,0x3a3a,0x4a4a,0x5a5a,0x6a6a,0x7a7a,0x8a8a,0x9a9a,0xaaaa,0xbaba,0xcaca,0xdada,0xeaea,0xfafa]);
+  const staticGrease = Array.isArray((ch as any).extensions) && (ch as any).extensions.some((e:number)=>GREASE_VALUES.has(e));
+  const dynGrease = Array.isArray((dyn as any).extensions) && (dyn as any).extensions.some((e:number)=>GREASE_VALUES.has(e));
         // ALPN comparison: prioritize set difference over ordering difference (so ALPN_SET_DIFF not masked)
         const alpnMatch = !!(ch && dyn.alpn.join(',') === ch.alpn.join(','));
         const alpnSetMatch = !!(ch && [...new Set(dyn.alpn)].sort().join(',') === [...new Set(ch.alpn||[])].sort().join(','));
@@ -1181,6 +1185,7 @@ export const STEP_10_CHECKS = [
         }
         if (!extMatch) mismatchCode = mismatchCode || 'EXT_SEQUENCE_MISMATCH';
         if (!extCountMatch) mismatchCode = mismatchCode || 'EXT_COUNT_DIFF';
+  if (staticGrease && !dynGrease) mismatchCode = mismatchCode || 'GREASE_ABSENT';
         // JA3 canonical hash mismatch (if both present)
         if (dyn.ja3Canonical && dyn.ja3Hash && dyn.ja3 && cryptoLikeEqual(dyn.ja3Canonical, dyn.ja3) === false) {
           mismatchCode = mismatchCode || 'JA3_HASH_MISMATCH';
