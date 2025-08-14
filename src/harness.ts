@@ -90,7 +90,7 @@ export interface HarnessOptions {
   quicInitialTimeoutMs?: number; // wait for response
   noiseRun?: boolean; // attempt to run binary to observe real noise rekey markers
   accessTicketSimulate?: boolean; // simulate access ticket dynamic sampling (padding variability, rotation interval)
-  echSimulate?: { outerHost: string; innerHost?: string; simulateCertDiff?: boolean; greaseAnomaly?: boolean }; // dual handshake simulation (Task 2)
+  echSimulate?: { outerHost: string; innerHost?: string; simulateCertDiff?: boolean; greaseAnomaly?: boolean; innerAddsPrivateAlpn?: boolean }; // dual handshake simulation (Task 2)
 }
 
 export interface HarnessEvidence {
@@ -259,9 +259,15 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
     const outerCertHash = crypto.createHash('sha256').update('cert:'+outerHost).digest('hex').slice(0,12);
     const innerCertHash = opts.echSimulate.simulateCertDiff ? crypto.createHash('sha256').update('cert:'+innerHost+':inner').digest('hex').slice(0,12) : outerCertHash;
     const certHashesDiffer = outerCertHash !== innerCertHash;
+    // Simulated ALPN offerings (outer always offers h2,http/1.1; inner may add private alpn)
+    const outerAlpn = ['h2','http/1.1'];
+    const innerAlpn = opts.echSimulate.innerAddsPrivateAlpn ? ['h2','http/1.1','priv-alpn'] : ['h2','http/1.1'];
+    const alpnConsistent = outerAlpn.every((a,i)=> innerAlpn[i] === a); // strict prefix order consistent
+    const greasePresent = !opts.echSimulate.greaseAnomaly; // anomaly => missing GREASE rotation
     const diffIndicators: string[] = [];
     if (certHashesDiffer) diffIndicators.push('cert-hash-diff');
-    if (!opts.echSimulate.greaseAnomaly) diffIndicators.push('grease-absent');
+    if (alpnConsistent) diffIndicators.push('alpn-ok');
+    if (greasePresent) diffIndicators.push('grease-present'); else diffIndicators.push('grease-missing');
     evidence as any; (evidence as any).echVerification = {
       outerSni: outerHost,
       innerSni: innerHost,
@@ -269,7 +275,11 @@ export async function runHarness(binaryPath: string, outFile: string, opts: Harn
       innerCertHash,
       certHashesDiffer,
       extensionPresent: true,
-      greaseAbsenceObserved: !opts.echSimulate.greaseAnomaly,
+      greasePresent,
+      greaseAbsenceObserved: greasePresent, // backward compatibility
+      outerAlpn,
+      innerAlpn,
+      alpnConsistent,
       diffIndicators
     };
   }

@@ -1,4 +1,20 @@
 export interface Evidence {
+  echVerification?: {
+    outerSni?: string;
+    innerSni?: string;
+    outerCertHash?: string;
+    innerCertHash?: string;
+    certHashesDiffer?: boolean;
+    extensionPresent?: boolean;
+    greasePresent?: boolean; // true when GREASE mechanisms observed (positive); failure if explicitly false
+    greaseAbsenceObserved?: boolean; // legacy field (true/undefined = ok). Retained for backward compat
+    outerAlpn?: string[];
+    innerAlpn?: string[];
+    alpnConsistent?: boolean;
+    diffIndicators?: string[]; // e.g. ['cert-hash-diff','alpn-ok','grease-present']
+    verified?: boolean; // final harness conclusion
+    failureCodes?: string[]; // populated by check 32 evaluator for transparency
+  };
   h2AdaptiveDynamic?: {
     settings?: Record<string, number>;
     paddingJitterMeanMs?: number;

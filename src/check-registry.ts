@@ -1618,19 +1618,30 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
       if (!ech) {
         return { id: 32, name: 'ECH Verification', description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence', passed: false, details: '❌ No ECH verification evidence', severity: 'major', evidenceType: 'heuristic' };
       }
+      const failureCodes: string[] = [];
       const extensionPresent = ech.extensionPresent === true;
+      if (!extensionPresent) failureCodes.push('EXTENSION_ABSENT');
       const certDiff = ech.certHashesDiffer === true || (ech.outerCertHash && ech.innerCertHash && ech.outerCertHash !== ech.innerCertHash);
-      const greaseOk = ech.greaseAbsenceObserved !== false; // treat undefined as ok
+      if (extensionPresent && !certDiff) failureCodes.push('MISSING_DIFF');
+  // GREASE: absence should only fail if explicitly flagged as anomaly (greasePresent === false AND greaseAbsenceObserved === false)
+  const greasePresent = ech.greasePresent === true || ech.greaseAbsenceObserved !== false; // default ok unless explicit false
+  if (ech.greasePresent === false || ech.greaseAbsenceObserved === false) failureCodes.push('GREASE_ABSENT');
+      const alpnConsistent = ech.alpnConsistent !== false; // default ok
+      if (!alpnConsistent) failureCodes.push('ALPN_DIVERGENCE');
       const diffIndicators: string[] = ech.diffIndicators || [];
-      const verified = extensionPresent && certDiff && greaseOk;
+      const verified = failureCodes.length === 0;
+      ech.verified = verified;
+      ech.failureCodes = failureCodes;
+      if (verified && !diffIndicators.length) {
+        if (certDiff) diffIndicators.push('cert-hash-diff');
+        if (alpnConsistent) diffIndicators.push('alpn-ok');
+        if (greasePresent) diffIndicators.push('grease-present');
+      }
       const passed = verified;
-      const details = passed ? `✅ ECH accepted diffIndicators=${diffIndicators.join(',') || 'cert-hash-diff'}` : `❌ ECH not verified: ${missingList([
-        !extensionPresent && 'extension absent',
-        extensionPresent && !certDiff && 'no cert differential',
-        !greaseOk && 'GREASE anomalies'
-      ])}`;
-      // Evidence type escalation: dynamic-protocol only if verified AND dual handshake artifacts present
-      const evidenceType: 'heuristic' | 'dynamic-protocol' = passed && ech.outerSni && ech.innerSni ? 'dynamic-protocol' : 'heuristic';
+  const humanReasons = failureCodes.map(fc => fc === 'MISSING_DIFF' ? 'no cert differential' : (fc === 'EXTENSION_ABSENT' ? 'extension absent' : (fc === 'GREASE_ABSENT' ? 'GREASE anomalies' : (fc === 'ALPN_DIVERGENCE' ? 'ALPN divergence' : fc))));
+  const details = passed ? `✅ ECH accepted indicators=${diffIndicators.join(',')}` : `❌ ECH not verified: ${humanReasons.join(',')}`;
+      // Evidence type escalation: dynamic-protocol only if we have both outer & inner SNI and at least one differential indicator (cert or ALPN) plus extension
+      const evidenceType: 'heuristic' | 'dynamic-protocol' = passed && ech.outerSni && ech.innerSni && (certDiff || alpnConsistent) ? 'dynamic-protocol' : 'heuristic';
       return { id: 32, name: 'ECH Verification', description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence', passed, details, severity: 'major', evidenceType };
     }
   }
