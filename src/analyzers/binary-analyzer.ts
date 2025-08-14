@@ -1,5 +1,5 @@
 import * as fs from 'fs-extra';
-import * as path from 'path';
+// path import removed (unused)
 import execa from 'execa';
 
 export interface BinaryAnalysis {

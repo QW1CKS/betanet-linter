@@ -1,5 +1,5 @@
 import * as fs from 'fs-extra';
-import execa from 'execa';
+import { safeExec } from '../safe-exec';
 
 export interface NetworkAnalysis {
   protocols: string[];
@@ -92,7 +92,7 @@ export class NetworkAnalyzer {
 
       // Look for URL patterns and endpoints
       const urlRegex = /https?:\/\/[^\s<>"{}|\\^`[\]]+/g;
-      const endpointRegex = /\/[a-zA-Z0-9\-_\/]+/g;
+  const endpointRegex = /\/[a-zA-Z0-9-_\/]+/g;
 
       const urlMatches = content.match(urlRegex);
       const endpointMatches = content.match(endpointRegex);
@@ -120,7 +120,8 @@ export class NetworkAnalyzer {
 
   async detectCertificates(binaryPath: string): Promise<any[]> {
     try {
-      const { stdout } = await execa('strings', [binaryPath]);
+      const res = await safeExec('strings', [binaryPath], 4000);
+      const stdout = res.failed ? '' : res.stdout;
       const certificates: any[] = [];
 
       // Look for certificate-related strings
@@ -174,7 +175,8 @@ export class NetworkAnalyzer {
 
   async analyzeTLSConfig(binaryPath: string): Promise<any> {
     try {
-      const { stdout } = await execa('strings', [binaryPath]);
+      const res = await safeExec('strings', [binaryPath], 4000);
+      const stdout = res.failed ? '' : res.stdout;
       const tlsConfig: any = {
         versions: [],
         ciphers: [],

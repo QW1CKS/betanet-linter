@@ -67,6 +67,11 @@ class BetanetComplianceChecker {
         if (!this._analyzer || options.forceRefresh) {
             this._analyzer = new analyzer_1.BinaryAnalyzer(binaryPath, options.verbose);
         }
+        // Attach options reference for downstream checks needing global flags (Task 11 strictAuth)
+        try {
+            this._analyzer.options = { ...this._analyzer.options, ...options };
+        }
+        catch { /* ignore */ }
         // Phase 6: Apply network allowance (default deny)
         try {
             this._analyzer.setNetworkAllowed?.(!!options.enableNetwork, options.networkAllowlist);
@@ -577,6 +582,18 @@ class BetanetComplianceChecker {
         const criticalChecks = considered.filter(c => c.severity === 'critical' && !c.passed);
         const overallScore = considered.length === 0 ? 0 : Math.round((passedChecks.length / considered.length) * 100);
         let passed = considered.length > 0 && passedChecks.length === considered.length && criticalChecks.length === 0;
+        // Task 11: In strictAuthMode require authenticity check (35) passes if present OR fail with EVIDENCE_UNSIGNED
+        if (options.strictAuthMode) {
+            const authCheck = checks.find(c => c.id === 35);
+            if (authCheck) {
+                if (!authCheck.passed)
+                    passed = false; // authenticity failure blocks overall pass
+            }
+            else {
+                // If authenticity check missing but strictAuth requested, treat as failure
+                passed = false;
+            }
+        }
         // In strict mode if there are any heuristic-only passes counting toward compliance, force non-pass unless allowed
         let heuristicContributionCount = 0;
         if (strictMode && !allowHeuristic) {

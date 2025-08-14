@@ -2,6 +2,8 @@ import { SBOM } from '../types';
 import { BinaryAnalyzer } from '../analyzer';
 export declare class SBOMGenerator {
     generate(binaryPath: string, format?: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json', analyzer?: BinaryAnalyzer): Promise<SBOM>;
+    private selectRootVersion;
+    private getToolVersion;
     private deriveFeatures;
     private getBinaryInfo;
     private calculateHash;
@@ -14,6 +16,7 @@ export declare class SBOMGenerator {
     private generateCycloneDX;
     private generateSPDXTagValue;
     private generateSPDXJson;
+    private computeBomRef;
     private generateUUID;
 }
 //# sourceMappingURL=sbom-generator.d.ts.map

@@ -1,6 +1,6 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
-import execa from 'execa'; // retained for hash fallback; phased out for core probes
+// Removed unused execa import (safeExec now covers external commands)
 import { SBOM } from '../types';
 import { BinaryAnalyzer } from '../analyzer';
 import { safeExec } from '../safe-exec';

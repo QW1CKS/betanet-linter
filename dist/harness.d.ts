@@ -28,6 +28,12 @@ export interface HarnessOptions {
     quicInitialTimeoutMs?: number;
     noiseRun?: boolean;
     accessTicketSimulate?: boolean;
+    echSimulate?: {
+        outerHost: string;
+        innerHost?: string;
+        simulateCertDiff?: boolean;
+        greaseAnomaly?: boolean;
+    };
 }
 export interface HarnessEvidence {
     noiseTranscriptDynamic?: {

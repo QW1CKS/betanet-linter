@@ -1,6 +1,6 @@
 {
   "name": "betanet-compliance-linter",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "CLI tool for checking Betanet specification compliance",
   "main": "dist/index.js",
   "bin": {

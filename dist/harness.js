@@ -246,6 +246,31 @@ async function runHarness(binaryPath, outFile, opts = {}) {
         voucher: patterns.voucher ? { structLikely: patterns.voucher.structLikely, tokenHits: patterns.voucher.tokenHits, proximityBytes: patterns.voucher.proximityBytes } : undefined,
         meta: { generated: new Date().toISOString(), scenarios: opts.scenarios || [] }
     };
+    // ECH Verification simulation (dual handshake differential)
+    if (opts.echSimulate) {
+        const outerHost = opts.echSimulate.outerHost;
+        const innerHost = opts.echSimulate.innerHost || outerHost;
+        // Simulated certificate hashes (stable via hash of host name); inner differs if simulateCertDiff
+        const outerCertHash = crypto.createHash('sha256').update('cert:' + outerHost).digest('hex').slice(0, 12);
+        const innerCertHash = opts.echSimulate.simulateCertDiff ? crypto.createHash('sha256').update('cert:' + innerHost + ':inner').digest('hex').slice(0, 12) : outerCertHash;
+        const certHashesDiffer = outerCertHash !== innerCertHash;
+        const diffIndicators = [];
+        if (certHashesDiffer)
+            diffIndicators.push('cert-hash-diff');
+        if (!opts.echSimulate.greaseAnomaly)
+            diffIndicators.push('grease-absent');
+        evidence;
+        evidence.echVerification = {
+            outerSni: outerHost,
+            innerSni: innerHost,
+            outerCertHash,
+            innerCertHash,
+            certHashesDiffer,
+            extensionPresent: true,
+            greaseAbsenceObserved: !opts.echSimulate.greaseAnomaly,
+            diffIndicators
+        };
+    }
     if (opts.probeHost) {
         evidence.tlsProbe = await performTlsProbe(opts.probeHost, opts.probePort || 443, ['h2', 'http/1.1'], opts.probeTimeoutMs || 5000);
     }

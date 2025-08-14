@@ -1,4 +1,4 @@
-import * as fs from 'fs-extra';
+// Removed unused fs import (lint cleanup)
 import execa from 'execa';
 
 export interface CryptoAnalysis {

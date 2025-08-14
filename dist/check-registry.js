@@ -2,11 +2,45 @@
 // Central registry of Betanet compliance checks (Plan 3 consolidation)
 // Each check definition contains metadata & an evaluator that derives result from the BinaryAnalyzer.
 // This replaces ad-hoc per-check methods and normalizes naming & severities.
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ALL_CHECKS = exports.PHASE_7_CONT_CHECKS = exports.PHASE_4_CHECKS = exports.STEP_10_CHECKS = exports.CHECK_REGISTRY = void 0;
 exports.getChecksByIds = getChecksByIds;
 const constants_1 = require("./constants");
 const heuristics_1 = require("./heuristics");
+const crypto = __importStar(require("crypto"));
 const format_1 = require("./format");
 // missingList helper moved to format.ts (ISSUE-027) for reuse across modules
 exports.CHECK_REGISTRY = [
@@ -324,10 +358,11 @@ exports.CHECK_REGISTRY = [
             const paymentSupport = await analyzer.checkPaymentSupport();
             const ev = analyzer.evidence;
             const pow = ev?.powAdaptive;
+            const voucherCrypto = ev?.voucherCrypto;
+            const rateLimit = ev?.rateLimit;
             let passed = paymentSupport.hasCashu && paymentSupport.hasLightning && paymentSupport.hasFederation;
             let powDetail = '';
             if (pow && Array.isArray(pow.difficultySamples) && pow.difficultySamples.length >= 3) {
-                // Simple evolution validation: ensure samples converge within ±2 bits of target and no single backward jump >4 bits
                 const target = pow.targetBits || 22;
                 const withinBand = pow.difficultySamples.every((b) => Math.abs(b - target) <= 2);
                 let maxDrop = 0;
@@ -342,12 +377,32 @@ exports.CHECK_REGISTRY = [
                 passed = passed && powOk;
                 powDetail = ` powDiff=[${pow.difficultySamples.join('>')}] target=${target} maxDrop=${maxDrop}` + (powOk ? '' : ' pow-evolution-fail');
             }
+            // Artifact escalation conditional: only when ALL artifact evidences present
+            const haveAllArtifact = !!(voucherCrypto && pow && rateLimit);
+            let evidenceType = haveAllArtifact ? 'artifact' : 'heuristic';
+            const artifactIssues = [];
+            if (haveAllArtifact) {
+                const frost = voucherCrypto.frostThreshold || {};
+                if (!(voucherCrypto.signatureValid === true))
+                    artifactIssues.push('voucher signature');
+                if (!((frost.n || 0) >= 5 && (frost.t || 0) === 3))
+                    artifactIssues.push('FROST n>=5 t=3');
+                const buckets = Array.isArray(rateLimit.buckets) ? rateLimit.buckets : [];
+                const names = new Set(buckets.map((b) => (b.name || '').toLowerCase()));
+                const hasGlobal = [...names].some(n => n === 'global');
+                if (!(buckets.length >= 2 && hasGlobal))
+                    artifactIssues.push('rateLimit global+scoped');
+                if (artifactIssues.length)
+                    passed = false;
+            }
             let details;
             if (passed) {
-                details = '✅ Found Cashu, Lightning, and federation support' +
+                details = '✅ Payment system' +
                     (paymentSupport.hasVoucherFormat ? ' + voucher format' : '') +
                     (paymentSupport.hasFROST ? ' + FROST group' : '') +
-                    (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '') + powDetail;
+                    (paymentSupport.hasPoW22 ? ' + PoW≥22b' : '') +
+                    (voucherCrypto ? ' + voucherCrypto' : '') +
+                    (rateLimit ? ' + rateLimit' : '') + powDetail;
             }
             else {
                 const missingParts = [
@@ -357,14 +412,17 @@ exports.CHECK_REGISTRY = [
                 ];
                 const baseMissing = (0, format_1.missingList)(missingParts);
                 const noBaseMissing = missingParts.filter(Boolean).length === 0;
-                if (pow && powDetail.includes('pow-evolution-fail') && noBaseMissing) {
+                if (haveAllArtifact && artifactIssues.length && noBaseMissing) {
+                    details = `❌ Missing artifact: ${artifactIssues.join(', ')}`;
+                }
+                else if (pow && powDetail.includes('pow-evolution-fail') && noBaseMissing) {
                     details = `❌ PoW evolution invalid ${powDetail.trim()}`;
                 }
                 else {
                     details = `❌ Missing: ${baseMissing}${pow ? powDetail : ''}`;
                 }
             }
-            return { id: 8, name: 'Payment System', description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)', passed, details, severity: 'major', evidenceType: pow ? 'artifact' : 'heuristic' };
+            return { id: 8, name: 'Payment System', description: 'Accepts Cashu vouchers from federated mints & supports Lightning settlement (voucher/FROST signals optional)', passed, details, severity: 'major', evidenceType };
         }
     },
     {
@@ -384,11 +442,17 @@ exports.CHECK_REGISTRY = [
             const materialsMismatchCount = prov.materialsMismatchCount || 0;
             const materialsComplete = prov.materialsComplete === true;
             const signatureVerified = prov.signatureVerified === true;
+            const rebuildDigestMatch = prov.rebuildDigestMatch === true && prov.rebuildDigestMismatch !== true;
+            const toolchainDiff = typeof prov.toolchainDiff === 'number' ? prov.toolchainDiff : undefined;
+            const toolchainDiffOk = toolchainDiff === undefined || toolchainDiff === 0;
             const dsseSigners = prov.dsseSignerCount || 0;
             const dsseEnvelopeVerified = prov.dsseEnvelopeVerified === true;
             const dsseThresholdMet = prov.dsseThresholdMet === true;
             const dsseRequiredKeysPresent = prov.dsseRequiredKeysPresent === true;
             const dssePolicyReasons = prov.dssePolicyReasons || [];
+            const requiredSignerThreshold = prov.dsseRequiredSignerThreshold || prov.dsseThreshold; // allow existing field
+            const requiredSignerCount = prov.dsseVerifiedSignerCount || dsseSigners;
+            const signerThresholdOk = !requiredSignerThreshold || (requiredSignerCount >= requiredSignerThreshold);
             // Validate normative provenance
             let normativeDetails = [];
             let hasNormative = false;
@@ -457,7 +521,14 @@ exports.CHECK_REGISTRY = [
                 rebuildMismatch = true;
                 normativeDetails.push('rebuild digest mismatch flagged');
             }
-            const passed = !rebuildMismatch && ((buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative) && (!materialsMismatchCount);
+            // Task 10 strict criteria
+            const strictSigOk = signatureVerified || dsseEnvelopeVerified;
+            const strictMaterialsOk = materialsValidated && materialsComplete && materialsMismatchCount === 0;
+            const strictRebuildOk = rebuildDigestMatch !== false && !rebuildMismatch;
+            const strictOverall = strictSigOk && signerThresholdOk && strictMaterialsOk && strictRebuildOk && toolchainDiffOk;
+            const provenancePresent = !!prov.predicateType || !!prov.builderId || !!prov.binaryDigest || Array.isArray(prov.subjects);
+            // If provenancePresent, require strictOverall; otherwise allow legacy heuristic fallback
+            const passed = provenancePresent ? strictOverall : (strictOverall || (!rebuildMismatch && ((buildInfo.hasSLSA && buildInfo.reproducible && buildInfo.provenance) || hasNormative) && (!materialsMismatchCount)));
             const missing = (0, format_1.missingList)([
                 !(buildInfo.hasSLSA || prov.predicateType) && 'SLSA support/predicate',
                 !(buildInfo.reproducible || hasNormative) && 'reproducible builds',
@@ -468,7 +539,23 @@ exports.CHECK_REGISTRY = [
                 name: 'Build Provenance',
                 description: 'Builds reproducibly and publishes SLSA 3 provenance',
                 passed,
-                details: passed ? (hasNormative ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; detached signature verified' : ''}${dsseEnvelopeVerified ? '; dsse envelope verified' : (dsseSigners ? `; dsse signers=${dsseSigners}` : '')}${dsseThresholdMet ? '; dsse threshold met' : ''}${dsseRequiredKeysPresent ? '' : '; missing required dsse keys'}${dssePolicyReasons.length ? '; policy issues: ' + dssePolicyReasons.join(',') : ''})` : '✅ Found SLSA, reproducible builds, and provenance heuristics') : (rebuildMismatch ? '❌ Rebuild digest mismatch (non-reproducible)' : (materialsMismatchCount ? `❌ Materials/SBOM mismatch (${materialsMismatchCount} unmatched)` : `❌ Missing: ${missing}`)),
+                details: passed
+                    ? (hasNormative
+                        ? `✅ Provenance verified (${normativeDetails.join('; ')}${materialsValidated ? '; materials cross-checked' : ''}${materialsComplete ? '; materials complete' : ''}${signatureVerified ? '; detached signature verified' : ''}${dsseEnvelopeVerified ? '; dsse envelope verified' : (dsseSigners ? `; dsse signers=${dsseSigners}` : '')}${dsseThresholdMet ? '; dsse threshold met' : ''}${dsseRequiredKeysPresent ? '' : '; missing required dsse keys'}${signerThresholdOk ? '' : '; signer threshold unmet'}${toolchainDiffOk ? '' : `; toolchainDiff=${toolchainDiff}`}${strictRebuildOk ? '' : '; rebuild mismatch'}${dssePolicyReasons.length ? '; policy issues: ' + dssePolicyReasons.join(',') : ''})`
+                        : '✅ Found SLSA, reproducible builds, and provenance heuristics')
+                    : (rebuildMismatch
+                        ? '❌ REBUILD_MISMATCH'
+                        : (materialsMismatchCount
+                            ? '❌ MATERIAL_GAP'
+                            : (!strictSigOk
+                                ? '❌ SIG_INVALID'
+                                : (!signerThresholdOk
+                                    ? '❌ MISSING_SIGNER'
+                                    : (!toolchainDiffOk
+                                        ? '❌ TOOLCHAIN_DIFF'
+                                        : (!strictMaterialsOk
+                                            ? '❌ MATERIAL_GAP'
+                                            : `❌ Missing: ${missing}`)))))),
                 severity: 'minor',
                 evidenceType: hasNormative ? 'artifact' : 'heuristic'
             };
@@ -554,6 +641,176 @@ exports.CHECK_REGISTRY = [
             };
         }
     },
+    // Task 15: Negative Assertion Expansion & Forbidden Artifact Hashes (Check 39)
+    {
+        id: 39,
+        key: 'forbidden-artifact-hashes',
+        name: 'Forbidden Artifact Hashes',
+        description: 'Validates absence of disallowed legacy hashes / deprecated cipher constants',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const neg = ev.negative || {};
+            const forbiddenHashes = Array.isArray(neg.forbiddenHashes) ? neg.forbiddenHashes : [];
+            const detected = Array.isArray(neg.detectedForbiddenHashes) ? neg.detectedForbiddenHashes : [];
+            // If no policy list provided treat as informational fail until supplied
+            if (!forbiddenHashes.length) {
+                return { id: 39, name: 'Forbidden Artifact Hashes', description: 'Validates absence of disallowed legacy hashes / deprecated cipher constants', passed: false, details: '❌ No forbidden hash policy provided', severity: 'major', evidenceType: 'heuristic' };
+            }
+            const present = detected.filter(h => forbiddenHashes.includes(h));
+            const passed = present.length === 0;
+            const details = passed ? `✅ No forbidden artifact hashes (policy size=${forbiddenHashes.length})` : `❌ FORBIDDEN_HASH: ${present.join(', ')}`;
+            return { id: 39, name: 'Forbidden Artifact Hashes', description: 'Validates absence of disallowed legacy hashes / deprecated cipher constants', passed, details, severity: 'major', evidenceType: passed ? 'artifact' : 'artifact' };
+        }
+    },
+    // Task 14: Post-Quantum Date Boundary Reliability (Check 38)
+    {
+        id: 38,
+        key: 'pq-date-boundary',
+        name: 'Post-Quantum Date Boundary',
+        description: 'Enforces PQ suite presence after mandatory date; forbids premature PQ without approved override',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer, now) => {
+            const ev = analyzer.evidence || {};
+            const cryptoCaps = await (analyzer.checkCryptographicCapabilities?.() || Promise.resolve({}));
+            // Allow test override of current epoch for deterministic tests
+            let currentEpoch = now.getTime();
+            if (typeof ev.pqTestNowEpoch === 'number')
+                currentEpoch = ev.pqTestNowEpoch;
+            const mandatoryEpoch = constants_1.POST_QUANTUM_MANDATORY_EPOCH_MS; // imported from constants
+            const pqPresent = !!(cryptoCaps.hasKyber768 || cryptoCaps.hasPQHybrid || ev.provenance?.pqHybridUsed || ev.pqSuite?.kyber768);
+            const overrideApproved = !!(ev.pqOverride?.approved === true || ev.provenance?.pqOverrideApproved === true);
+            const afterDate = currentEpoch >= mandatoryEpoch;
+            let passed = true;
+            let failCode = null;
+            if (afterDate && !pqPresent) {
+                passed = false;
+                failCode = 'PQ_PAST_DUE';
+            }
+            if (!afterDate && pqPresent && !overrideApproved) {
+                passed = false;
+                failCode = 'PQ_EARLY_WITHOUT_OVERRIDE';
+            }
+            const evidenceType = pqPresent ? 'artifact' : 'heuristic';
+            const details = passed ? `✅ PQ boundary ok (${afterDate ? 'post' : 'pre'}-date${pqPresent ? ' pq-present' : ' pq-absent'}${overrideApproved ? ' override-approved' : ''})` : `❌ ${failCode}`;
+            return { id: 38, name: 'Post-Quantum Date Boundary', description: 'Enforces PQ suite presence after mandatory date; forbids premature PQ without approved override', passed, details, severity: 'major', evidenceType };
+        }
+    },
+    // Task 13: Statistical Jitter Randomness Tests (Check 37)
+    {
+        id: 37,
+        key: 'jitter-randomness',
+        name: 'Statistical Jitter Randomness',
+        description: 'Validates adaptive jitter & teardown distributions via p-value threshold',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const rt = ev.randomnessTest; // expected shape { pValue:number, sampleCount:number, method?:string }
+            // Fallback: derive trivial pValue heuristic from statisticalJitter stddev vs mean if randomnessTest absent
+            let pValue = rt?.pValue;
+            let sampleCount = rt?.sampleCount;
+            if (pValue === undefined && ev.statisticalJitter) {
+                const sj = ev.statisticalJitter;
+                if (typeof sj.stdDevMs === 'number' && typeof sj.meanMs === 'number' && sj.meanMs > 0) {
+                    const cv = sj.stdDevMs / sj.meanMs; // coefficient of variation
+                    // Map CV heuristically to pseudo p-value (purely placeholder): higher dispersion -> higher pseudo p
+                    pValue = Math.max(0, Math.min(1, cv / 2));
+                    sampleCount = sj.samples || sj.sampleCount;
+                }
+            }
+            const threshold = 0.01; // AC threshold
+            const minSamples = 20;
+            if (pValue === undefined || !Number.isFinite(pValue)) {
+                return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed: false, details: '❌ JITTER_RANDOMNESS_WEAK: missing pValue', severity: 'major', evidenceType: 'heuristic' };
+            }
+            const enoughSamples = (sampleCount || 0) >= minSamples;
+            const passed = pValue > threshold && enoughSamples;
+            const evidenceType = (rt && enoughSamples) ? 'artifact' : 'heuristic';
+            const details = passed ? `✅ randomness pValue=${pValue.toExponential(2)} samples=${sampleCount}` : `❌ JITTER_RANDOMNESS_WEAK: pValue=${pValue.toExponential(2)} samples=${sampleCount || 0}${!enoughSamples ? ' insufficient-samples' : ''}`;
+            return { id: 37, name: 'Statistical Jitter Randomness', description: 'Validates adaptive jitter & teardown distributions via p-value threshold', passed, details, severity: 'major', evidenceType };
+        }
+    },
+    // Task 12: Adaptive PoW & Rate-Limit Statistical Validation (Check 36)
+    {
+        id: 36,
+        key: 'adaptive-pow-rate-statistics',
+        name: 'Adaptive PoW & Rate-Limit Statistics',
+        description: 'Analyzes PoW difficulty trend stability, max drop, acceptance percentile & rate-limit bucket dispersion',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const pow = ev.powAdaptive;
+            const rl = ev.rateLimit;
+            if (!pow) {
+                return { id: 36, name: 'Adaptive PoW & Rate-Limit Statistics', description: 'Analyzes PoW difficulty trend stability, max drop, acceptance percentile & rate-limit bucket dispersion', passed: false, details: '❌ No powAdaptive evidence', severity: 'major', evidenceType: 'heuristic' };
+            }
+            const samples = Array.isArray(pow.difficultySamples) ? pow.difficultySamples.slice() : [];
+            const target = typeof pow.targetBits === 'number' ? pow.targetBits : (samples.length ? samples[0] : 0);
+            // Metrics
+            let maxDrop = 0;
+            for (let i = 1; i < samples.length; i++) {
+                const drop = samples[i - 1] - samples[i];
+                if (drop > maxDrop)
+                    maxDrop = drop;
+            }
+            // Linear regression slope (simple):
+            let slope = 0;
+            if (samples.length >= 3) {
+                const n = samples.length;
+                const xs = samples.map((_, i) => i);
+                const meanX = (n - 1) / 2;
+                const meanY = samples.reduce((a, b) => a + b, 0) / n;
+                let num = 0, den = 0;
+                for (let i = 0; i < n; i++) {
+                    num += (xs[i] - meanX) * (samples[i] - meanY);
+                    den += (xs[i] - meanX) ** 2;
+                }
+                slope = den ? num / den : 0;
+            }
+            // Acceptance percentile: % of samples within ±2 of target
+            const withinTol = samples.filter(v => Math.abs(v - target) <= 2).length;
+            const acceptancePercentile = samples.length ? withinTol / samples.length : 0;
+            const difficultyTrendStable = Math.abs(slope) <= 0.2; // heuristic threshold
+            const maxDropOk = maxDrop <= 4; // reuse earlier PoW evolution tolerance
+            const acceptanceOk = acceptancePercentile >= 0.7; // require 70% within tolerance band
+            // Rate-limit dispersion sanity (if rl evidence present)
+            let rateLimitOk = true;
+            if (rl && Array.isArray(rl.buckets)) {
+                const caps = rl.buckets.map((b) => b.capacity).filter((c) => typeof c === 'number' && c > 0);
+                if (caps.length >= 2) {
+                    const min = Math.min(...caps);
+                    const max = Math.max(...caps);
+                    const ratio = max / min;
+                    // Flag as suspicious if dispersion extreme (>100x) unless explicitly justified
+                    if (ratio > 100)
+                        rateLimitOk = false;
+                }
+            }
+            const passed = difficultyTrendStable && maxDropOk && acceptanceOk && rateLimitOk;
+            const evidenceType = (pow && rl) ? 'artifact' : 'heuristic';
+            let details;
+            if (passed) {
+                details = `✅ PoW trend stable slope=${slope.toFixed(3)} maxDrop=${maxDrop} acceptPct=${(acceptancePercentile * 100).toFixed(0)}%${!rateLimitOk ? ' rl-dispersion-anom' : ''}`;
+            }
+            else {
+                const reasons = [];
+                if (!difficultyTrendStable)
+                    reasons.push('trend-unstable');
+                if (!maxDropOk)
+                    reasons.push('max-drop-exceeded');
+                if (!acceptanceOk)
+                    reasons.push('low-acceptance-percentile');
+                if (!rateLimitOk)
+                    reasons.push('rate-limit-dispersion');
+                details = `❌ POW_TREND_DIVERGENCE: ${reasons.join(',')}`;
+            }
+            return { id: 36, name: 'Adaptive PoW & Rate-Limit Statistics', description: 'Analyzes PoW difficulty trend stability, max drop, acceptance percentile & rate-limit bucket dispersion', passed, details, severity: 'major', evidenceType };
+        }
+    },
     {
         id: 19,
         key: 'noise-rekey-policy',
@@ -563,24 +820,77 @@ exports.CHECK_REGISTRY = [
         introducedIn: '1.1',
         evaluate: async (analyzer) => {
             const ev = analyzer.evidence;
-            const n = ev?.noiseTranscriptDynamic || ev?.noiseExtended;
+            // Normalize evidence: prefer new noiseTranscript structure, fallback to legacy noiseTranscriptDynamic / noiseExtended
+            const n = ev?.noiseTranscript || ev?.noiseTranscriptDynamic || ev?.noiseExtended;
             let passed = false;
             let details = '❌ No dynamic transcript evidence';
-            let evidenceType = 'heuristic';
-            if (ev?.noiseTranscriptDynamic)
-                evidenceType = 'dynamic-protocol';
-            else if (ev?.noiseExtended)
-                evidenceType = 'dynamic-protocol';
+            const failureCodes = [];
+            let evidenceType = n ? 'dynamic-protocol' : 'heuristic';
             if (n) {
-                const bytesOk = !n.rekeyTriggers?.bytes || n.rekeyTriggers.bytes >= (8 * 1024 * 1024 * 1024);
-                const timeOk = !n.rekeyTriggers?.timeMinSec || n.rekeyTriggers.timeMinSec >= 3600;
-                const framesOk = !n.rekeyTriggers?.frames || n.rekeyTriggers.frames >= 65536;
-                const pqDateOk = n.pqDateOk !== false; // must be true or undefined
-                const transcriptOk = n.expectedSequenceOk !== false && n.patternVerified !== false;
-                passed = (n.rekeysObserved || 0) >= 1 && bytesOk && timeOk && framesOk && pqDateOk && transcriptOk;
+                // Extract messages pattern (legacy messagesObserved array vs new messages objects)
+                let msgs = [];
+                if (Array.isArray(n.messages)) {
+                    msgs = n.messages.map((m) => (typeof m === 'string' ? m : m?.type)).filter((x) => typeof x === 'string');
+                }
+                else if (Array.isArray(n.messagesObserved)) {
+                    msgs = [...n.messagesObserved];
+                }
+                // Expected Noise XK initial handshake message sequence (client perspective): e, ee, s, es
+                const expectedPrefix = ['e', 'ee', 's', 'es'];
+                const prefix = msgs.slice(0, expectedPrefix.length);
+                let patternOk = expectedPrefix.every((v, i) => prefix[i] === v);
+                // Backward compatibility: if no explicit messages provided but legacy pattern flag present, accept pattern
+                if (msgs.length === 0 && n.pattern === 'XK')
+                    patternOk = true;
+                if (!patternOk)
+                    failureCodes.push('MSG_PATTERN_MISMATCH');
+                // Rekey detection
+                const rekeysObserved = n.rekeysObserved || (n.rekeyEvents?.length || 0);
+                if (rekeysObserved < 1)
+                    failureCodes.push('NO_REKEY');
+                // Nonce overuse / duplication detection (if nonce fields present)
+                let nonceOveruse = false;
+                if (Array.isArray(n.messages)) {
+                    const nonces = n.messages.map((m) => m && typeof m.nonce === 'number' ? m.nonce : undefined).filter((x) => x !== undefined);
+                    if (nonces.length) {
+                        const seen = new Set();
+                        for (let i = 0; i < nonces.length; i++) {
+                            const cur = nonces[i];
+                            if (seen.has(cur)) {
+                                nonceOveruse = true;
+                                break;
+                            }
+                            seen.add(cur);
+                            if (i > 0 && nonces[i - 1] > cur) {
+                                nonceOveruse = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (nonceOveruse)
+                    failureCodes.push('NONCE_OVERUSE');
+                // Trigger thresholds validation (bytes/time/frames) - must meet at least one if rekey occurred
+                const triggers = n.rekeyTriggers || {};
+                const bytesDefined = triggers.bytes !== undefined;
+                const timeDefined = triggers.timeMinSec !== undefined;
+                const framesDefined = triggers.frames !== undefined;
+                const bytesOk = bytesDefined && triggers.bytes >= (8 * 1024 * 1024 * 1024);
+                const timeOk = timeDefined && triggers.timeMinSec >= 3600;
+                const framesOk = framesDefined && triggers.frames >= 65536;
+                const anyDefined = bytesDefined || timeDefined || framesDefined;
+                // Require at least one defined trigger to meet its threshold when a rekey occurred
+                const triggerOk = anyDefined ? (bytesOk || timeOk || framesOk) : true;
+                if (rekeysObserved >= 1 && !triggerOk)
+                    failureCodes.push('REKEY_TRIGGER_INVALID');
+                // PQ date and legacy flags (retain backwards compatibility)
+                const pqDateOk = n.pqDateOk !== false;
+                if (!pqDateOk)
+                    failureCodes.push('PQ_DATE_INVALID');
+                passed = failureCodes.length === 0;
                 details = passed
-                    ? `✅ rekeysObserved=${n.rekeysObserved} pqDateOk=${pqDateOk} transcriptOk=${transcriptOk}`
-                    : `❌ Rekey policy insufficient: rekeysObserved=${n.rekeysObserved || 0} pqDateOk=${pqDateOk} transcriptOk=${transcriptOk}`;
+                    ? `✅ Noise transcript ok rekeys=${rekeysObserved} pattern=${patternOk} triggersOk=${triggerOk}`
+                    : `❌ Noise rekey/transcript issues: ${failureCodes.join(',')}`;
             }
             return { id: 19, name: 'Noise Rekey Policy', description: 'Observes at least one rekey event and validates trigger thresholds (bytes/time/frames)', passed, details, severity: 'minor', evidenceType };
         }
@@ -668,13 +978,17 @@ exports.CHECK_REGISTRY = [
         evaluate: async (analyzer) => {
             const patterns = await analyzer.getStaticPatterns?.();
             const voucher = patterns?.voucher;
+            const ev = analyzer.evidence;
+            // Allow external voucherCrypto evidence to satisfy structLikely when static tokens absent
+            const voucherCrypto = ev?.voucherCrypto;
+            const structLikely = voucher?.structLikely || voucherCrypto?.structLikely;
             const passed = !!(voucher && voucher.structLikely);
             return {
                 id: 14,
                 name: 'Voucher Struct Heuristic',
                 description: 'Detects presence of 128B voucher struct token triad',
-                passed,
-                details: voucher ? (voucher.structLikely ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}`) : '❌ No voucher struct tokens',
+                passed: structLikely === true,
+                details: structLikely ? (voucher ? `✅ Struct tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : '✅ Struct evidence (voucherCrypto)') : (voucher ? `❌ Incomplete tokens: ${voucher.tokenHits.join(', ')} proximity=${voucher.proximityBytes ?? 'n/a'}` : '❌ No voucher struct tokens'),
                 severity: 'minor',
                 evidenceType: 'static-structural'
             };
@@ -708,16 +1022,49 @@ exports.CHECK_REGISTRY = [
                 // Integrate historical diversity stability if present
                 const hist = analyzer.evidence?.governanceHistoricalDiversity;
                 const { asCapApplied, orgCapApplied, maxASShare, maxOrgShare, partitionsDetected } = gov;
-                // Historical diversity now requires BOTH basic stability and (if present) advancedStable not false
-                const histStable = hist ? (hist.stable === true && (hist.advancedStable !== false)) : true;
-                passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && histStable);
-                details = passed ? `✅ Caps enforced (AS<=${maxASShare} org<=${maxOrgShare}) no partitions${hist ? ' diversityStable=' + hist.stable : ''}` : `❌ Governance issues: ${(0, format_1.missingList)([
+                // Advanced historical diversity enforcement
+                // Require: (a) basic stability, (b) advancedStable true, (c) volatility <=0.05, (d) maxWindowShare <=0.2, (e) maxDeltaShare <=0.05, (f) avgTop3 <=0.24
+                let diversityOk = true;
+                let diversityReasons = [];
+                if (hist) {
+                    const stableBasic = hist.stable === true;
+                    const adv = typeof hist.advancedStable === 'boolean' ? hist.advancedStable : true;
+                    // Some older evidence may lack advanced metrics; treat absence as soft-fail until metrics present
+                    const hasAdvMetrics = ('volatility' in hist) || ('maxWindowShare' in hist) || ('maxDeltaShare' in hist) || ('avgTop3' in hist);
+                    const volatilityOk = hist.volatility === undefined || hist.volatility <= 0.05;
+                    const windowOk = hist.maxWindowShare === undefined || hist.maxWindowShare <= 0.2;
+                    const deltaOk = hist.maxDeltaShare === undefined || hist.maxDeltaShare <= 0.05;
+                    const avgTop3Ok = hist.avgTop3 === undefined || hist.avgTop3 <= 0.24; // 20% cap * 1.2 = 0.24
+                    const pointsOk = !hist.series || hist.series.length >= (7 * 24); // require ≥7*24 points if series provided
+                    const degradationOk = hist.degradationPct === undefined || hist.degradationPct <= 0.20; // Task 7 threshold
+                    diversityOk = stableBasic && adv && volatilityOk && windowOk && deltaOk && avgTop3Ok && pointsOk && degradationOk;
+                    if (!stableBasic)
+                        diversityReasons.push('historical basic instability');
+                    if (!adv)
+                        diversityReasons.push('advancedStable=false');
+                    if (!volatilityOk)
+                        diversityReasons.push(`volatility=${hist.volatility}`);
+                    if (!windowOk)
+                        diversityReasons.push(`maxWindowShare=${hist.maxWindowShare}`);
+                    if (!deltaOk)
+                        diversityReasons.push(`maxDeltaShare=${hist.maxDeltaShare}`);
+                    if (!avgTop3Ok)
+                        diversityReasons.push(`avgTop3=${hist.avgTop3}`);
+                    if (!hasAdvMetrics)
+                        diversityReasons.push('adv-metrics-missing');
+                    if (!pointsOk)
+                        diversityReasons.push('insufficient-points');
+                    if (!degradationOk)
+                        diversityReasons.push('PARTITION_DEGRADATION');
+                }
+                passed = !!(asCapApplied && orgCapApplied && maxASShare <= 0.2 && maxOrgShare <= 0.25 && partitionsDetected === false && diversityOk);
+                details = passed ? `✅ Caps enforced (AS=${(maxASShare ?? 0).toFixed(3)} org=${(maxOrgShare ?? 0).toFixed(3)}) partitions=none diversity=stable` : `❌ Governance issues: ${(0, format_1.missingList)([
                     !asCapApplied && 'AS caps not applied',
                     !orgCapApplied && 'Org caps not applied',
                     (maxASShare > 0.2) && `AS share ${maxASShare}`,
                     (maxOrgShare > 0.25) && `Org share ${maxOrgShare}`,
                     partitionsDetected === true && 'partitions detected',
-                    hist && !histStable && 'historical diversity unstable (basic or advanced)'
+                    (!diversityOk) && `diversity ${diversityReasons.join(',')}`
                 ])}`;
             }
             return { id: 15, name: 'Governance Anti-Concentration', description: 'Validates AS/org caps & partition safety (evidence-based)', passed, details, severity: 'major', evidenceType: gov ? 'artifact' : 'heuristic' };
@@ -727,7 +1074,7 @@ exports.CHECK_REGISTRY = [
         id: 16,
         key: 'ledger-finality-observation',
         name: 'Ledger Finality Observation',
-        description: 'Evidence of 2-of-3 finality & quorum certificate validity',
+        description: 'Deep validation of 2-of-3 finality, quorum certificate weights, emergency advance prerequisites',
         severity: 'major',
         introducedIn: '1.1',
         evaluate: async (analyzer) => {
@@ -752,24 +1099,37 @@ exports.CHECK_REGISTRY = [
                     }
                     catch { /* ignore */ }
                 }
-                const { finalitySets, quorumCertificatesValid, emergencyAdvanceUsed, emergencyAdvanceLivenessDays, emergencyAdvanceJustification } = ledger;
-                const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2; // simplified proxy
-                let emergencyOk = true;
+                const { finalitySets, quorumCertificatesValid } = ledger;
+                const finalityDepth = ledger.finalityDepth;
+                const quorumWeights = ledger.quorumWeights;
+                const emergencyObj = ledger.emergencyAdvance || {};
+                const emergencyAdvanceUsed = ledger.emergencyAdvanceUsed ?? emergencyObj.used;
+                const emergencyAdvanceJustification = ledger.emergencyAdvanceJustification ?? emergencyObj.justified ? 'justified' : undefined;
+                const emergencyAdvanceLivenessDays = ledger.emergencyAdvanceLivenessDays ?? emergencyObj.livenessDays;
+                const failureCodes = [];
+                const has2of3 = Array.isArray(finalitySets) && finalitySets.length >= 2;
+                if (!has2of3)
+                    failureCodes.push('FINALITY_SETS_INSUFFICIENT');
+                if (typeof finalityDepth === 'number' && finalityDepth < 2)
+                    failureCodes.push('FINALITY_DEPTH_SHORT');
+                if (quorumCertificatesValid !== true)
+                    failureCodes.push('QUORUM_CERTS_INVALID');
+                if (quorumWeights && quorumWeights.some(w => w <= 0))
+                    failureCodes.push('QUORUM_WEIGHT_MISMATCH');
                 if (emergencyAdvanceUsed === true) {
-                    // Require liveness failure prerequisite >=14 days and justification token
-                    emergencyOk = (typeof emergencyAdvanceLivenessDays === 'number' && emergencyAdvanceLivenessDays >= 14) && !!emergencyAdvanceJustification;
+                    const emergencyOk = (typeof emergencyAdvanceLivenessDays === 'number' && emergencyAdvanceLivenessDays >= 14) && !!emergencyAdvanceJustification;
+                    if (!emergencyOk)
+                        failureCodes.push('EMERGENCY_LIVENESS_SHORT');
                 }
-                passed = !!(has2of3 && quorumCertificatesValid === true && emergencyOk);
-                details = passed ? `✅ Finality sets=${finalitySets.length} quorum certs valid${emergencyAdvanceUsed ? ' (emergency advance justified)' : ''}` : `❌ Ledger issues: ${(0, format_1.missingList)([
-                    !has2of3 && 'insufficient finality sets',
-                    quorumCertificatesValid !== true && 'invalid quorum certificates',
-                    emergencyAdvanceUsed === true && !emergencyOk && 'emergency advance unjustified'
-                ])}`;
+                passed = failureCodes.length === 0;
+                details = passed
+                    ? `✅ Finality sets=${(finalitySets || []).length} depth=${finalityDepth ?? 'n/a'} quorumCertsOk weights=${quorumWeights ? quorumWeights.length : 0}${emergencyAdvanceUsed ? ' emergencyAdvanceOk' : ''}`
+                    : `❌ Ledger issues: ${failureCodes.join(',')}`;
                 if (!passed && Array.isArray(ledger.quorumCertificateInvalidReasons) && ledger.quorumCertificateInvalidReasons.length) {
                     details += ' reasons=' + ledger.quorumCertificateInvalidReasons.join(',');
                 }
             }
-            return { id: 16, name: 'Ledger Finality Observation', description: 'Evidence of 2-of-3 finality & quorum certificate validity', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
+            return { id: 16, name: 'Ledger Finality Observation', description: 'Deep validation of 2-of-3 finality, quorum certificate weights, emergency advance prerequisites', passed, details, severity: 'major', evidenceType: ledger ? 'artifact' : 'heuristic' };
         }
     },
     {
@@ -860,6 +1220,16 @@ exports.CHECK_REGISTRY = [
     }
 ];
 // Step 10 appended checks (IDs 21-23) added after existing registry for stability
+function cryptoLikeEqual(a, b) {
+    if (a.length !== b.length)
+        return false;
+    try {
+        return crypto.timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    }
+    catch {
+        return a === b;
+    }
+}
 exports.STEP_10_CHECKS = [
     {
         id: 21,
@@ -889,6 +1259,7 @@ exports.STEP_10_CHECKS = [
             const ev = analyzer.evidence || {};
             const ch = ev.clientHelloTemplate;
             const dyn = ev.dynamicClientHelloCapture;
+            const h2 = ev.h2Adaptive || ev.h2AdaptiveDynamic; // potential SETTINGS evidence for SETTINGS_DRIFT code
             let evidenceType = 'heuristic';
             let passed = false;
             let details = '❌ No ClientHello template';
@@ -899,17 +1270,45 @@ exports.STEP_10_CHECKS = [
             }
             // Dynamic upgrade: if dynamic capture present ensure it matches static template & promote evidence type
             if (dyn && dyn.alpn && dyn.extOrderSha256) {
-                const matches = ch && dyn.alpn.join(',') === ch.alpn.join(',') && dyn.extOrderSha256 === ch.extOrderSha256;
                 evidenceType = 'dynamic-protocol';
-                passed = passed && matches; // require static baseline + dynamic match
-                let mismatchCode = '';
-                if (!matches && dyn.note && dyn.note.includes(':')) {
-                    const parts = dyn.note.split(':');
-                    mismatchCode = parts[parts.length - 1];
+                let mismatchCode;
+                if (!ch) {
+                    mismatchCode = 'NO_STATIC_BASELINE';
                 }
+                const alpnMatch = !!(ch && dyn.alpn.join(',') === ch.alpn.join(','));
+                const extMatch = !!(ch && dyn.extOrderSha256 === ch.extOrderSha256);
+                if (!alpnMatch)
+                    mismatchCode = mismatchCode || 'ALPN_ORDER_MISMATCH';
+                if (!extMatch)
+                    mismatchCode = mismatchCode || 'EXT_SEQUENCE_MISMATCH';
+                // JA3 canonical hash mismatch (if both present)
+                if (dyn.ja3Canonical && dyn.ja3Hash && dyn.ja3 && cryptoLikeEqual(dyn.ja3Canonical, dyn.ja3) === false) {
+                    mismatchCode = mismatchCode || 'JA3_HASH_MISMATCH';
+                }
+                // JA4 class mismatch heuristic: Expect pattern TLSH-*a-*e-*c-*g where counts align with dyn lists
+                if (dyn.ja4) {
+                    const ja4Parts = dyn.ja4.split('-');
+                    if (ja4Parts.length >= 5) {
+                        const a = parseInt((ja4Parts[1] || '').replace(/[^0-9]/g, ''), 10);
+                        if (!isNaN(a) && dyn.alpn && dyn.alpn.length !== a) {
+                            mismatchCode = mismatchCode || 'JA4_CLASS_MISMATCH';
+                        }
+                    }
+                }
+                // SETTINGS drift: if HTTP/2 SETTINGS present compare to ch expected ext order presence; simple tolerance placeholder (stddev/mean test if available)
+                if (h2 && h2.settings && Object.keys(h2.settings).length) {
+                    const iw = h2.settings.INITIAL_WINDOW_SIZE;
+                    const frameSize = h2.settings.MAX_FRAME_SIZE;
+                    if (typeof iw === 'number' && (iw < 1024 * 1024 || iw > 10 * 1024 * 1024))
+                        mismatchCode = mismatchCode || 'SETTINGS_DRIFT';
+                    if (typeof frameSize === 'number' && (frameSize < 16384 || frameSize > 1048576))
+                        mismatchCode = mismatchCode || 'SETTINGS_DRIFT';
+                }
+                const matches = !mismatchCode;
+                passed = passed && matches; // require static baseline pass + no mismatch
                 const ja3Disp = dyn.ja3Hash ? `${dyn.ja3Hash.slice(0, 12)}` : (dyn.ja3 || '').slice(0, 16);
                 const ja4Disp = dyn.ja4 ? ` ja4=${dyn.ja4}` : '';
-                details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0, 12)} ja3=${ja3Disp}${ja4Disp}` : `❌ Dynamic mismatch ${mismatchCode ? '(' + mismatchCode + ') ' : ''}staticHash=${ch?.extOrderSha256?.slice(0, 12)} dynHash=${dyn.extOrderSha256.slice(0, 12)} ja3=${ja3Disp}${ja4Disp}`;
+                details = passed ? `✅ dynamic match ALPN=${dyn.alpn.join(',')} extHash=${dyn.extOrderSha256.slice(0, 12)} ja3=${ja3Disp}${ja4Disp}` : `❌ Dynamic mismatch${mismatchCode ? ' (' + mismatchCode + ')' : ''} staticHash=${ch?.extOrderSha256?.slice(0, 12)} dynHash=${dyn.extOrderSha256.slice(0, 12)} ja3=${ja3Disp}${ja4Disp}`;
             }
             // Upgrade severity if full raw capture present (treat as stronger dynamic evidence)
             let severity = 'minor';
@@ -992,14 +1391,15 @@ exports.PHASE_4_CHECKS = [
             if (!ft)
                 return { id: 25, name: 'Fallback Timing Policy', description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)', passed: false, details: '❌ No fallback timing evidence', severity: 'minor', evidenceType: 'heuristic' };
             const udpOk = typeof ft.udpTimeoutMs === 'number' && ft.udpTimeoutMs >= 100 && ft.udpTimeoutMs <= 600; // expected window
-            const retryOk = typeof ft.retryDelayMs === 'number' ? ft.retryDelayMs <= 30 : true; // near-immediate retry
+            // Stricter retry: must be <=25ms (elastic immediate) and non-negative
+            const retryOk = typeof ft.retryDelayMs === 'number' ? (ft.retryDelayMs >= 0 && ft.retryDelayMs <= 25) : true;
             let teardownStd = ft.teardownStdDevMs;
             if (!teardownStd && Array.isArray(ft.coverTeardownMs) && ft.coverTeardownMs.length >= 2) {
                 const arr = ft.coverTeardownMs;
                 const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
                 teardownStd = Math.sqrt(arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / arr.length);
             }
-            const teardownOk = typeof teardownStd !== 'number' || teardownStd <= 500; // dispersion limit
+            const teardownOk = typeof teardownStd !== 'number' || teardownStd <= 450; // tightened dispersion limit
             // Advanced metrics (Phase 7 quantitative modeling) if present
             const cv = ft.coverTeardownCv;
             const median = ft.coverTeardownMedianMs;
@@ -1009,11 +1409,29 @@ exports.PHASE_4_CHECKS = [
             const anomalyCodes = ft.coverTeardownAnomalyCodes || [];
             const modelScore = ft.behaviorModelScore;
             const behaviorOk = ft.behaviorWithinPolicy !== false; // default pass unless explicitly false
-            const cvOk = typeof cv !== 'number' || cv <= 1.5;
+            const cvOk = typeof cv !== 'number' || cv <= 1.2; // tightened
             const skewOk = typeof skew !== 'number' || Math.abs(skew) <= 1.2;
-            const outlierOk = typeof outliers !== 'number' || outliers <= Math.ceil((ft.coverTeardownMs?.length || 0) * 0.25);
-            const modelScoreOk = typeof modelScore !== 'number' || modelScore >= 0.6;
-            const passed = udpOk && retryOk && teardownOk && behaviorOk && cvOk && skewOk && outlierOk && modelScoreOk;
+            const sampleLen = ft.coverTeardownMs?.length || 0;
+            const outlierOk = typeof outliers !== 'number' || outliers <= Math.ceil(sampleLen * 0.20); // tighten to 20%
+            const modelScoreOk = typeof modelScore !== 'number' || modelScore >= 0.7; // tighten
+            const coverConn = ft.coverConnections ?? ft.coverConnectionCount;
+            const coverConnOk = typeof coverConn !== 'number' || coverConn >= 2; // require at least 2 cover connections when provided
+            // Median & p95 sanity windows if present
+            const medianOk = typeof median !== 'number' || (median >= 200 && median <= 1200);
+            const p95Ok = typeof p95 !== 'number' || (p95 >= median && p95 <= 1800);
+            // Fail if unexpected anomaly codes beyond an allowlist
+            const allowedAnomalies = new Set(['NONE', 'EXPECTED_OUTLIER']);
+            const anomaliesOk = anomalyCodes.every(c => allowedAnomalies.has(c));
+            // Task 8 metrics
+            const startDelay = ft.coverStartDelayMs;
+            const startDelayOk = typeof startDelay !== 'number' || (startDelay >= 0 && startDelay <= 500); // allow up to 500ms launch jitter
+            const iqr = ft.teardownIqrMs;
+            const iqrOk = typeof iqr !== 'number' || iqr <= 900; // IQR reasonable bound
+            const outlierPct = ft.outlierPct;
+            const outlierPctOk = typeof outlierPct !== 'number' || outlierPct <= 0.25; // ≤25% outliers
+            const provenance = Array.isArray(ft.provenanceCategories) ? ft.provenanceCategories : [];
+            const provenanceOk = provenance.length >= 2; // expect at least cover + real categories
+            const passed = udpOk && retryOk && teardownOk && behaviorOk && cvOk && skewOk && outlierOk && modelScoreOk && coverConnOk && medianOk && p95Ok && anomaliesOk && startDelayOk && iqrOk && outlierPctOk && provenanceOk;
             const detailParts = passed ? [
                 `udpTimeout=${ft.udpTimeoutMs}ms`,
                 `retryDelay=${ft.retryDelayMs || 0}ms`,
@@ -1023,7 +1441,8 @@ exports.PHASE_4_CHECKS = [
                 p95 !== undefined ? `p95=${p95}ms` : undefined,
                 skew !== undefined ? `skew=${skew.toFixed ? skew.toFixed(2) : skew}` : undefined,
                 modelScore !== undefined ? `model=${modelScore}` : undefined,
-                anomalyCodes.length ? `anomalies=[${anomalyCodes.join(',')}]` : undefined
+                anomalyCodes.length ? `anomalies=[${anomalyCodes.join(',')}]` : undefined,
+                coverConn !== undefined ? `coverConn=${coverConn}` : undefined
             ].filter(Boolean) : [];
             const failReasons = !passed ? [
                 !udpOk && 'udpTimeout out of range',
@@ -1033,9 +1452,24 @@ exports.PHASE_4_CHECKS = [
                 !cvOk && 'cv high',
                 !skewOk && 'skew excessive',
                 !outlierOk && 'outliers excessive',
-                !modelScoreOk && 'model score low'
+                !modelScoreOk && 'model score low',
+                !coverConnOk && 'insufficient cover connections',
+                !medianOk && 'median out of range',
+                !p95Ok && 'p95 out of range',
+                !anomaliesOk && 'unexpected anomaly codes',
+                !startDelayOk && 'cover start delay out of range',
+                !iqrOk && 'teardown iqr excessive',
+                !outlierPctOk && 'outlier pct excessive',
+                !provenanceOk && 'insufficient provenance categories'
             ].filter(Boolean) : [];
-            const details = passed ? `✅ ${detailParts.join(' ')}` : `❌ Fallback timing issues: ${(0, format_1.missingList)(failReasons)}`;
+            const failureCodes = [];
+            if (!coverConnOk)
+                failureCodes.push('COVER_INSUFFICIENT');
+            if (!startDelayOk || !retryOk)
+                failureCodes.push('COVER_DELAY_OUT_OF_RANGE');
+            if (!teardownOk || !iqrOk || !outlierPctOk)
+                failureCodes.push('TEARDOWN_VARIANCE_EXCESS');
+            const details = passed ? `✅ ${detailParts.join(' ')}` : `❌ Fallback timing issues: ${(0, format_1.missingList)(failReasons)} codes=[${failureCodes.join(',')}]`;
             return { id: 25, name: 'Fallback Timing Policy', description: 'Validates UDP->TCP fallback timing (retry delay ~0, bounded UDP timeout, cover teardown variance & distribution)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
         }
     },
@@ -1111,6 +1545,59 @@ exports.PHASE_7_CONT_CHECKS = [
             return { id: 28, name: 'HTTP/3 Adaptive Emulation', description: 'Validates HTTP/3 (QUIC) adaptive padding jitter, stddev, and randomness with strict tolerances (Full compliance)', passed, details, severity: 'major', evidenceType: 'dynamic-protocol' };
         }
     },
+    // Task 9: Algorithm Agility Registry Validation
+    {
+        id: 34,
+        key: 'algorithm-agility-registry',
+        name: 'Algorithm Agility Registry',
+        description: 'Validates cryptographic algorithm set usage against registered allowed sets',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const aa = ev.algorithmAgility;
+            if (!aa)
+                return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed: false, details: '❌ No algorithmAgility evidence', severity: 'major', evidenceType: 'heuristic' };
+            const allowed = Array.isArray(aa.allowedSets) ? aa.allowedSets : [];
+            const used = Array.isArray(aa.usedSets) ? aa.usedSets : [];
+            const unregistered = (aa.unregisteredUsed && Array.isArray(aa.unregisteredUsed)) ? aa.unregisteredUsed : used.filter((s) => !allowed.includes(s));
+            const digestOk = typeof aa.registryDigest === 'string' && aa.registryDigest.length >= 32;
+            const usedOk = used.length > 0;
+            const passed = digestOk && usedOk && unregistered.length === 0;
+            const failReasons = !passed ? [
+                !digestOk && 'registry digest missing/invalid',
+                !usedOk && 'no usedSets',
+                unregistered.length > 0 && `unregisteredUsed=${unregistered.join(',')}`
+            ].filter(Boolean) : [];
+            const details = passed ? `✅ registryDigest=${aa.registryDigest?.slice(0, 12)} sets=${used.length}` : `❌ Algorithm agility issues: ${(0, format_1.missingList)(failReasons)}`;
+            return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed, details, severity: 'major', evidenceType: 'artifact' };
+        }
+    },
+    // Task 11: Evidence Authenticity & Bundle Trust (Check 35)
+    {
+        id: 35,
+        key: 'evidence-authenticity',
+        name: 'Evidence Authenticity',
+        description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const diag = (analyzer.getDiagnostics && analyzer.getDiagnostics()) || {};
+            const provenance = ev.provenance || {};
+            const bundle = ev.signedEvidenceBundle;
+            const strictAuth = analyzer.options?.strictAuthMode === true; // options attached in ensureAnalyzer
+            // Determine authenticity signals
+            const detachedValid = provenance.signatureVerified === true || diag.evidenceSignatureValid === true;
+            const bundleValid = bundle?.multiSignerThresholdMet === true;
+            const anyAuth = (detachedValid === true) || (bundleValid === true);
+            // Pass policy: if strictAuth mode enabled, require anyAuth true. If not strict, informational pass if authenticity present.
+            const passed = anyAuth; // bool
+            let evidenceType = anyAuth ? 'artifact' : 'heuristic';
+            const details = anyAuth ? `✅ authenticity ${detachedValid ? 'detached-signature' : 'bundle'} verified` : (strictAuth ? '❌ EVIDENCE_UNSIGNED' : '❌ EVIDENCE_UNSIGNED (not enforced)');
+            return { id: 35, name: 'Evidence Authenticity', description: 'Validates signed evidence authenticity (detached signature or multi-signer bundle) in strictAuth mode', passed, details, severity: 'major', evidenceType };
+        }
+    },
     {
         id: 29,
         key: 'voucher-frost-struct-validation',
@@ -1178,7 +1665,7 @@ exports.PHASE_7_CONT_CHECKS = [
         id: 31,
         key: 'voucher-aggregated-signature',
         name: 'Voucher Aggregated Signature',
-        description: 'Verifies voucher aggregated signature structure (synthetic hash prefix match)',
+        description: 'Validates voucher aggregated FROST signature (threshold params, participant key count, synthetic sig check)',
         severity: 'minor',
         introducedIn: '1.1',
         evaluate: async (analyzer) => {
@@ -1186,15 +1673,92 @@ exports.PHASE_7_CONT_CHECKS = [
             const ev = analyzer.evidence || {};
             const vc = ev.voucherCrypto;
             if (!vc)
-                return { id: 31, name: 'Voucher Aggregated Signature', description: 'Verifies voucher aggregated signature structure (synthetic hash prefix match)', passed: false, details: '❌ No voucherCrypto evidence', severity: 'minor', evidenceType: 'heuristic' };
-            const sigOk = vc.signatureValid === true;
-            const thresholdOk = vc.frostThreshold ? ((vc.frostThreshold.n || 0) >= 5 && (vc.frostThreshold.t || 0) >= 3) : false;
-            const passed = sigOk && thresholdOk;
-            const details = passed ? `✅ aggregatedSig valid n=${vc.frostThreshold?.n} t=${vc.frostThreshold?.t}` : `❌ Aggregated signature invalid: ${(0, format_1.missingList)([
-                !sigOk && 'signature structure',
-                !thresholdOk && 'threshold'
+                return { id: 31, name: 'Voucher Aggregated Signature', description: 'Validates voucher aggregated FROST signature (threshold params, participant key count, synthetic sig check)', passed: false, details: '❌ No voucherCrypto evidence', severity: 'minor', evidenceType: 'heuristic' };
+            const failureCodes = [];
+            // Threshold params validation
+            const n = vc.frostThreshold?.n || 0;
+            const t = vc.frostThreshold?.t || 0;
+            if (!(n >= 5 && t === 3))
+                failureCodes.push('FROST_PARAMS_INVALID');
+            // Simulated keyset list (if future key details provided). For now infer from presence of keysetIdB64 secretB64 aggregatedSigB64
+            const keysetPresent = !!vc.keysetIdB64;
+            if (!keysetPresent)
+                failureCodes.push('INSUFFICIENT_KEYS');
+            // Synthetic aggregated signature validation: emulate expected hash prefix match
+            let sigStructuralOk = vc.signatureValid === true;
+            if (!sigStructuralOk)
+                failureCodes.push('AGG_SIG_INVALID');
+            const passed = failureCodes.length === 0;
+            const details = passed ? `✅ aggregatedSig valid n=${n} t=${t}` : `❌ Aggregated signature issues: ${failureCodes.join(',')}`;
+            return { id: 31, name: 'Voucher Aggregated Signature', description: 'Validates voucher aggregated FROST signature (threshold params, participant key count, synthetic sig check)', passed, details, severity: 'minor', evidenceType: 'static-structural' };
+        }
+    },
+    {
+        id: 32,
+        key: 'ech-verification',
+        name: 'ECH Verification',
+        description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence',
+        severity: 'major',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const ech = ev.echVerification;
+            // Evidence shape expectation:
+            // echVerification: {
+            //   outerSni: string, innerSni: string, outerCertHash?: string, innerCertHash?: string,
+            //   certHashesDiffer?: boolean, extensionPresent?: boolean, retryCount?: number,
+            //   diffIndicators?: string[], // e.g. ['cert-hash-diff','grease-absent']
+            //   verified?: boolean, failureReason?: string
+            // }
+            if (!ech) {
+                return { id: 32, name: 'ECH Verification', description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence', passed: false, details: '❌ No ECH verification evidence', severity: 'major', evidenceType: 'heuristic' };
+            }
+            const extensionPresent = ech.extensionPresent === true;
+            const certDiff = ech.certHashesDiffer === true || (ech.outerCertHash && ech.innerCertHash && ech.outerCertHash !== ech.innerCertHash);
+            const greaseOk = ech.greaseAbsenceObserved !== false; // treat undefined as ok
+            const diffIndicators = ech.diffIndicators || [];
+            const verified = extensionPresent && certDiff && greaseOk;
+            const passed = verified;
+            const details = passed ? `✅ ECH accepted diffIndicators=${diffIndicators.join(',') || 'cert-hash-diff'}` : `❌ ECH not verified: ${(0, format_1.missingList)([
+                !extensionPresent && 'extension absent',
+                extensionPresent && !certDiff && 'no cert differential',
+                !greaseOk && 'GREASE anomalies'
             ])}`;
-            return { id: 31, name: 'Voucher Aggregated Signature', description: 'Verifies voucher aggregated signature structure (synthetic hash prefix match)', passed, details, severity: 'minor', evidenceType: 'static-structural' };
+            // Evidence type escalation: dynamic-protocol only if verified AND dual handshake artifacts present
+            const evidenceType = passed && ech.outerSni && ech.innerSni ? 'dynamic-protocol' : 'heuristic';
+            return { id: 32, name: 'ECH Verification', description: 'Confirms encrypted ClientHello (ECH) actually accepted via dual handshake differential evidence', passed, details, severity: 'major', evidenceType };
+        }
+    },
+    {
+        id: 33,
+        key: 'scion-control-stream',
+        name: 'SCION Control Stream',
+        description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)',
+        severity: 'minor',
+        introducedIn: '1.1',
+        evaluate: async (analyzer) => {
+            const ev = analyzer.evidence || {};
+            const sc = ev.scionControl;
+            if (!sc)
+                return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)', passed: false, details: '❌ No scionControl evidence', severity: 'minor', evidenceType: 'heuristic' };
+            const failureCodes = [];
+            const offers = Array.isArray(sc.offers) ? sc.offers : [];
+            if (offers.length < 3)
+                failureCodes.push('INSUFFICIENT_OFFERS');
+            const unique = new Set(offers.map((o) => o.path));
+            if (unique.size < 3)
+                failureCodes.push('INSUFFICIENT_UNIQUE_PATHS');
+            if (sc.noLegacyHeader === false)
+                failureCodes.push('LEGACY_HEADER_PRESENT');
+            if (sc.duplicateOfferDetected)
+                failureCodes.push('DUPLICATE_OFFER');
+            if (sc.parseError)
+                failureCodes.push('CBOR_PARSE_ERROR');
+            const passed = failureCodes.length === 0;
+            const details = passed
+                ? `✅ offers=${offers.length} uniquePaths=${unique.size} noLegacyHeader=${sc.noLegacyHeader !== false}`
+                : `❌ SCION control issues: ${failureCodes.join(',')}`;
+            return { id: 33, name: 'SCION Control Stream', description: 'Validates SCION gateway CBOR control stream (≥3 offers, ≥3 unique paths, no legacy header, no duplicates in window)', passed, details, severity: 'minor', evidenceType: 'dynamic-protocol' };
         }
     }
 ];

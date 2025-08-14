@@ -1,5 +1,4 @@
 import * as fs from 'fs-extra';
-import * as path from 'path';
 import { AnalyzerDiagnostics } from './types';
 import { safeExec, isToolSkipped } from './safe-exec';
 import { FALLBACK_MAX_BYTES, DEFAULT_FALLBACK_STRING_MIN_LEN, DEFAULT_TOOL_TIMEOUT_MS } from './constants';
@@ -12,7 +11,7 @@ import { introspectBinary } from './binary-introspect';
 export class BinaryAnalyzer {
   private binaryPath: string;
   private verbose: boolean;
-  private dynamicProbe: boolean = false; // enable lightweight runtime '--help' probe enrichment
+  private dynamicProbe = false; // enable lightweight runtime '--help' probe enrichment
   private cachedAnalysis: Promise<{
     strings: string[];
     symbols: string[];
@@ -67,7 +66,9 @@ export class BinaryAnalyzer {
     }
     const maxRetries = 2;
     let attempt = 0;
-    while (true) {
+  // retry loop (maxRetries bounded)
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
       try {
         const res = fn ? await fn() : null;
         const dur = performance.now() - start;

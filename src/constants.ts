@@ -69,7 +69,7 @@ export function sanitizeName(name: string): string {
   // Normalize to NFC to reduce multi-codepoint equivalence issues, ignore errors silently
   try { name = name.normalize('NFC'); } catch { /* ignore */ }
   // Replace disallowed chars
-  let cleaned = name.replace(/[^A-Za-z0-9._-]+/g, '-');
+  let cleaned = name.replace(/[^A-Za-z0-9._.-]+/g, '-');
   // Collapse dashes
   cleaned = cleaned.replace(/-+/g, '-');
   // Trim leading/trailing dashes/periods (avoid hidden or awkward names)

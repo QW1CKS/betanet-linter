@@ -1,6 +1,43 @@
+## 1.1.0 - 2025-08-14
+
+Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a hardened 39‑check registry covering every §11 high‑level requirement plus auxiliary integrity / anti‑evasion surfaces. All tests (148) pass; provenance & SBOM generators upgraded; documentation de‑transitionalized. This version supersedes 1.0.0 which only partially surfaced 1.1 heuristics.
+
+### Highlights
+- Full decomposition of 13 §11 normative items into 39 granular checks (static, dynamic, artifact, heuristic, defensive) with explicit mapping in README.
+- Evidence schema v2+ (binaryMeta, clientHelloTemplate, noisePatternDetail, negative, mix variance, fallback timing, jitter randomness, powAdaptive, voucherCrypto, algorithmAgility, governance/ledger, provenance authenticity).
+- Dynamic harness extensions: Noise rekey policy, HTTP/2 & HTTP/3 adaptive emulation, fallback timing distribution, mix diversity & variance, adaptive PoW trend, statistical jitter randomness.
+- Authenticity & anti‑evasion: detached / multi‑signer evidence signature gating (check 35), multi‑signal scoring & keyword padding detection (check 18), forbidden artifact hash denial (39), negative assertions (23).
+- Algorithm agility registry validation (34) & PQ boundary enforcement (10, 38) with override safeguard.
+- SBOM enhancements: bom‑ref, dependency component synthesis (CycloneDX & SPDX), feature tagging (betanet.feature), metadata.tools, SPDX relationship fixes.
+- Governance & ledger: diversity volatility thresholds, quorum certificate parsing scaffolds, emergency advance gating (7, 15, 16).
+- Reproducible build & SLSA provenance elevation (9) with authenticity gate (35) and failing/strict auth modes.
+
+### Upgrade Notes
+- Heuristic passes excluded by default (strict mode); use `--allow-heuristic` during transition or supply artifact/dynamic evidence via `--evidence-file` / harness.
+- Deprecated `--sbom-format` retained with warning; prefer `--format`.
+- Added README §11→39 decomposition table for operator clarity.
+- Lint configuration updated to resolve `@typescript-eslint` ruleset naming for CI stability.
+
+### Internal Metrics
+- Test suites: 13 (148 tests) passing.
+- Check registry IDs: 1–39 stable; adding a new check remains an append‑only operation.
+- Evidence fields: backward compatible (schema v2 retains prior fields; new consumers ignore unknown keys).
+
+### Security & Integrity
+- Multi‑signal gating reduces single-surface spoofing risk.
+- Signature verification & DSSE thresholds configurable (detached & bundle modes).
+- Forbidden hash & negative assertions widen denial for deprecated constructs.
+
+### Known Optional Enhancements (Deferred)
+- Full raw JA3/JA4 canonicalization & QUIC Initial exhaustive parse.
+- Extended HTTP/3 adaptive distribution metrics & additional confidence intervals.
+- Long‑window governance diversity corpus & cryptographic quorum certificate signature validation.
+- Full cryptographic verification of aggregated voucher signatures (beyond placeholder hash prefixes).
+- Transparency log + key rotation policy for evidence signing.
+
 ## Unreleased
 
-This section tracks post‑1.1 optional enhancements and polish items. Core Betanet 1.1 normative coverage is COMPLETE (39 checks: 1–39) with authenticity, adaptive PoW statistics, statistical jitter randomness, PQ boundary, governance diversity, negative assertions, forbidden artifact hash denial, algorithm agility registry validation, aggregated voucher signature placeholder crypto check, multi‑signal anti‑evasion scoring, and reproducible build/SLSA provenance verification all implemented and tested.
+Post‑1.1 optional enhancements and polish items (see deferred list above). No breaking changes scheduled; future work will aim for additive schema expansions and optional flags.
 
 ### Added (since 1.0 baseline, historical aggregation)
 - Evidence schema v2+ (binaryMeta, clientHelloTemplate hash, noisePatternDetail, negative assertions) and later authenticity / adaptive PoW / jitter evidence fields.

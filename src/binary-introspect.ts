@@ -2,7 +2,7 @@
 // Extracts format, section names (best-effort), sample of import-like strings and debug indicator.
 
 import * as fs from 'fs-extra';
-import * as path from 'path';
+// removed unused path import
 
 export interface BinaryIntrospection {
   format: 'elf' | 'pe' | 'macho' | 'unknown';

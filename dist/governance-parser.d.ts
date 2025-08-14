@@ -53,5 +53,6 @@ export declare function evaluateHistoricalDiversityAdvanced(series: {
     advancedStable: boolean;
     volatility: number;
     maxWindowShare: number;
+    maxDeltaShare: number;
 };
 //# sourceMappingURL=governance-parser.d.ts.map

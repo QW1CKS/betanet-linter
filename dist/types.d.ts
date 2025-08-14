@@ -31,6 +31,19 @@ export interface Evidence {
         pqDateOk?: boolean;
         withinPolicy?: boolean;
     };
+    scionControl?: {
+        offers?: {
+            path: string;
+            latencyMs?: number;
+            expiresAt?: string;
+        }[];
+        rawCborB64?: string;
+        uniquePaths?: number;
+        noLegacyHeader?: boolean;
+        duplicateOfferDetected?: boolean;
+        duplicateWindowSec?: number;
+        parseError?: string;
+    };
 }
 export interface ComplianceCheck {
     id: number;
@@ -161,6 +174,7 @@ export interface CheckOptions {
     dsseRequiredKeys?: string;
     dsseThreshold?: number;
     evidenceBundleFile?: string;
+    strictAuthMode?: boolean;
 }
 export interface SBOMOptions {
     format: 'cyclonedx' | 'spdx' | 'cyclonedx-json' | 'spdx-json';
@@ -186,9 +200,11 @@ export interface IngestedEvidence {
         verified?: boolean;
         sourceDateEpoch?: number;
         rebuildDigestMismatch?: boolean;
+        rebuildDigestMatch?: boolean;
         materialsValidated?: boolean;
         materialsMismatchCount?: number;
         materialsComplete?: boolean;
+        toolchainDiff?: number;
         signatureVerified?: boolean;
         signatureError?: string;
         dsseEnvelopeVerified?: boolean;
@@ -196,6 +212,8 @@ export interface IngestedEvidence {
         dsseVerifiedSignerCount?: number;
         dsseThresholdMet?: boolean;
         dsseRequiredKeysPresent?: boolean;
+        dsseRequiredSignerThreshold?: number;
+        dsseRequiredSignerCount?: number;
         dsseSignerDetails?: {
             keyid?: string;
             verified: boolean;
@@ -220,6 +238,10 @@ export interface IngestedEvidence {
         coverTeardownMs?: number[];
         withinPolicy?: boolean;
         teardownStdDevMs?: number;
+        coverStartDelayMs?: number;
+        teardownIqrMs?: number;
+        outlierPct?: number;
+        provenanceCategories?: string[];
     };
     statisticalVariance?: {
         jitterStdDevMs?: number;
@@ -257,7 +279,22 @@ export interface IngestedEvidence {
         withinPolicy?: boolean;
     };
     governance?: any;
-    ledger?: any;
+    ledger?: {
+        finalitySets?: string[];
+        quorumCertificatesValid?: boolean;
+        quorumCertificatesCbor?: string[];
+        quorumCertificateInvalidReasons?: string[];
+        finalityDepth?: number;
+        quorumWeights?: number[];
+        emergencyAdvanceUsed?: boolean;
+        emergencyAdvanceJustification?: string;
+        emergencyAdvanceLivenessDays?: number;
+        emergencyAdvance?: {
+            used?: boolean;
+            justified?: boolean;
+            livenessDays?: number;
+        };
+    };
     governanceHistoricalDiversity?: {
         series?: {
             timestamp: string;
@@ -265,6 +302,12 @@ export interface IngestedEvidence {
         }[];
         maxASShareDropPct?: number;
         stable?: boolean;
+        volatility?: number;
+        maxWindowShare?: number;
+        maxDeltaShare?: number;
+        avgTop3?: number;
+        degradationPct?: number;
+        advancedStable?: boolean;
     };
     mix?: {
         samples?: number;
@@ -401,6 +444,12 @@ export interface IngestedEvidence {
         bucketCount?: number;
         distinctScopes?: number;
         scopeRefillVariancePct?: number;
+    };
+    algorithmAgility?: {
+        registryDigest?: string;
+        allowedSets?: string[];
+        usedSets?: string[];
+        unregisteredUsed?: string[];
     };
     negative?: {
         forbiddenPresent?: string[];
