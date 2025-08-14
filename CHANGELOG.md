@@ -54,6 +54,11 @@ Betanet 1.1 normative closure release. Expands initial 11 baseline checks to a h
 ## Unreleased
 
 ### Task 11 Completion: Provenance & Evidence Authenticity Hardening
+### Task 12 Completion: Algorithm Agility Registry Enforcement
+- Expanded Check 34 with schema/digest validation and granular failure codes: REGISTRY_DIGEST_INVALID, REGISTRY_SCHEMA_INVALID, NO_USED_SETS, UNREGISTERED_SET_PRESENT, UNKNOWN_COMBO, MAPPING_INVALID, ALGORITHM_MISMATCH
+- Added extended evidence fields (suiteMapping, mismatches, unknownCombos, observedSuites) and upgraded types
+- Added comprehensive positive + negative tests in final-compliance-tasks suite
+- Updated ROADMAP to mark Task 12 complete with caveats for future cryptographic suite canonicalization & deeper schema validation
 - Added granular authenticity failure codes in Check 35: SIG_DETACHED_INVALID, BUNDLE_THRESHOLD_UNMET, BUNDLE_SIGNATURE_INVALID, MISSING_AUTH_SIGNALS, EVIDENCE_UNSIGNED (non-strict informational)
 - strictAuthMode now enforces presence of either verified detached signature or multi-signer bundle threshold; non-strict mode surfaces unsigned state without blocking
 - Extended tests (Task 11 section) covering pass (detached + bundle) and each new negative scenario

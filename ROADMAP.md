@@ -325,9 +325,10 @@ The following additional items were identified as still incomplete for a strictl
   - New authenticity failure codes (Check 35): SIG_DETACHED_INVALID (detached signature attempted but invalid), BUNDLE_THRESHOLD_UNMET (bundle present but threshold unmet), BUNDLE_SIGNATURE_INVALID (one or more bundle entry signatures invalid), MISSING_AUTH_SIGNALS (no detached or bundle authenticity signals), EVIDENCE_UNSIGNED (non-strict mode informational fallback). Passing when either detached signature verified or multi-signer bundle threshold met.
   - Tests: Added positive detached & bundle pass plus negative scenarios for each new failure code in `final-compliance-tasks.test.ts`.
   - Caveats (non-blocking): Real cryptographic verification for multi-signer bundle (currently flag-based), canonical JSON normalization before hashing, key allow/deny list policy ingestion, per-entry signer identity validation, aggregation of DSSE + bundle interplay (combined threshold policy), tamper-proof hash chain verification & signature caching.
-12. [ ] Algorithm Agility Registry Enforcement
-  - Parse registry artifact (allowed cipher/hash/KEM sets); verify used sets ⊆ allowed; unregisteredUsed empty; failure on unknown combos.
-  - Caveats: canonical registry hash, strict parsing (schema validation), mapping binary-observed suites to registry names, mismatch diff reporting & tests.
+12. [x] Algorithm Agility Registry Enforcement
+  - Implemented: Check 34 upgraded to enforce registry digest format (hex ≥32 chars), schema validity, used set non-empty, used ⊆ allowed, mapping diagnostics (suiteMapping), detection of unregistered sets, unknown combos, invalid mapping entries, and expected vs actual mismatches. New failure codes: REGISTRY_DIGEST_INVALID, REGISTRY_SCHEMA_INVALID, NO_USED_SETS, UNREGISTERED_SET_PRESENT, UNKNOWN_COMBO, MAPPING_INVALID, ALGORITHM_MISMATCH.
+  - Tests: Added positive pass plus negative cases for each failure category in `final-compliance-tasks.test.ts` (legacy tests updated to expect new codes).
+  - Caveats (non-blocking): Canonical registry artifact hashing (currently superficial), deeper schema JSON Schema validation, cryptographic suite canonicalization (mapping multiple observed forms to one logical set), diff pretty-print of mismatches, dynamic extraction of suites from real binaries vs synthetic evidence, future allowlist version pin & provenance of registry source.
 13. [ ] Post-Quantum Mandatory Date Gate (2027‑01‑01)
   - Enforce failure if hybrid X25519-Kyber768 absent after date (PQ_PAST_DUE) or present prematurely without override (PQ_EARLY_WITHOUT_OVERRIDE).
   - Caveats: reliable UTC date sourcing, override mechanism (env/config) audit logging, test matrix around boundary (±1 day) with simulated clock.

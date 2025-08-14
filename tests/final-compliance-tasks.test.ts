@@ -646,20 +646,20 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       expect(check34.passed).toBe(true);
     });
 
-    it('fails when unregistered set present', async () => {
-      const aa = { registryDigest: 'abcdef1234567890abcdef1234567890', allowedSets: ['TLS_AES_128_GCM_SHA256+X25519'], usedSets: ['TLS_AES_128_GCM_SHA256+X25519','UNREGISTERED_CIPHER+FOO'] };
+    it('fails when unregistered set present (UNREGISTERED_SET_PRESENT)', async () => {
+      const aa = { registryDigest: 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890', allowedSets: ['TLS_AES_128_GCM_SHA256+X25519'], usedSets: ['TLS_AES_128_GCM_SHA256+X25519','UNREGISTERED_CIPHER+FOO'] };
       const result = await runWithAnalyzer(analyzerForAA(aa));
       const check34 = result.checks.find(c => c.id === 34)!;
       expect(check34.passed).toBe(false);
-      expect(check34.details).toMatch(/unregisteredUsed/);
+      expect(check34.details).toMatch(/UNREGISTERED_SET_PRESENT/);
     });
 
-    it('fails when registry digest missing', async () => {
-      const aa = { allowedSets: ['A'], usedSets: ['A'] };
+    it('fails when registry digest invalid (REGISTRY_DIGEST_INVALID)', async () => {
+      const aa = { registryDigest: '123', allowedSets: ['A'], usedSets: ['A'] };
       const result = await runWithAnalyzer(analyzerForAA(aa));
       const check34 = result.checks.find(c => c.id === 34)!;
       expect(check34.passed).toBe(false);
-      expect(check34.details).toMatch(/registry digest missing/);
+      expect(check34.details).toMatch(/REGISTRY_DIGEST_INVALID/);
     });
   });
 
@@ -852,6 +852,65 @@ describe('Final Compliance Tasks (1-16) – Tracking Suite', () => {
       const result = await runWithAnalyzer(analyzerForPow(pow, rl));
       const check36 = result.checks.find(c => c.id === 36)!;
       expect(check36.details).toMatch(/BUCKET_SATURATION_EXCESS/);
+    });
+  });
+
+  // Task 13 (renumbered in roadmap original list -> here focusing on Algorithm Agility now as Task 12 completion): Algorithm Agility Registry Enforcement (Check 34)
+  describe('Task 12: Algorithm Agility Registry Enforcement (Check 34)', () => {
+    function analyzerForAgility(aa: any) {
+      return {
+        analyze: () => Promise.resolve({ strings: ['algo','registry'], symbols: [], dependencies: [], fileFormat: 'ELF', architecture: 'x86_64', size: 1 }),
+        evidence: { algorithmAgility: aa }
+      } as any;
+    }
+    it('passes with valid registry digest, schema, used ⊆ allowed', async () => {
+      const aa = { registryDigest: 'a'.repeat(64), allowedSets: ['TLS_AES_128_GCM_SHA256+X25519','CHACHA20_POLY1305_SHA256+X25519'], usedSets: ['TLS_AES_128_GCM_SHA256+X25519'], schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForAgility(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(true);
+      expect(check34.details).toMatch(/registryDigest=/);
+    });
+    it('fails with REGISTRY_DIGEST_INVALID when digest malformed', async () => {
+      const aa = { registryDigest: '123', allowedSets: ['A'], usedSets: ['A'], schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForAgility(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/REGISTRY_DIGEST_INVALID/);
+    });
+    it('fails with NO_USED_SETS when used empty', async () => {
+      const aa = { registryDigest: 'b'.repeat(64), allowedSets: ['A'], usedSets: [], schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForAgility(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/NO_USED_SETS/);
+    });
+    it('fails with UNREGISTERED_SET_PRESENT when used contains unallowed set', async () => {
+      const aa = { registryDigest: 'c'.repeat(64), allowedSets: ['A'], usedSets: ['A','B'], schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForAgility(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/UNREGISTERED_SET_PRESENT/);
+    });
+    it('fails with MAPPING_INVALID when mapping has invalid entry', async () => {
+      const aa = { registryDigest: 'd'.repeat(64), allowedSets: ['A'], usedSets: ['A'], suiteMapping: [{ observed: 'raw1', mapped: 'A', valid: true }, { observed: 'raw2', valid: false }], schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForAgility(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/MAPPING_INVALID/);
+    });
+    it('fails with UNKNOWN_COMBO when unknownCombos present', async () => {
+      const aa = { registryDigest: 'e'.repeat(64), allowedSets: ['A'], usedSets: ['A'], unknownCombos: ['weird+suite'], schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForAgility(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/UNKNOWN_COMBO/);
+    });
+    it('fails with ALGORITHM_MISMATCH when mismatches present', async () => {
+      const aa = { registryDigest: 'f'.repeat(64), allowedSets: ['A'], usedSets: ['A'], mismatches: [{ expected: 'A', actual: 'B' }], schemaValid: true };
+      const result = await runWithAnalyzer(analyzerForAgility(aa));
+      const check34 = result.checks.find(c => c.id === 34)!;
+      expect(check34.passed).toBe(false);
+      expect(check34.details).toMatch(/ALGORITHM_MISMATCH/);
     });
   });
 

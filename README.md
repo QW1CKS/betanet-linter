@@ -88,7 +88,7 @@ JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCou
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Diversity volatility/window/delta/top3 + 7d degradation, gap ratio, spike detection enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Bounds: udpTimeout 100–600ms, retry<=25ms, coverConn≥2, teardownStd<=450ms, CV≤1.2, |skew|≤1.2, outliers≤20%, modelScore≥0.7, median 200–1200ms, p95≤1800ms, startDelay≤500ms, IQR≤900ms, outlierPct≤25%, ≥2 provenance categories |
 |12 Privacy hop enforcement (balanced/strict) | 11, 17 | dynamic-protocol | Full | Strict mode hop depth + uniqueness ratio + diversity index + entropy/no-early-reuse safeguards |
-|13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity |
+|13 Reproducible builds & SLSA provenance | 9, 35 | artifact | Full | Predicate type, builder ID, digest & materials validation, DSSE signer threshold, detached signature / bundle authenticity (codes: SIG_DETACHED_INVALID, BUNDLE_THRESHOLD_UNMET, BUNDLE_SIGNATURE_INVALID, MISSING_AUTH_SIGNALS) |
 | – Algorithm agility registry | 34 | artifact | Full | Allowed vs used sets; unregisteredUsed empty |
 | – Statistical jitter randomness | 26, 37 | dynamic-protocol | Full | Jitter variance + randomness pValue > 0.01, adequate samples |
 | – SCION control stream path failover metrics | 33 | dynamic-protocol | Full | Path switch latency & probe/backoff/timestamp skew + signature/schema flags |
@@ -279,7 +279,7 @@ betanet-lint check /path/to/binary --verbose
 
 ## Compliance Checks
 
-Registry (39 checks): foundation (1–23), rate‑limit & fallback/jitter (24–26), mix variance & HTTP/3 (27–28), algorithm agility & payment/voucher deepening (29–34), authenticity & advanced statistical / PQ boundary / forbidden hashes (35–39).
+Registry (39 checks): foundation (1–23), rate‑limit & fallback/jitter (24–26), mix variance & HTTP/3 (27–28), algorithm agility & payment/voucher deepening (29–34) with enhanced algorithm agility failure codes (REGISTRY_DIGEST_INVALID, REGISTRY_SCHEMA_INVALID, NO_USED_SETS, UNREGISTERED_SET_PRESENT, UNKNOWN_COMBO, MAPPING_INVALID, ALGORITHM_MISMATCH), authenticity & advanced statistical / PQ boundary / forbidden hashes (35–39).
 
 Architecture note: All checks are declared in `check-registry.ts` (IDs 1–23 after Step 10). New checks require only one object append. Structural augmentation & evidence schema population occur in `analyzer.ts` (static patterns + binary introspection) and specialized modules (`static-parsers.ts`, `binary-introspect.ts`). Dynamic ClientHello calibration now emits a heuristic JA3 string plus `ja3Hash` (MD5 over the canonical tuple) when OpenSSL capture succeeds (`captureQuality: parsed-openssl`). This is a precursor to full raw packet JA3/JA4 capture.
 

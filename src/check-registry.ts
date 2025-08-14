@@ -1679,31 +1679,53 @@ export const PHASE_7_CONT_CHECKS: CheckDefinitionMeta[] = [
     }
   }
   ,
-  // Task 9: Algorithm Agility Registry Validation
+  // Task 12: Algorithm Agility Registry Enforcement (upgraded)
   {
     id: 34,
     key: 'algorithm-agility-registry',
     name: 'Algorithm Agility Registry',
-    description: 'Validates cryptographic algorithm set usage against registered allowed sets',
+    description: 'Validates cryptographic algorithm set usage against registered allowed sets (schema, mapping, diffs)',
     severity: 'major',
     introducedIn: '1.1',
     evaluate: async (analyzer: any) => {
       const ev = analyzer.evidence || {};
       const aa = ev.algorithmAgility;
-      if (!aa) return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed: false, details: '❌ No algorithmAgility evidence', severity: 'major', evidenceType: 'heuristic' };
+      if (!aa) return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets (schema, mapping, diffs)', passed: false, details: '❌ No algorithmAgility evidence', severity: 'major', evidenceType: 'heuristic' };
+      const failureCodes: string[] = [];
       const allowed = Array.isArray(aa.allowedSets) ? aa.allowedSets : [];
       const used = Array.isArray(aa.usedSets) ? aa.usedSets : [];
-  const unregistered = (aa.unregisteredUsed && Array.isArray(aa.unregisteredUsed)) ? aa.unregisteredUsed : used.filter((s: string) => !allowed.includes(s));
-      const digestOk = typeof aa.registryDigest === 'string' && aa.registryDigest.length >= 32;
-      const usedOk = used.length > 0;
-      const passed = digestOk && usedOk && unregistered.length === 0;
-      const failReasons = !passed ? [
-        !digestOk && 'registry digest missing/invalid',
-        !usedOk && 'no usedSets',
-        unregistered.length > 0 && `unregisteredUsed=${unregistered.join(',')}`
-      ].filter(Boolean) : [];
-      const details = passed ? `✅ registryDigest=${aa.registryDigest?.slice(0,12)} sets=${used.length}` : `❌ Algorithm agility issues: ${missingList(failReasons)}`;
-      return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets', passed, details, severity: 'major', evidenceType: 'artifact' };
+      const digestOk = typeof aa.registryDigest === 'string' && /^[a-f0-9]{32,64}$/i.test(aa.registryDigest || '');
+      if (!digestOk) failureCodes.push('REGISTRY_DIGEST_INVALID');
+      const schemaOk = aa.schemaValid !== false; // default true unless explicitly false
+      if (!schemaOk) failureCodes.push('REGISTRY_SCHEMA_INVALID');
+      const hasUsed = used.length > 0;
+      if (!hasUsed) failureCodes.push('NO_USED_SETS');
+      // Compute unregistered sets if not provided
+  const unregistered = Array.isArray(aa.unregisteredUsed) ? aa.unregisteredUsed : used.filter((s: string) => !allowed.includes(s));
+      if (unregistered.length > 0) failureCodes.push('UNREGISTERED_SET_PRESENT');
+      // Mapping diagnostics
+      const mapping = Array.isArray(aa.suiteMapping) ? aa.suiteMapping : [];
+      const unknownCombos = Array.isArray(aa.unknownCombos) ? aa.unknownCombos : [];
+      if (unknownCombos.length > 0) failureCodes.push('UNKNOWN_COMBO');
+  const invalidMappings = mapping.filter((m: any) => m.valid === false);
+      if (invalidMappings.length > 0) failureCodes.push('MAPPING_INVALID');
+      // Mismatch diff (expected vs actual) indicates usage drift
+      const mismatches = Array.isArray(aa.mismatches) ? aa.mismatches : [];
+      if (mismatches.length > 0) failureCodes.push('ALGORITHM_MISMATCH');
+      const passed = failureCodes.length === 0;
+      const detailParts: string[] = [];
+      if (passed) {
+        detailParts.push(`registryDigest=${aa.registryDigest?.slice(0,12)}`);
+        detailParts.push(`used=${used.length}`);
+        if (mapping.length) detailParts.push(`mapped=${mapping.length}`);
+      } else {
+        detailParts.push(`failCodes=[${failureCodes.join(',')}]`);
+        if (unregistered.length) detailParts.push(`unregistered=[${unregistered.join(',')}]`);
+        if (unknownCombos.length) detailParts.push(`unknownCombos=${unknownCombos.length}`);
+        if (mismatches.length) detailParts.push(`mismatches=${mismatches.length}`);
+      }
+      const details = (passed ? '✅ ' : '❌ ') + 'Algorithm agility ' + (passed ? 'ok ' : 'issues ') + detailParts.join(' ');
+      return { id: 34, name: 'Algorithm Agility Registry', description: 'Validates cryptographic algorithm set usage against registered allowed sets (schema, mapping, diffs)', passed, details, severity: 'major', evidenceType: passed ? 'artifact' : 'heuristic' };
     }
   }
   ,

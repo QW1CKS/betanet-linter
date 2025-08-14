@@ -248,6 +248,18 @@ export interface IngestedEvidence {
     bundleSha256?: string; // hash over concatenated entry hashes
     multiSignerThresholdMet?: boolean; // >=2 signers present
   };
+  // Task 12: Algorithm agility registry artifact
+  algorithmAgility?: {
+    allowedSets?: string[]; // registry-declared allowed cipher/KEM/hash profile identifiers
+    usedSets?: string[]; // sets observed in binary / runtime capture
+    unregisteredUsed?: string[]; // explicit list of unregistered sets (may be computed)
+    registryDigest?: string; // canonical SHA256 (hex) of registry artifact
+    observedSuites?: string[]; // raw observed crypto suites before mapping
+    suiteMapping?: { observed: string; mapped?: string; valid: boolean; reason?: string }[]; // mapping diagnostics
+    unknownCombos?: string[]; // suite combos not understood / parse failures
+    mismatches?: { expected: string; actual: string }[]; // diff between expected baseline and actual mapping
+    schemaValid?: boolean; // schema / shape validation flag
+  };
   // Phase 7: quantitative fallback timing evidence
   fallbackTiming?: {
     udpTimeoutMs?: number; // observed UDP wait before TCP attempt
@@ -482,13 +494,6 @@ export interface IngestedEvidence {
   capacityP95?: number; // 95th percentile capacity across buckets
   capacityStdDev?: number; // standard deviation of capacities
   refillVarianceTrend?: number; // optional trend metric over observed refills
-  };
-  // Task 9: Algorithm agility registry validation
-  algorithmAgility?: {
-    registryDigest?: string; // sha256 hex of registry artifact
-    allowedSets?: string[]; // e.g., 'TLS_AES_128_GCM_SHA256+X25519', 'CHACHA20_POLY1305_SHA256+X25519'
-    usedSets?: string[]; // sets extracted from binary/evidence
-    unregisteredUsed?: string[]; // computed: used - allowed
   };
   // SCION control stream evidence (Outstanding Spec Gap Task 4)
   scionControl?: {
