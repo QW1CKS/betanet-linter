@@ -1480,6 +1480,7 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
     evaluate: async (analyzer) => {
       const ev: any = (analyzer as any).evidence;
       const mix = ev?.mix;
+      const opt = (analyzer as any).options || {};
   let passed = false;
       let details = '❌ No mix diversity evidence';
       if (mix && typeof mix === 'object') {
@@ -1488,16 +1489,19 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         const ratio = samples ? unique / samples : 0;
         const pathLengths: number[] = mix.pathLengths || [];
         const minLen = pathLengths.length ? Math.min(...pathLengths) : 0;
+        const baseUniq = Number.isFinite(opt.mixUniquenessBase) ? opt.mixUniquenessBase : 0.8;
+        const minSamplesReq = Number.isFinite(opt.mixMinSamples) ? opt.mixMinSamples : 5;
         const depthOk = minLen >= (mix.minHopsBalanced || 2);
-        // Uniqueness thresholds scale with sample size
-        let required = 0.8;
-        if (samples < 10) required = 0.7;
-        if (samples < 6) required = 0.6;
+        // Adaptive uniqueness requirement scaling with sample size unless overridden by mixUniquenessBase
+        let required = baseUniq;
+        if (samples < 10) required = Math.min(required, baseUniq - 0.1);
+        if (samples < 6) required = Math.min(required, baseUniq - 0.2);
         const uniquenessOk = ratio >= required;
         const diversityIndex = mix.diversityIndex || 0; // require some baseline dispersion
-        const diversityOk = diversityIndex >= 0.4; // crude threshold
+        const diversityIdxMin = Number.isFinite(opt.mixDiversityIndexMin) ? opt.mixDiversityIndexMin : 0.4;
+        const diversityOk = diversityIndex >= diversityIdxMin;
         // Task 6 extended metrics
-        const requiredUniqueBeforeReuse = mix.requiredUniqueBeforeReuse || 8;
+        const requiredUniqueBeforeReuse = opt.mixRequiredUniqueBeforeReuse || mix.requiredUniqueBeforeReuse || 8;
         // Determine first reuse index if hopSets present
         let firstReuseIndex = mix.firstReuseIndex;
         if (Array.isArray(mix.hopSets) && firstReuseIndex === undefined) {
@@ -1519,7 +1523,8 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           for (const c of Object.values(counts)) { const p = c/total; H -= p * Math.log2(p); }
           entropyBits = H;
         }
-        const entropyOk = (entropyBits||0) >= 4; // baseline threshold
+        const entropyMin = Number.isFinite(opt.mixEntropyMinBits) ? opt.mixEntropyMinBits : 4;
+        const entropyOk = (entropyBits||0) >= entropyMin;
         // Task 20 variance & entropy stability metrics
         const pathLenStdDev = typeof mix.pathLengthStdDev === 'number' ? mix.pathLengthStdDev : undefined;
         const pathLenStdErr = typeof mix.pathLengthStdErr === 'number' ? mix.pathLengthStdErr : undefined;
@@ -1530,13 +1535,16 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
         let varianceOk = true;
         if (varianceMetricsPresent) {
           const mean = typeof mix.pathLengthMean === 'number' ? mix.pathLengthMean : (pathLengths.reduce((a,b)=>a+b,0)/(pathLengths.length||1));
+          const stdDevMaxFactor = Number.isFinite(opt.mixPathLenStdDevMaxFactor) ? opt.mixPathLenStdDevMaxFactor : 1.5;
+          const ci95WidthMaxFactor = Number.isFinite(opt.mixCI95WidthMaxFactor) ? opt.mixCI95WidthMaxFactor : 1.2;
           if (mean > 0) {
-            if (pathLenStdDev === 0 && samples >= 5 && ratio < 1) varianceOk = false; // zero variance suspicious unless all unique & small
-            if (pathLenStdDev !== undefined && pathLenStdDev > mean * 1.5) varianceOk = false; // too dispersed
+            if (pathLenStdDev === 0 && samples >= minSamplesReq && ratio < 1) varianceOk = false; // zero variance suspicious unless all unique & small
+            if (pathLenStdDev !== undefined && pathLenStdDev > mean * stdDevMaxFactor) varianceOk = false; // too dispersed
           }
-          if (ci95Width !== undefined && ci95Width > Math.max(2, mean*1.2)) varianceOk = false; // CI too wide
+          if (ci95Width !== undefined && ci95Width > Math.max(2, mean*ci95WidthMaxFactor)) varianceOk = false; // CI too wide
         }
-        const entropyConfidenceOk = entropyConfidence === undefined || entropyConfidence >= 0.5; // require at least moderate confidence when provided
+        const entropyConfidenceMin = Number.isFinite(opt.mixEntropyConfidenceMin) ? opt.mixEntropyConfidenceMin : 0.5;
+        const entropyConfidenceOk = entropyConfidence === undefined || entropyConfidence >= entropyConfidenceMin; // require at least moderate confidence when provided
         // ASN / Org diversity (derived if mappings and hopSets provided)
         let asDiv = mix.asDiversityIndex;
         let orgDiv = mix.orgDiversityIndex;
@@ -1550,31 +1558,50 @@ export const CHECK_REGISTRY: CheckDefinitionMeta[] = [
           if (asDiv === undefined) asDiv = asSet.size / Math.max(1,nodeCount);
           if (orgDiv === undefined) orgDiv = orgSet.size / Math.max(1,nodeCount);
         }
-        const asDivOk = asDiv === undefined || asDiv >= 0.15; // at least 15% of nodes from unique AS (heuristic)
-        const orgDivOk = orgDiv === undefined || orgDiv >= 0.15; // same baseline
+        const divMin = Number.isFinite(opt.mixAsOrgDiversityMin) ? opt.mixAsOrgDiversityMin : 0.15;
+        const asDivOk = asDiv === undefined || asDiv >= divMin; // at least baseline unique AS
+        const orgDivOk = orgDiv === undefined || orgDiv >= divMin; // same baseline
         // VRF proofs validation: all provided proofs must be marked valid
         const vrfProofs = Array.isArray(mix.vrfProofs) ? mix.vrfProofs : [];
-  const vrfOk = vrfProofs.length === 0 || vrfProofs.every((p: any) => p.valid !== false && typeof p.proof === 'string');
+        // Placeholder cryptographic VRF verification hook (future real verification). For now treat p.valid === false as failure; otherwise require presence of proof string
+        const vrfOk = vrfProofs.length === 0 || vrfProofs.every((p: any) => p.valid !== false && typeof p.proof === 'string');
         // Beacon sources aggregated entropy (if provided)
         const beaconEntropy = mix.aggregatedBeaconEntropyBits;
-        const beaconOk = beaconEntropy === undefined || beaconEntropy >= 8; // aggregated randomness threshold
+        const beaconEntropyMin = Number.isFinite(opt.mixBeaconEntropyMinBits) ? opt.mixBeaconEntropyMinBits : 8;
+        let fetchedBeaconOk = true;
+        // Attempt lightweight beacon fetch if beaconSources includes an HTTP(S) URL and network enabled (best-effort, non-fatal)
+        if (Array.isArray(mix.beaconSources)) {
+          for (const src of mix.beaconSources) {
+            if (typeof src === 'string' && /^https?:/i.test(src)) {
+              try {
+                await (analyzer as any).attemptNetwork(src, 'GET', async () => null); // placeholder fetch
+              } catch { /* ignore network disabled or failure */ }
+            }
+          }
+        }
+        const beaconOk = beaconEntropy === undefined || beaconEntropy >= beaconEntropyMin;
         // Overall pass
-        passed = samples >= 5 && depthOk && uniquenessOk && diversityOk && reuseOk && entropyOk && asDivOk && orgDivOk && vrfOk && beaconOk && varianceOk && entropyConfidenceOk;
+        passed = samples >= minSamplesReq && depthOk && uniquenessOk && diversityOk && reuseOk && entropyOk && asDivOk && orgDivOk && vrfOk && beaconOk && varianceOk && entropyConfidenceOk && fetchedBeaconOk;
         const failReasons: string[] = [];
-        if (samples < 5) failReasons.push('insufficient samples');
+        if (samples < minSamplesReq) failReasons.push(`insufficient samples (<${minSamplesReq})`);
         if (!depthOk) failReasons.push('min hop depth');
         if (!uniquenessOk) failReasons.push(`uniqueness ${(ratio*100).toFixed(1)}% < ${(required*100)}%`);
-        if (!diversityOk) failReasons.push('diversityIdx low');
+        if (!diversityOk) failReasons.push(`diversityIdx ${(diversityIndex*100).toFixed(1)}% < ${(diversityIdxMin*100)}%`);
         if (!reuseOk) failReasons.push(`reuse before ${requiredUniqueBeforeReuse}`);
-        if (!entropyOk) failReasons.push(`entropy ${(entropyBits||0).toFixed(2)}<4`);
+        if (!entropyOk) failReasons.push(`entropy ${(entropyBits||0).toFixed(2)}<${entropyMin}`);
         if (!varianceOk) failReasons.push('path length variance abnormal');
-        if (!entropyConfidenceOk) failReasons.push('entropy confidence low');
-        if (!asDivOk) failReasons.push('AS diversity low');
-        if (!orgDivOk) failReasons.push('Org diversity low');
+        if (!entropyConfidenceOk) failReasons.push(`entropy confidence low (<${entropyConfidenceMin})`);
+        if (!asDivOk) failReasons.push(`AS diversity <${divMin}`);
+        if (!orgDivOk) failReasons.push(`Org diversity <${divMin}`);
         if (!vrfOk) failReasons.push('VRF proofs invalid');
-        if (!beaconOk) failReasons.push('beacon entropy low');
-        details = passed ? `✅ unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}% entropy=${(entropyBits||0).toFixed(2)} bits reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'}bits plStd=${pathLenStdDev ?? 'n/a'} ci95W=${ci95Width ?? 'n/a'} entConf=${entropyConfidence ?? 'n/a'}` :
-          `❌ Mix diversity issues: ${failReasons.join('; ')} unique=${unique}/${samples} minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}% entropy=${(entropyBits||0).toFixed(2)} reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'} plStd=${pathLenStdDev ?? 'n/a'} ci95W=${ci95Width ?? 'n/a'} entConf=${entropyConfidence ?? 'n/a'}`;
+        if (!beaconOk) failReasons.push(`beacon entropy ${(beaconEntropy ?? 0)}<${beaconEntropyMin}`);
+        // Wilson CI for uniqueness proportion (for transparency, not gating yet unless extremely low)
+        let uniqCI: [number, number] | undefined;
+        if (samples > 0) {
+          const z=1.96; const n=samples; const phat=ratio; const denom=1+ (z*z)/n; const center=phat+(z*z)/(2*n); const margin= z*Math.sqrt((phat*(1-phat)+(z*z)/(4*n))/n); uniqCI=[Math.max(0,(center-margin)/denom), Math.min(1,(center+margin)/denom)];
+        }
+        details = passed ? `✅ unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) CI95=${uniqCI?`[${(uniqCI[0]*100).toFixed(0)},${(uniqCI[1]*100).toFixed(0)}%]`:''} minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}% (min ${(diversityIdxMin*100).toFixed(0)}%) entropy=${(entropyBits||0).toFixed(2)}b (min ${entropyMin}) reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'}b (min ${beaconEntropyMin}) plStd=${pathLenStdDev ?? 'n/a'} ci95W=${ci95Width ?? 'n/a'} entConf=${entropyConfidence ?? 'n/a'} (min ${entropyConfidenceMin})` :
+          `❌ Mix diversity issues: ${failReasons.join('; ')} unique=${unique}/${samples} ${(ratio*100).toFixed(1)}% (req≥${(required*100)}%) minHop=${minLen} divIdx=${(diversityIndex*100).toFixed(1)}% entropy=${(entropyBits||0).toFixed(2)} reuseIdx=${firstReuseIndex ?? 'none'} asDiv=${asDiv?.toFixed?.(3)} orgDiv=${orgDiv?.toFixed?.(3)} vrfOk=${vrfOk} beaconH=${beaconEntropy ?? 'n/a'} plStd=${pathLenStdDev ?? 'n/a'} ci95W=${ci95Width ?? 'n/a'} entConf=${entropyConfidence ?? 'n/a'}`;
       }
       return { id: 17, name: 'Mix Diversity Sampling', description: 'Samples mix paths ensuring uniqueness ≥80% of samples & hop depth, entropy & AS/Org diversity & VRF/beacon integrity', passed, details, severity: 'major', evidenceType: mix ? 'dynamic-protocol' : 'heuristic' };
     }

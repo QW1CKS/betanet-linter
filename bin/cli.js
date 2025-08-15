@@ -86,6 +86,17 @@ program
   .option('--pow-window-max-drop <n>', 'Maximum allowed drop within any rolling window (default 3)', v => parseInt(v,10))
   .option('--rate-dispersion-max <n>', 'Maximum allowed rate-limit capacity dispersion ratio (default 100)', v => parseInt(v,10))
   .option('--rate-saturation-max <n>', 'Maximum allowed observed bucket saturation percent (default 98)', v => parseInt(v,10))
+  // Task 6 Caveat Resolution: configurable mix diversity thresholds
+  .option('--mix-min-samples <n>', 'Minimum mix path samples (default 5)', v => parseInt(v,10))
+  .option('--mix-uniqueness-base <f>', 'Base uniqueness requirement (default 0.8)', v => parseFloat(v))
+  .option('--mix-entropy-min-bits <n>', 'Minimum node entropy bits (default 4)', v => parseInt(v,10))
+  .option('--mix-beacon-entropy-min-bits <n>', 'Minimum aggregated beacon entropy bits (default 8)', v => parseInt(v,10))
+  .option('--mix-asorg-diversity-min <f>', 'Minimum AS/Org diversity ratio (default 0.15)', v => parseFloat(v))
+  .option('--mix-required-unique-before-reuse <n>', 'Unique hop sets required before reuse (default 8)', v => parseInt(v,10))
+  .option('--mix-diversity-index-min <f>', 'Minimum overall diversity index (default 0.4)', v => parseFloat(v))
+  .option('--mix-entropy-confidence-min <f>', 'Minimum entropy confidence (default 0.5)', v => parseFloat(v))
+  .option('--mix-pathlen-stddev-max-factor <f>', 'Max path length stddev factor vs mean (default 1.5)', v => parseFloat(v))
+  .option('--mix-ci95-width-max-factor <f>', 'Max path length CI95 width factor vs mean (default 1.2)', v => parseFloat(v))
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -150,6 +161,16 @@ program
   powWindowMaxDropBits: options.powWindowMaxDrop,
   rateDispersionMax: options.rateDispersionMax,
   rateSaturationMaxPct: options.rateSaturationMax
+  , mixMinSamples: options.mixMinSamples,
+  mixUniquenessBase: options.mixUniquenessBase,
+  mixEntropyMinBits: options.mixEntropyMinBits,
+  mixBeaconEntropyMinBits: options.mixBeaconEntropyMinBits,
+  mixAsOrgDiversityMin: options.mixAsorgDiversityMin || options.mixAsOrgDiversityMin,
+  mixRequiredUniqueBeforeReuse: options.mixRequiredUniqueBeforeReuse,
+  mixDiversityIndexMin: options.mixDiversityIndexMin,
+  mixEntropyConfidenceMin: options.mixEntropyConfidenceMin,
+  mixPathLenStdDevMaxFactor: options.mixPathlenStddevMaxFactor || options.mixPathLenStddevMaxFactor,
+  mixCI95WidthMaxFactor: options.mixCi95WidthMaxFactor || options.mixCI95WidthMaxFactor
       });
       
       if (options.sbom) {

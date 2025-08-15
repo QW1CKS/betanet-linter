@@ -27,6 +27,8 @@ A CLI tool that enforces the Betanet specification §11 requirements (1.0 baseli
 
 The evolving evidence schema covers: binary structural meta, static & dynamic ClientHello calibration (ALPN order, extension hash, JA3/JA3 hash placeholders), Noise pattern + rekey transcript, governance & ledger artifacts (CBOR quorum cert parsing, historical diversity analytics), bootstrap rotation + PoW evolution, multi‑bucket rate‑limit dispersion, statistical jitter distributions, fallback timing provenance, algorithm agility registry, voucher/FROST aggregated signature & payment subsystem, negative assertions & forbidden artifact hashes, build reproducibility & SLSA provenance (signer/materials policy), evidence authenticity & multi‑signal anti‑evasion.
 
+> Roadmap & Implementation History: See the comprehensive project evolution, task caveat resolutions, gap list (Definition A), and future enhancement backlog in the [ROADMAP.md](./ROADMAP.md) document.
+
 ### §11 → 39 Check Decomposition (Orientation)
 High‑level §11 item groups and their principal check IDs (non‑exhaustive; some groups have auxiliary defensive checks not listed for brevity):
 
@@ -106,6 +108,44 @@ Exit codes:
 ```
 
 JSON/YAML adds fields: `strictMode`, `allowHeuristic`, `heuristicContributionCount`.
+
+#### Mix Diversity & Entropy Configuration (Task 6 Caveat Resolution)
+The mix diversity sampling check (ID 17) now supports configurable thresholds to tailor uniqueness, entropy, diversity, and variance policies without code changes.
+
+Flags:
+```
+--mix-min-samples <n>                 # Minimum required samples (default 5)
+--mix-uniqueness-base <f>             # Base uniqueness proportion (default 0.8) with adaptive lowering on very small n
+--mix-entropy-min-bits <f>            # Minimum Shannon entropy bits across node occurrences (default 4)
+--mix-beacon-entropy-min-bits <f>     # Minimum aggregated external beacon entropy bits (default 8)
+--mix-as-org-diversity-min <f>        # Minimum AS/Org diversity index (default 0.15)
+--mix-required-unique-before-reuse <n># Hop set reuse not allowed before this many unique sets (default 8)
+--mix-diversity-index-min <f>         # Minimum overall diversityIndex (default 0.4)
+--mix-entropy-confidence-min <f>      # Minimum entropy confidence score when provided (default 0.5)
+--mix-pathlen-stddev-max-factor <f>   # Max allowed factor (σ ≤ factor·mean) for path length std dev (default 1.5)
+--mix-ci95-width-max-factor <f>       # Max allowed 95% CI width factor (width ≤ max(2, factor·mean)) (default 1.2)
+```
+
+Statistical transparency: The checker computes a Wilson 95% confidence interval for the uniqueness proportion and reports it in details (CI95=[L,U]%). Currently advisory (not gating unless uniqueness point estimate fails) enabling operators to monitor borderline diversity regressions.
+
+Example tightening uniqueness & entropy:
+```powershell
+betanet-lint check ./binary --mix-uniqueness-base 0.9 --mix-entropy-min-bits 5 --mix-diversity-index-min 0.5
+```
+
+Passing detail snippet:
+```
+✅ unique=18/20 90.0% (req≥90%) CI95=[78,97]% minHop=3 divIdx=52.0% (min 50%) entropy=5.22b (min 5) reuseIdx=none asDiv=0.210 orgDiv=0.195 vrfOk=true beaconH=12b
+```
+
+Failure (low entropy & early reuse):
+```
+❌ Mix diversity issues: entropy 3.11<5; reuse before 8 unique=14/20 70.0% (req≥90%) ...
+```
+
+Granular failure reasons enumerate exactly which metric breached policy (uniqueness, entropy, diversityIdx, AS/Org diversity, variance, beacon entropy, entropy confidence, reuse threshold).
+
+Roadmap note: Future enhancements may promote CI lower-bound gating, add bootstrap resampling for entropy confidence, and integrate real beacon (drand / NIST) & cryptographic VRF verification.
 
 ### Compliance Matrix (Normative Closure)
 | Spec §11 Item | Related Checks | Dominant Evidence Types | Status | Notes |

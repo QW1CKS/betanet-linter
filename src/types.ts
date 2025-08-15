@@ -232,6 +232,17 @@ export interface CheckOptions {
   powWindowMaxDropBits?: number; // maximum allowed drop within any rolling window (default 3)
   rateDispersionMax?: number; // maximum allowed capacity dispersion ratio (default 100)
   rateSaturationMaxPct?: number; // maximum allowed observed saturation percentage (default 98)
+  // Task 6 Caveat Resolution: configurable mix diversity thresholds
+  mixMinSamples?: number; // minimum required samples (default 5)
+  mixUniquenessBase?: number; // base uniqueness requirement for standard sample sizes (default 0.8)
+  mixEntropyMinBits?: number; // minimum node entropy bits (default 4)
+  mixBeaconEntropyMinBits?: number; // minimum aggregated beacon entropy (default 8)
+  mixAsOrgDiversityMin?: number; // minimum AS/Org diversity ratio (default 0.15)
+  mixRequiredUniqueBeforeReuse?: number; // required unique hop sets before reuse (default 8)
+  mixDiversityIndexMin?: number; // minimum overall diversity index (default 0.4)
+  mixEntropyConfidenceMin?: number; // minimum entropy confidence (default 0.5)
+  mixPathLenStdDevMaxFactor?: number; // maximum stddev factor vs mean (default 1.5)
+  mixCI95WidthMaxFactor?: number; // maximum CI95 width factor vs mean (default 1.2)
 }
 
 export interface SBOMOptions {
