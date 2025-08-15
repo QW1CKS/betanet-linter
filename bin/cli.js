@@ -97,6 +97,13 @@ program
   .option('--mix-entropy-confidence-min <f>', 'Minimum entropy confidence (default 0.5)', v => parseFloat(v))
   .option('--mix-pathlen-stddev-max-factor <f>', 'Max path length stddev factor vs mean (default 1.5)', v => parseFloat(v))
   .option('--mix-ci95-width-max-factor <f>', 'Max path length CI95 width factor vs mean (default 1.2)', v => parseFloat(v))
+  // Task 7 Caveat Resolution: ledger weight normalization & caps
+  .option('--ledger-weight-cap-pct <f>', 'Ledger signer weight cap percent (default 25)', v => parseFloat(v))
+  .option('--ledger-org-weight-cap-pct <f>', 'Ledger org aggregated weight cap percent (default 35)', v => parseFloat(v))
+  .option('--ledger-normalize-weights', 'Normalize signer weights prior to cap evaluation', false)
+  .option('--ledger-chain-rpc-file <path>', 'JSON mapping of chain name to RPC endpoint URL')
+  .option('--ledger-signer-org-map <path>', 'JSON mapping of signer id -> org id for refined duplicate detection')
+  .option('--ledger-rpc-timeout-ms <ms>', 'Per-chain RPC timeout in ms (default 2000)', v => parseInt(v,10))
   .option('-v, --verbose', 'Verbose output')
   .option('--format <format>', 'SBOM format (cyclonedx|cyclonedx-json|spdx|spdx-json)', 'cyclonedx')
   .option('--sbom-format <format>', '[DEPRECATED] SBOM format (use --format)', undefined)
@@ -171,6 +178,12 @@ program
   mixEntropyConfidenceMin: options.mixEntropyConfidenceMin,
   mixPathLenStdDevMaxFactor: options.mixPathlenStddevMaxFactor || options.mixPathLenStddevMaxFactor,
   mixCI95WidthMaxFactor: options.mixCi95WidthMaxFactor || options.mixCI95WidthMaxFactor
+  , ledgerWeightCapPct: options.ledgerWeightCapPct,
+  ledgerOrgWeightCapPct: options.ledgerOrgWeightCapPct,
+  ledgerNormalizeWeights: options.ledgerNormalizeWeights
+  , ledgerChainRpcFile: options.ledgerChainRpcFile,
+  ledgerSignerOrgMapFile: options.ledgerSignerOrgMap,
+  ledgerRpcTimeoutMs: options.ledgerRpcTimeoutMs
       });
       
       if (options.sbom) {

@@ -1,0 +1,55 @@
+{
+  "ledger": {
+    "finalitySets": [
+      "a",
+      "b"
+    ],
+    "quorumCertificatesValid": true,
+    "finalityDepth": 3,
+    "chains": [
+      {
+        "name": "chainA",
+        "finalityDepth": 3,
+        "weightSum": 50,
+        "epoch": 10,
+        "signatures": [
+          {
+            "signer": "sig1:ORG1",
+            "weight": 30,
+            "valid": true
+          },
+          {
+            "signer": "sig2:ORG2",
+            "weight": 20,
+            "valid": true
+          }
+        ]
+      },
+      {
+        "name": "chainB",
+        "finalityDepth": 3,
+        "weightSum": 50,
+        "epoch": 11,
+        "signatures": [
+          {
+            "signer": "sig3:ORG3",
+            "weight": 25,
+            "valid": true
+          },
+          {
+            "signer": "sig4:ORG4",
+            "weight": 25,
+            "valid": true
+          }
+        ]
+      }
+    ],
+    "signerAggregatedWeights": {
+      "sig1:ORG1": 30,
+      "sig2:ORG2": 20,
+      "sig3:ORG3": 25,
+      "sig4:ORG4": 25
+    },
+    "weightThresholdPct": 0.5
+  }
+}

@@ -307,6 +307,7 @@ The following additional items were identified as still incomplete for a strictl
   - New failure codes: CHAIN_FINALITY_DEPTH_SHORT, CHAIN_WEIGHT_THRESHOLD, EPOCH_NON_MONOTONIC, SIGNER_WEIGHT_INVALID, DUPLICATE_SIGNER, SIGNATURE_INVALID, SIGNATURE_COVERAGE_LOW, WEIGHT_CAP_EXCEEDED (in addition to FINALITY_DEPTH_SHORT, EMERGENCY_LIVENESS_SHORT, QUORUM_CERTS_INVALID, QUORUM_WEIGHT_MISMATCH).
   - Tests: Added positive extended pass and comprehensive multi-failure scenario exercising all new codes (`final-compliance-tasks.test.ts`).
   - Caveats (non-blocking): Real quorum certificate Ed25519 signature verification (placeholder validity flag), external chain RPC ingestion, refined duplicate signer/org detection, dynamic weight normalization & cap policy configuration.
+  - Caveats (non-blocking): External chain RPC ingestion (live per-chain finality & liveness sampling), refined duplicate signer/org detection (org-level correlation & alias resolution), dynamic weight normalization & cap policy configuration (adaptive weighting + configurable cap tuning).
 8. [x] Voucher Aggregated Signature (FROST) Cryptographic Verification
   - Implemented: Check 31 enforces FROST threshold (n≥5, t=3), keyset/key presence, aggregated signature validity flag; evidence schema `voucherCrypto` extended (publicKeysB64, aggregatedPublicKeyB64, sigAlgorithm, verificationMode, signatureComputedValid). Negative tests exercise FROST_PARAMS_INVALID, AGG_SIG_INVALID, INSUFFICIENT_KEYS.
   - Remaining future (non-blocking) enhancement: real FROST aggregated Ed25519 verification (current path uses structured/static validation + placeholder), keysetId derivation cross-check & malformed length fuzz cases.
@@ -455,7 +456,7 @@ These items are the frozen, additive gap set required to elevate from “Roadmap
 8. [ ] FROST Aggregate Signature Real Math & Keyset ID Cross-Check
   - Implement true FROST aggregated Ed25519 verification (nonce commitments, participant set) and recompute keysetId = SHA256(sorted pubkeys); fail on mismatch or malformed aggregation.
 9. [ ] Alias Ledger Finality via Chain RPC & Reorg Handling
-  - Query real chains for finality depth; detect reorgs; validate that payload hash achieves 2-of-3 finality with correct per-chain depths rather than relying on provided flags.
+  - (Scaffold Landed) External RPC endpoint ingestion + timeout + preliminary depth mismatch/unreachable failure codes (CHAIN_RPC_DEPTH_MISMATCH, CHAIN_RPC_UNREACHABLE) integrated in Check 16 (Task 7). Remaining: real depth consensus, reorg detection window, independent finality recomputation replacing provided flags.
 10. [ ] Emergency Advance Liveness Dataset Verification
   - Independently derive ≥14-day absence of 2-of-3 finality using historical chain observations before permitting emergency advance acceptance.
 11. [ ] Governance Path Diversity via Multi-Path Active Probing

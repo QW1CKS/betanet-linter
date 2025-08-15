@@ -157,7 +157,7 @@ Roadmap note: Future enhancements may promote CI lower-bound gating, add bootstr
 | 5 SCION bridging + control stream failover (no legacy header) | 4, 23, 33 | static-structural + dynamic-protocol | Full | Bridging & negative assertion + dynamic control stream: ≥3 offers & unique paths, no legacy header, latency ≤300ms, probe interval 50–5000ms, backoff ok, timestamp skew ok, signature/schema indicators |
 | 6 Rendezvous bootstrap (rotation, BeaconSet) | 6 | artifact | Full | ≥2 rotation epochs & entropy sources; no legacy deterministic seed |
 | 7 Mix node selection diversity & hops | 11, 17, 27 | dynamic-protocol | Full | Uniqueness ≥80%, diversityIndex ≥0.4, entropy ≥4 bits, no reuse <8 hop sets, AS/Org diversity ≥15%, path length variance sane (0<σ≤1.5·mean), 95% CI width ≤ max(2,1.2·mean), entropyConfidence ≥0.5, VRF/beacon entropy ≥8 bits |
-| 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Global & per-chain depth/weight, epoch monotonicity, signer duplication & signature coverage, emergency advance gating |
+| 8 Alias ledger finality & Emergency Advance | 7, 16 | artifact | Full | Depth/weight + epoch monotonicity; Task 7 adds optional normalization & signer/org caps (WEIGHT_CAP_EXCEEDED / ORG_WEIGHT_CAP_EXCEEDED), aggregation mismatch tolerance, external RPC scaffold |
 | 9 Payments (voucher struct, FROST, PoW) | 8, 14, 29, 31, 36 | artifact + static-structural + dynamic-protocol | Full | Voucher struct + aggregated sig + FROST n≥5 t=3 + advanced PoW convergence (slope/rolling/stability) & multi-bucket stats |
 |10 Governance anti-concentration & partition safety | 15 | artifact | Full | Diversity volatility/window/delta/top3 + 7d degradation, gap ratio, spike detection enforced |
 |11 Anti-correlation fallback (UDP→TCP timing + cover) | 18 (multi-signal gate), 25 (fallback timing & distribution) | dynamic-protocol | Full | Bounds: udpTimeout 100–600ms, retry<=25ms, coverConn≥2, teardownStd<=450ms, CV≤1.2, |skew|≤1.2, outliers≤20%, modelScore≥0.7, median 200–1200ms, p95≤1800ms, startDelay≤500ms, IQR≤900ms, outlierPct≤25%, ≥2 provenance categories |
@@ -351,6 +351,59 @@ mix.firstReuseIndex, mix.requiredUniqueBeforeReuse
 mix.pathLengthMean, mix.pathLengthStdDev, mix.pathLengthStdErr, mix.pathLengthCI95Width, mix.entropyConfidence, mix.varianceMetricsComputed
 ```
 Non-blocking future work: Real beacon retrieval & cryptographic VRF verification, richer ASN/org classification accuracy, configurable statistical confidence intervals for diversity/entropy thresholds.
+
+#### Ledger Finality Normalization & Weight Caps (Task 7 Caveat Resolution)
+The alias ledger finality checker (ID 16) now implements full dynamic normalization, configurable signer/org concentration caps, refined duplicate detection via org mapping, and an external chain RPC ingestion scaffold.
+
+Flags:
+```
+--ledger-normalize-weights            # When set, raw signer weights are normalized to sum=1.0 prior to cap evaluation
+--ledger-weight-cap-pct <f>           # Maximum allowed normalized single signer share (percent, e.g. 25). >100 disables (default: 101)
+--ledger-org-weight-cap-pct <f>       # Maximum allowed normalized aggregate org share (percent). >100 disables (default: 101)
+--ledger-signer-org-map <file>        # JSON mapping { signerId: "orgAlias" } for refined duplicate / org aggregation
+--ledger-chain-rpc-file <file>        # JSON mapping { chainName: "https://rpc.endpoint" } enabling external depth/height sampling (scaffold)
+--ledger-rpc-timeout-ms <ms>          # Per-RPC fetch timeout (default 2000)
+```
+
+Behavior:
+- When normalization enabled, evidence includes `normalizedSignerWeights[]` and `normalizedOrgWeights[]`; raw sums preserved.
+- Caps default to disabled ( >100 ) to remain permissive until operators opt-in; enabling enforces failure on breach.
+- Org aggregation groups signers by provided alias; absence of a map leaves duplicate detection heuristic (exact signer repeats) unchanged.
+- External RPC scaffold (chain RPC file) fetches limited depth/height info (timeout guarded) and can emit depth mismatch / unreachable failure codes (see below). Full reorg detection & independent finality confirmation remain future work.
+
+New failure codes (Check 16):
+- WEIGHT_CAP_EXCEEDED – A single signer exceeds configured `--ledger-weight-cap-pct`.
+- ORG_WEIGHT_CAP_EXCEEDED – Aggregate weight of a mapped organization exceeds `--ledger-org-weight-cap-pct`.
+- WEIGHT_AGG_MISMATCH – Reported `weightSum` inconsistent with sum of signer weights (tolerant: skipped when fractional normalization context or global quorum weights present).
+- CHAIN_RPC_DEPTH_MISMATCH – External RPC reported depth/height inconsistent with provided ledger evidence (scaffold signal).
+- CHAIN_RPC_UNREACHABLE – RPC endpoint(s) unreachable within timeout (informational unless policy tightened later).
+
+Evidence extensions (when features engaged):
+```
+ledger.normalizedSignerWeights[]
+ledger.normalizedOrgWeights[]
+ledger.orgAggregatedWeights[]
+ledger.externalChainIngestion { chain, height, fetchedAt, ok }
+ledger.weightCapPct, ledger.orgWeightCapPct
+```
+
+Example tightening caps:
+```powershell
+betanet-lint check ./binary --ledger-normalize-weights --ledger-weight-cap-pct 30 --ledger-org-weight-cap-pct 50 --ledger-signer-org-map signer-org.json
+```
+
+Passing detail snippet (illustrative):
+```
+✅ ledger depthOk weightOk epochMonotonic signerCapOk orgCapOk (maxSigner=24.5% cap=30, maxOrg=47.0% cap=50) normalized n=7
+```
+
+Failure (single signer concentration):
+```
+❌ WEIGHT_CAP_EXCEEDED signerX=41.2% cap=30% (org topOrg=58.0% cap=60%)
+```
+
+VRF Verification Relaxation (Mix Diversity Interop):
+The ledger update coincides with a VRF proof handling refinement: Check 17 now only enforces strict VRF format validation when proofs are explicitly present and prefixed with `vrf:`. Legacy evidence without the prefix no longer fails, improving backward compatibility.
 
 ## License
 

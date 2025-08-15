@@ -243,6 +243,13 @@ export interface CheckOptions {
   mixEntropyConfidenceMin?: number; // minimum entropy confidence (default 0.5)
   mixPathLenStdDevMaxFactor?: number; // maximum stddev factor vs mean (default 1.5)
   mixCI95WidthMaxFactor?: number; // maximum CI95 width factor vs mean (default 1.2)
+  // Task 7 Caveat Resolution (partial): ledger normalization & caps
+  ledgerWeightCapPct?: number; // maximum allowed normalized signer weight share (default 0.25)
+  ledgerOrgWeightCapPct?: number; // maximum allowed normalized org weight share (default 0.35)
+  ledgerNormalizeWeights?: boolean; // if true, normalize signer weights before cap evaluation
+  ledgerChainRpcFile?: string; // path to JSON mapping chain name -> RPC endpoint (supports inline: URI)
+  ledgerSignerOrgMapFile?: string; // path to JSON mapping signer -> org alias (refined duplicate detection)
+  ledgerRpcTimeoutMs?: number; // timeout per RPC fetch (ms)
 }
 
 export interface SBOMOptions {
@@ -394,6 +401,16 @@ export interface IngestedEvidence {
   quorumSignatureStats?: { total: number; valid: number; invalid: number; mode: string };
   signerAggregatedWeights?: Record<string, number>; // aggregated weight across chains
   weightAggregationMismatch?: boolean; // flag when declared weightSum differs from aggregated signer weights
+  // Task 7 caveat resolution scaffolding fields
+  normalizedWeightsApplied?: boolean; // true when normalization performed
+  normalizedSignerWeights?: Record<string, number>; // normalized weight share per signer (0-1)
+  weightCapPct?: number; // policy weight cap used
+  orgWeightCapPct?: number; // policy org weight cap used
+  signerOrgMap?: Record<string, string>; // mapping signer -> org identifier
+  orgAggregatedWeights?: Record<string, number>; // aggregated raw weights per org
+  normalizedOrgWeights?: Record<string, number>; // normalized org weight shares
+  orgWeightCapExceeded?: boolean; // org-level cap breach
+  externalChainIngestion?: { attempted: boolean; successCount: number; failures?: { chain: string; error: string }[] }; // external RPC fetch summary
   };
   governanceHistoricalDiversity?: {
     // Time-series of AS share distributions: array of { timestamp, asShares: { [as: string]: number } }
